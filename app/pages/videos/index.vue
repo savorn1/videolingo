@@ -9,6 +9,7 @@
         <UInput v-model="search" placeholder="Search title or description" icon="i-lucide-search" class="w-64" />
         <USelect v-if="!filter.deleted" v-model="filter.enabled" :items="statusFilterOptions" placeholder="Status" class="w-36" />
         <USelect v-model="filter.language" :items="languageFilterOptions" placeholder="Language" class="w-40" />
+        <USelect v-model="filter.categoryId" :items="categoryFilterOptions" placeholder="Category" class="w-44" />
         <USelectMenu
           v-model="filter.ownerId"
           :items="ownerFilterOptions"
@@ -62,6 +63,9 @@
             <div class="min-w-0">
               <p class="font-semibold text-gray-900 dark:text-white truncate" :title="row.title">{{ row.title }}</p>
               <p v-if="row.description" class="text-xs text-gray-500 dark:text-gray-400 truncate">{{ row.description }}</p>
+              <div v-if="row.categories.length" class="flex flex-wrap gap-1 mt-1">
+                <CategoryBadge v-for="c in row.categories" :key="c.id" :name="c.name" :color="c.color" :enabled="c.enabled" />
+              </div>
             </div>
           </div>
         </template>
@@ -153,6 +157,7 @@ const filter = reactive<{
   deleted: boolean
   enabled: boolean | undefined
   language: string | undefined
+  categoryId: number | undefined
   ownerId: number | undefined
   createdFrom: string | undefined
   createdTo: string | undefined
@@ -160,6 +165,7 @@ const filter = reactive<{
   deleted: false,
   enabled: undefined,
   language: undefined,
+  categoryId: undefined,
   ownerId: undefined,
   createdFrom: undefined,
   createdTo: undefined
@@ -191,6 +197,11 @@ const statusFilterOptions = [
   { label: 'Disabled', value: false }
 ]
 const languageFilterOptions = computed(() => [{ label: 'All languages', value: undefined }, ...languageOptions(filter.language)])
+// All categories (disabled ones too — filtering by them is still useful).
+const categoryFilterOptions = computed(() => [
+  { label: 'All categories', value: undefined },
+  ...categoryCatalog().map((c) => ({ label: c.enabled ? c.name : `${c.name} (disabled)`, value: c.id }))
+])
 
 // Owner choices come from the user list; fine at this app's scale (see size).
 const owners = ref<{ id: number; username: string }[]>([])
@@ -238,6 +249,7 @@ async function load() {
       deleted: filter.deleted,
       enabled: filter.enabled,
       language: filter.language,
+      categoryId: filter.categoryId,
       ownerId: filter.ownerId,
       createdFrom: filter.createdFrom || undefined,
       createdTo: filter.createdTo || undefined,
@@ -275,6 +287,7 @@ const hasActiveFilter = computed(
     search.value !== '' ||
     filter.enabled !== undefined ||
     filter.language !== undefined ||
+    filter.categoryId !== undefined ||
     filter.ownerId !== undefined ||
     !!filter.createdFrom ||
     !!filter.createdTo
@@ -285,6 +298,7 @@ function clearFilters() {
   debouncedSearch.value = ''
   filter.enabled = undefined
   filter.language = undefined
+  filter.categoryId = undefined
   filter.ownerId = undefined
   filter.createdFrom = undefined
   filter.createdTo = undefined

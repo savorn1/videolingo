@@ -97,7 +97,9 @@ const items = computed<SidebarItem[]>(() => [
           defaultOpen: true,
           children: [
             { label: 'Videos', to: '/videos', icon: 'i-lucide-video' },
+            { label: 'Categories', to: '/categories', icon: 'i-lucide-folder-tree' },
             { label: 'Transcripts', to: '/transcripts', icon: 'i-lucide-captions' },
+            { label: 'Subtitles', to: '/subtitles', icon: 'i-lucide-subtitles' },
             { label: 'Processing jobs', to: '/processing-jobs', icon: 'i-lucide-cpu' }
           ]
         },
@@ -106,7 +108,10 @@ const items = computed<SidebarItem[]>(() => [
           icon: 'i-lucide-shield',
           color: 'rose',
           defaultOpen: true,
-          children: [{ label: 'Users', to: '/users', icon: 'i-lucide-users' }]
+          children: [
+            { label: 'Users', to: '/users', icon: 'i-lucide-users' },
+            { label: 'Languages', to: '/languages', icon: 'i-lucide-languages' }
+          ]
         }
       ]
     : [])

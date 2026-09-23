@@ -42,7 +42,15 @@ const fields = computed<FieldDef[]>(() => [
     type: 'combobox',
     options: [{ label: 'Not set', value: undefined }, ...languageOptions(props.video?.language)]
   },
-  { name: 'thumbnailUrl', label: 'Thumbnail URL', type: 'url', placeholder: 'https://…' }
+  { name: 'thumbnailUrl', label: 'Thumbnail URL', type: 'url', placeholder: 'https://…' },
+  {
+    name: 'categoryIds',
+    label: 'Categories',
+    type: 'multiselect',
+    options: categoryOptions(props.video?.categories.map((c) => c.id) ?? []),
+    placeholder: categoryCatalog().length ? 'Choose categories' : 'No categories yet — add some under Categories',
+    wrapper: 'full'
+  }
 ])
 
 // Refill from the target each time the modal opens, so a previous video's
@@ -53,7 +61,8 @@ watch(open, (value) => {
     title: props.video.title,
     description: props.video.description ?? '',
     language: props.video.language ?? undefined,
-    thumbnailUrl: props.video.thumbnailUrl ?? ''
+    thumbnailUrl: props.video.thumbnailUrl ?? '',
+    categoryIds: props.video.categories.map((c) => c.id)
   }
   error.value = ''
 })
@@ -68,7 +77,8 @@ async function onSubmit(values: Record<string, any>) {
       title: values.title?.trim(),
       description: values.description || undefined,
       language: values.language || undefined,
-      thumbnailUrl: values.thumbnailUrl || undefined
+      thumbnailUrl: values.thumbnailUrl || undefined,
+      categoryIds: values.categoryIds ?? []
     })
     toast.add({ title: 'Video updated', color: 'success' })
     open.value = false

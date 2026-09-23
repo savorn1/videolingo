@@ -128,8 +128,9 @@ async function loadVideos() {
 watch(videoId, async (id) => {
   takenLanguages.value = []
   if (!id) return
-  // Default to the video's spoken language — the usual first transcript.
-  const spoken = selectedVideo.value?.language ?? undefined
+  // Default to the video's spoken language — the usual first transcript —
+  // or the platform default when the video has none set.
+  const spoken = selectedVideo.value?.language ?? defaultLanguageCode()
   try {
     takenLanguages.value = (await listTranscripts({ videoId: id, size: 100 })).data.map((t) => t.language)
   } catch {

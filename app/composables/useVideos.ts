@@ -28,6 +28,8 @@ export interface Video {
   createdAt: string | null
   updatedAt: string | null
   viewCount: number
+  /** Display order (category sortOrder, then name). */
+  categories: { id: number; name: string; color: string | null; enabled: boolean }[]
 }
 
 export interface VideoFilter {
@@ -36,6 +38,7 @@ export interface VideoFilter {
   ownerId?: number
   language?: string
   enabled?: boolean
+  categoryId?: number
   /** false (default) = live videos, true = trash. */
   deleted?: boolean
   /** yyyy-mm-dd, inclusive. */
@@ -52,6 +55,8 @@ export interface UpdateVideoPayload {
   description?: string
   language?: string
   thumbnailUrl?: string
+  /** Replaces the video's categories; omit to leave them unchanged. */
+  categoryIds?: number[]
 }
 
 export interface VideoStatistics {

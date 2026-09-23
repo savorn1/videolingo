@@ -66,6 +66,7 @@ export type FieldType =
   | 'url'
   | 'select'
   | 'combobox'
+  | 'multiselect'
   | 'radio'
   | 'checkbox'
   | 'switch'
@@ -100,7 +101,7 @@ export interface FieldDef {
   required?: boolean
   disabled?: boolean
   readonly?: boolean
-  /** select / combobox / radio choices. combobox is a select with a search box — use it for long option lists. */
+  /** select / combobox / multiselect / radio choices. combobox is a select with a search box — use it for long option lists; multiselect picks several (value is an array). */
   options?: FieldOption[]
   /** number / date constraints. */
   min?: number | string

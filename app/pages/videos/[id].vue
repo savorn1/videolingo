@@ -3,6 +3,7 @@
     <PageHeader :title="video?.title ?? 'Video'" :crumbs="[{ label: 'Videos', to: '/videos' }, { label: video?.title ?? '…' }]">
       <template v-if="video" #actions>
         <UButton color="neutral" variant="soft" icon="i-lucide-captions" :to="`/transcripts?videoId=${video.id}`">Transcripts</UButton>
+        <UButton color="neutral" variant="soft" icon="i-lucide-subtitles" :to="`/subtitles?videoId=${video.id}`">Subtitles</UButton>
         <UButton color="neutral" variant="soft" icon="i-lucide-cpu" :to="`/processing-jobs?videoId=${video.id}`">Processing jobs</UButton>
         <template v-if="video.deleted">
           <UButton color="success" variant="soft" icon="i-lucide-rotate-ccw" :loading="busy" @click="onRestore">Restore</UButton>
@@ -75,6 +76,7 @@
               <UBadge v-if="video.deleted" color="error" variant="subtle">In trash</UBadge>
               <UBadge v-else :color="video.enabled ? 'success' : 'warning'" variant="subtle">{{ video.enabled ? 'Enabled' : 'Disabled' }}</UBadge>
               <UBadge v-if="video.language" color="neutral" variant="subtle" icon="i-lucide-languages">{{ languageLabel(video.language) }}</UBadge>
+              <CategoryBadge v-for="c in video.categories" :key="c.id" :name="c.name" :color="c.color" :enabled="c.enabled" />
             </div>
             <div v-for="item in summary" :key="item.label" class="flex justify-between gap-4">
               <dt class="text-gray-500 dark:text-gray-400">{{ item.label }}</dt>
