@@ -1,0 +1,14 @@
+{
+  // https://nuxt.com/docs/guide/concepts/typescript
+  //
+  // Deliberately a plain `extends`, not TS project `references`: the four
+  // per-environment configs Nuxt generates under .nuxt/ (app/server/shared/node)
+  // all set `noEmit: true`, and TS forbids referencing a project that disables
+  // emit (TS6310) — `references` also requires each referenced project to set
+  // `composite: true`, which itself conflicts with `noEmit`. `.nuxt/tsconfig.json`
+  // is Nuxt's single combined config covering app+shared+root config files, and
+  // extending it (rather than referencing the split configs) sidesteps both
+  // conflicts entirely. vitest.config.ts/vitest.setup.ts are added to its
+  // `include` via `typescript.tsConfig` in nuxt.config.ts.
+  "extends": "./.nuxt/tsconfig.json"
+}
