@@ -1,5 +1,5 @@
-// Starting readability rules for a new track, mirroring SubtitleRules.defaultsFor
-// on the backend (CJK text uses shorter, slower lines).
+// Starting readability rules for a new track — Settings › Translation on the
+// backend (compact scripts such as Japanese/Chinese use shorter, slower lines).
 import type { SubtitleRules } from './subtitleQuality'
 
 // Keep these object literals multi-line: the auto-import scanner misreads a
@@ -21,7 +21,19 @@ export const CJK_SUBTITLE_RULES: SubtitleRules = {
   maxCps: 9
 }
 
+// Replaced at runtime by Settings › Translation (see plugins/settings.client.ts);
+// the constants above are the fallback until that loads.
+let standard: SubtitleRules = DEFAULT_SUBTITLE_RULES
+let compact: SubtitleRules = CJK_SUBTITLE_RULES
+let compactLanguages: string[] = ['ja', 'zh']
+
+export function setSubtitleRuleDefaults(next: { standardRules: SubtitleRules; compactRules: SubtitleRules; compactLanguages: string[] }) {
+  standard = { ...next.standardRules }
+  compact = { ...next.compactRules }
+  compactLanguages = next.compactLanguages.map((c) => c.toLowerCase())
+}
+
 export function defaultSubtitleRules(language: string | null | undefined): SubtitleRules {
   const primary = (language ?? '').split('-')[0]!.toLowerCase()
-  return { ...(primary === 'ja' || primary === 'zh' ? CJK_SUBTITLE_RULES : DEFAULT_SUBTITLE_RULES) }
+  return { ...(compactLanguages.includes(primary) ? compact : standard) }
 }

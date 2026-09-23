@@ -11,7 +11,17 @@
         <USelect v-model="filter.language" :items="languageFilterOptions" placeholder="Language" class="w-40" />
         <USelect v-model="filter.categoryId" :items="categoryFilterOptions" placeholder="Category" class="w-44" />
         <USelectMenu
+          v-model="filter.tagId"
+          :items="tagFilterOptions"
+          value-key="value"
+          placeholder="Tag"
+          :search-input="{ placeholder: 'Search tags…' }"
+          class="w-40"
+          aria-label="Tag"
+        />
+        <USelectMenu
           v-model="filter.ownerId"
+          aria-label="Owner"
           :items="ownerFilterOptions"
           value-key="value"
           placeholder="Owner"
@@ -63,8 +73,10 @@
             <div class="min-w-0">
               <p class="font-semibold text-gray-900 dark:text-white truncate" :title="row.title">{{ row.title }}</p>
               <p v-if="row.description" class="text-xs text-gray-500 dark:text-gray-400 truncate">{{ row.description }}</p>
-              <div v-if="row.categories.length" class="flex flex-wrap gap-1 mt-1">
+              <div v-if="row.categories.length || row.tags.length" class="flex flex-wrap gap-1 mt-1">
                 <CategoryBadge v-for="c in row.categories" :key="c.id" :name="c.name" :color="c.color" :enabled="c.enabled" />
+                <TagChip v-for="t in row.tags.slice(0, 4)" :key="t.id" :name="t.name" />
+                <span v-if="row.tags.length > 4" class="text-xs text-gray-400">+{{ row.tags.length - 4 }}</span>
               </div>
             </div>
           </div>
@@ -142,6 +154,7 @@ definePageMeta({ middleware: 'admin' })
 
 const { list, updateStatus, remove, restore } = useVideos()
 const { list: listUsers } = useUsers()
+const { list: listTags } = useTags()
 const toast = useToast()
 
 const rows = ref<Video[]>([])
@@ -158,6 +171,7 @@ const filter = reactive<{
   enabled: boolean | undefined
   language: string | undefined
   categoryId: number | undefined
+  tagId: number | undefined
   ownerId: number | undefined
   createdFrom: string | undefined
   createdTo: string | undefined
@@ -166,6 +180,7 @@ const filter = reactive<{
   enabled: undefined,
   language: undefined,
   categoryId: undefined,
+  tagId: undefined,
   ownerId: undefined,
   createdFrom: undefined,
   createdTo: undefined
@@ -197,6 +212,18 @@ const statusFilterOptions = [
   { label: 'Disabled', value: false }
 ]
 const languageFilterOptions = computed(() => [{ label: 'All languages', value: undefined }, ...languageOptions(filter.language)])
+// Tag filter options: the 200 most relevant tags by name — enough for a picker;
+// a deep link (?tagId=) to any other tag still filters correctly.
+const tags = ref<{ id: number; name: string }[]>([])
+const tagFilterOptions = computed(() => [{ label: 'All tags', value: undefined }, ...tags.value.map((t) => ({ label: `#${t.name}`, value: t.id }))])
+async function loadTags() {
+  try {
+    tags.value = (await listTags({ size: 200, sortBy: 'name', sortOrder: 'asc' })).data
+  } catch {
+    tags.value = []
+  }
+}
+
 // All categories (disabled ones too — filtering by them is still useful).
 const categoryFilterOptions = computed(() => [
   { label: 'All categories', value: undefined },
@@ -250,6 +277,7 @@ async function load() {
       enabled: filter.enabled,
       language: filter.language,
       categoryId: filter.categoryId,
+      tagId: filter.tagId,
       ownerId: filter.ownerId,
       createdFrom: filter.createdFrom || undefined,
       createdTo: filter.createdTo || undefined,
@@ -288,6 +316,7 @@ const hasActiveFilter = computed(
     filter.enabled !== undefined ||
     filter.language !== undefined ||
     filter.categoryId !== undefined ||
+    filter.tagId !== undefined ||
     filter.ownerId !== undefined ||
     !!filter.createdFrom ||
     !!filter.createdTo
@@ -299,6 +328,7 @@ function clearFilters() {
   filter.enabled = undefined
   filter.language = undefined
   filter.categoryId = undefined
+  filter.tagId = undefined
   filter.ownerId = undefined
   filter.createdFrom = undefined
   filter.createdTo = undefined
@@ -306,6 +336,7 @@ function clearFilters() {
 
 onMounted(() => {
   loadOwners()
+  loadTags()
   load()
 })
 

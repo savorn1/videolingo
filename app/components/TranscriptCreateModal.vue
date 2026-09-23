@@ -6,6 +6,7 @@
           <UFormField label="Video" required>
             <USelectMenu
               v-model="videoId"
+              aria-label="Video"
               :items="videoOptions"
               value-key="value"
               placeholder="Choose a video"
@@ -15,7 +16,7 @@
             />
           </UFormField>
           <UFormField label="Language" required :hint="languageHint">
-            <USelectMenu v-model="language" :items="languageItems" value-key="value" placeholder="Choose a language" class="w-full" />
+            <USelectMenu v-model="language" aria-label="Language" :items="languageItems" value-key="value" placeholder="Choose a language" class="w-full" />
           </UFormField>
         </div>
 
@@ -105,13 +106,19 @@ const takenLanguages = ref<string[]>([])
 
 const videoOptions = computed(() => videos.value.map((v) => ({ label: v.title, value: v.id })))
 const selectedVideo = computed(() => videos.value.find((v) => v.id === videoId.value))
-const languageItems = computed(() =>
-  languageOptions(language.value).map((o) => ({
+// Settings › Translation's suggested languages are listed first.
+const { settings: clientSettings } = useClientSettings()
+const suggested = computed(() => clientSettings.value?.defaultTargetLanguages ?? [])
+const languageItems = computed(() => {
+  const items = languageOptions(language.value).map((o) => ({
     ...o,
-    label: o.value === selectedVideo.value?.language ? `${o.label} (spoken)` : o.label,
+    label:
+      o.value === selectedVideo.value?.language ? `${o.label} (spoken)` : o.value && suggested.value.includes(o.value) ? `${o.label} (suggested)` : o.label,
     disabled: !!o.value && takenLanguages.value.includes(o.value)
   }))
-)
+  const rank = (v: string | undefined) => (v === selectedVideo.value?.language ? 0 : v && suggested.value.includes(v) ? 1 : 2)
+  return items.sort((a, b) => rank(a.value) - rank(b.value))
+})
 const languageHint = computed(() => (takenLanguages.value.length ? `Already has: ${takenLanguages.value.map(languageLabel).join(', ')}` : undefined))
 
 async function loadVideos() {

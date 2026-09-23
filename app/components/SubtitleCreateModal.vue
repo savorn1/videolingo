@@ -5,6 +5,7 @@
         <UFormField label="Video" required>
           <USelectMenu
             v-model="videoId"
+            aria-label="Video"
             :items="videoOptions"
             value-key="value"
             placeholder="Choose a video"
@@ -38,18 +39,32 @@
           >
             <UIcon name="i-lucide-file-up" class="w-6 h-6 text-gray-400" />
             <span class="text-sm font-semibold text-gray-700 dark:text-gray-200">{{ file?.name ?? 'Choose a .srt or .vtt file' }}</span>
-            <span class="text-xs text-gray-500">UTF-8, up to 5 MB</span>
+            <span class="text-xs text-gray-500">UTF-8, up to {{ maxFileMb }} MB</span>
             <input type="file" accept=".srt,.vtt,text/vtt,application/x-subrip" class="sr-only" @change="onFile" />
           </label>
           <UFormField label="Language" required>
-            <USelectMenu v-model="language" :items="languageOptions(language)" value-key="value" placeholder="Choose a language" class="w-full" />
+            <USelectMenu
+              v-model="language"
+              aria-label="Language"
+              :items="languageOptions(language)"
+              value-key="value"
+              placeholder="Choose a language"
+              class="w-full"
+            />
           </UFormField>
         </template>
 
         <!-- Empty -->
         <template v-else>
           <UFormField label="Language" required>
-            <USelectMenu v-model="language" :items="languageOptions(language)" value-key="value" placeholder="Choose a language" class="w-full" />
+            <USelectMenu
+              v-model="language"
+              aria-label="Language"
+              :items="languageOptions(language)"
+              value-key="value"
+              placeholder="Choose a language"
+              class="w-full"
+            />
           </UFormField>
           <p class="text-sm text-gray-500 dark:text-gray-400">Creates an empty track to fill in with the cue editor.</p>
         </template>
@@ -88,7 +103,9 @@ const { list: listVideos } = useVideos()
 const { list: listTranscripts } = useTranscripts()
 const { create, upload } = useSubtitles()
 
-const MAX_FILE_BYTES = 5 * 1024 * 1024
+// Settings › Storage (the backend enforces the same cap).
+const { settings: clientSettings } = useClientSettings()
+const maxFileMb = computed(() => clientSettings.value?.maxSubtitleUploadMb ?? 5)
 
 const modeItems = [
   { label: 'From transcript', value: 'transcript', icon: 'i-lucide-captions' },
@@ -164,8 +181,8 @@ const file = ref<File | null>(null)
 function onFile(event: Event) {
   const picked = (event.target as HTMLInputElement).files?.[0] ?? null
   error.value = ''
-  if (picked && picked.size > MAX_FILE_BYTES) {
-    error.value = 'That file is larger than 5 MB'
+  if (picked && picked.size > maxFileMb.value * 1024 * 1024) {
+    error.value = `That file is larger than ${maxFileMb.value} MB`
     file.value = null
     return
   }

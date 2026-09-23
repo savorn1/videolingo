@@ -16,7 +16,7 @@
           <span class="flex items-center justify-center w-8 h-8 rounded-lg bg-primary-500 text-white shrink-0">
             <UIcon name="i-lucide-languages" class="w-4 h-4" />
           </span>
-          <span v-if="!collapsed" class="font-bold text-gray-900 dark:text-white tracking-tight"> VideoLingo </span>
+          <span v-if="!collapsed" class="font-bold text-gray-900 dark:text-white tracking-tight truncate">{{ siteName }}</span>
         </NuxtLink>
       </template>
 
@@ -38,6 +38,7 @@
 
           <template #right>
             <UDashboardSearchButton />
+            <InboxBell />
             <UColorModeButton />
             <UDropdownMenu :items="profileItems" :content="{ align: 'end' }" :ui="{ content: 'w-56' }">
               <UButton size="sm" color="neutral" variant="ghost" trailing-icon="i-lucide-chevron-down">
@@ -65,6 +66,10 @@ import type { BreadcrumbItem, DropdownMenuItem } from '@nuxt/ui'
 import type { SidebarItem } from '~/components/SidebarNav.vue'
 
 const { username, role, hasAnyAccess, logout } = useAuth()
+// Settings › General
+const { settings: clientSettings } = useClientSettings()
+const siteName = computed(() => clientSettings.value?.siteName || 'VideoLingo')
+useHead({ title: siteName })
 const route = useRoute()
 
 const profileItems = computed<DropdownMenuItem[][]>(() => [
@@ -87,6 +92,7 @@ const profileItems = computed<DropdownMenuItem[][]>(() => [
 // in SidebarNav (header icon, active-item background/border).
 const items = computed<SidebarItem[]>(() => [
   { label: 'Dashboard', to: '/', icon: 'i-lucide-layout-dashboard' },
+  ...(hasAnyAccess.value ? [{ label: 'Analytics', to: '/analytics', icon: 'i-lucide-chart-no-axes-combined' }] : []),
 
   ...(hasAnyAccess.value
     ? [
@@ -98,9 +104,33 @@ const items = computed<SidebarItem[]>(() => [
           children: [
             { label: 'Videos', to: '/videos', icon: 'i-lucide-video' },
             { label: 'Categories', to: '/categories', icon: 'i-lucide-folder-tree' },
+            { label: 'Tags', to: '/tags', icon: 'i-lucide-hash' },
+            { label: 'Collections', to: '/collections', icon: 'i-lucide-library' },
             { label: 'Transcripts', to: '/transcripts', icon: 'i-lucide-captions' },
             { label: 'Subtitles', to: '/subtitles', icon: 'i-lucide-subtitles' },
             { label: 'Processing jobs', to: '/processing-jobs', icon: 'i-lucide-cpu' }
+          ]
+        },
+        {
+          label: 'Notifications',
+          icon: 'i-lucide-bell',
+          color: 'sky',
+          defaultOpen: true,
+          children: [
+            { label: 'Send', to: '/notifications/send', icon: 'i-lucide-send' },
+            { label: 'Notifications', to: '/notifications', icon: 'i-lucide-inbox' },
+            { label: 'History', to: '/notifications/history', icon: 'i-lucide-history' },
+            { label: 'Templates', to: '/notifications/templates', icon: 'i-lucide-file-text' }
+          ]
+        },
+        {
+          label: 'AI',
+          icon: 'i-lucide-sparkles',
+          color: 'amber',
+          defaultOpen: true,
+          children: [
+            { label: 'AI Studio', to: '/ai', icon: 'i-lucide-wand-sparkles' },
+            { label: 'Usage & cost', to: '/ai/usage', icon: 'i-lucide-chart-column' }
           ]
         },
         {
@@ -110,7 +140,8 @@ const items = computed<SidebarItem[]>(() => [
           defaultOpen: true,
           children: [
             { label: 'Users', to: '/users', icon: 'i-lucide-users' },
-            { label: 'Languages', to: '/languages', icon: 'i-lucide-languages' }
+            { label: 'Languages', to: '/languages', icon: 'i-lucide-languages' },
+            { label: 'Settings', to: '/settings', icon: 'i-lucide-settings' }
           ]
         }
       ]

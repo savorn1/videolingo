@@ -86,8 +86,16 @@ const props = defineProps<{ items: SidebarItem[]; collapsed?: boolean }>()
 
 const route = useRoute()
 
-function isActive(to: string) {
+function matches(to: string) {
   return route.path === to || route.path.startsWith(`${to}/`)
+}
+
+// Every nav destination, so a nested one (/ai/usage) wins over its prefix (/ai).
+const allPaths = computed(() => props.items.flatMap((item) => (isGroup(item) ? item.children.map((c) => c.to) : isLink(item) ? [item.to] : [])))
+
+function isActive(to: string) {
+  if (!matches(to)) return false
+  return !allPaths.value.some((other) => other.length > to.length && other.startsWith(`${to}/`) && matches(other))
 }
 
 function isGroup(item: SidebarItem): item is SidebarGroup {

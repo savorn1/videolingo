@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatDuration, formatRelativeTime, formatWatchTime } from './format'
+import { formatDuration, formatFileSize, formatRelativeTime, formatWatchTime } from './format'
 
 describe('formatDuration', () => {
   it('shows minutes and zero-padded seconds', () => {
@@ -69,5 +69,15 @@ describe('formatRelativeTime', () => {
   it('handles missing or unparseable values', () => {
     expect(formatRelativeTime(null)).toBe('—')
     expect(formatRelativeTime('not a date')).toBe('—')
+  })
+})
+
+describe('formatFileSize', () => {
+  it('scales up to TB', () => {
+    expect(formatFileSize(512)).toBe('512 B')
+    expect(formatFileSize(1536)).toBe('1.5 KB')
+    expect(formatFileSize(420_100_059)).toBe('400.6 MB')
+    expect(formatFileSize(17_644_202_514)).toBe('16.4 GB')
+    expect(formatFileSize(3 * 1024 ** 4)).toBe('3.0 TB')
   })
 })

@@ -8,7 +8,18 @@
       <template v-if="subtitle && !editing" #actions>
         <UButton color="primary" variant="soft" icon="i-lucide-pencil" @click="startEditing">Edit</UButton>
         <UButton v-if="subtitle.published" color="neutral" variant="soft" icon="i-lucide-eye-off" :loading="busy" @click="togglePublished">Unpublish</UButton>
-        <UButton v-else color="success" variant="soft" icon="i-lucide-eye" :loading="busy" @click="togglePublished">Publish</UButton>
+        <UButton
+          v-else
+          color="success"
+          variant="soft"
+          icon="i-lucide-eye"
+          :loading="busy"
+          :disabled="publishBlocked"
+          :title="publishBlocked ? 'Fix the readability issues first — Settings › Translation blocks publishing tracks with issues' : undefined"
+          @click="togglePublished"
+        >
+          Publish
+        </UButton>
         <UDropdownMenu :items="moreItems" :content="{ align: 'end' }">
           <UButton color="neutral" variant="soft" icon="i-lucide-ellipsis" aria-label="More actions" />
         </UDropdownMenu>
@@ -110,7 +121,13 @@
                   <USelect v-model="draftMeta.kind" :items="SUBTITLE_KINDS.map((k) => ({ label: k.label, value: k.value }))" class="w-full" />
                 </UFormField>
               </div>
-              <USwitch v-model="draftMeta.published" label="Published — offered to learners" />
+              <USwitch
+                v-model="draftMeta.published"
+                label="Published — offered to learners"
+                :description="
+                  clientSettings?.blockPublishWithIssues ? 'Tracks with readability issues can\'t be published (Settings › Translation).' : undefined
+                "
+              />
               <UFormField label="Readability rules" description="Warnings update as you edit.">
                 <SubtitleRulesFields v-model="draftMeta.rules" :language="draftMeta.language" compact />
               </UFormField>
@@ -323,6 +340,8 @@ const { list: listTranscripts } = useTranscripts()
 
 const id = computed(() => Number(route.params.id))
 const subtitle = ref<Subtitle | null>(null)
+const { settings: clientSettings } = useClientSettings()
+const publishBlocked = computed(() => !!clientSettings.value?.blockPublishWithIssues && (subtitle.value?.issueCount ?? 0) > 0)
 const loading = ref(false)
 const error = ref('')
 const busy = ref(false)

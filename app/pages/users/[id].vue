@@ -193,6 +193,10 @@ const permissionsByModule = computed(() => {
 
 const moreItems = computed<DropdownMenuItem[][]>(() => [
   [
+    { label: 'Send notification', icon: 'i-lucide-send', to: `/notifications/send?userId=${user.value?.id}` },
+    { label: 'View notifications', icon: 'i-lucide-bell', to: `/notifications?recipientId=${user.value?.id}` }
+  ],
+  [
     { label: 'Reset password', icon: 'i-lucide-key-round', onSelect: () => openResetPassword() },
     { label: 'Force logout', icon: 'i-lucide-log-out', onSelect: () => (confirmForceLogout.value = true) }
   ],

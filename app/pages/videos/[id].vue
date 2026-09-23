@@ -2,9 +2,9 @@
   <div>
     <PageHeader :title="video?.title ?? 'Video'" :crumbs="[{ label: 'Videos', to: '/videos' }, { label: video?.title ?? '…' }]">
       <template v-if="video" #actions>
-        <UButton color="neutral" variant="soft" icon="i-lucide-captions" :to="`/transcripts?videoId=${video.id}`">Transcripts</UButton>
-        <UButton color="neutral" variant="soft" icon="i-lucide-subtitles" :to="`/subtitles?videoId=${video.id}`">Subtitles</UButton>
-        <UButton color="neutral" variant="soft" icon="i-lucide-cpu" :to="`/processing-jobs?videoId=${video.id}`">Processing jobs</UButton>
+        <UDropdownMenu :items="relatedItems" :content="{ align: 'end' }">
+          <UButton color="neutral" variant="soft" icon="i-lucide-layers" trailing-icon="i-lucide-chevron-down">Related</UButton>
+        </UDropdownMenu>
         <template v-if="video.deleted">
           <UButton color="success" variant="soft" icon="i-lucide-rotate-ccw" :loading="busy" @click="onRestore">Restore</UButton>
         </template>
@@ -78,6 +78,12 @@
               <UBadge v-if="video.language" color="neutral" variant="subtle" icon="i-lucide-languages">{{ languageLabel(video.language) }}</UBadge>
               <CategoryBadge v-for="c in video.categories" :key="c.id" :name="c.name" :color="c.color" :enabled="c.enabled" />
             </div>
+            <div class="pb-2 border-b border-gray-100 dark:border-gray-800">
+              <dt class="text-gray-500 dark:text-gray-400 mb-1.5">Tags</dt>
+              <dd>
+                <TagInput :video="video" :disabled="video.deleted" @updated="(v) => video && (video = { ...video, tags: v.tags })" />
+              </dd>
+            </div>
             <div v-for="item in summary" :key="item.label" class="flex justify-between gap-4">
               <dt class="text-gray-500 dark:text-gray-400">{{ item.label }}</dt>
               <dd class="font-semibold text-gray-900 dark:text-white text-right tabular-nums" :title="item.title">
@@ -122,7 +128,7 @@
               <template v-if="stats?.lastViewedAt">Last watched {{ formatRelativeTime(stats.lastViewedAt) }}</template>
               <template v-else-if="stats">Not watched yet</template>
             </p>
-            <USelect v-model="statDays" :items="statDayOptions" class="w-36" />
+            <USelect v-model="statDays" :items="statDayOptions" class="w-36" aria-label="Statistics window" @update:model-value="statDaysPicked = true" />
           </div>
 
           <UAlert v-if="statsError" color="error" variant="subtle" class="mb-3" :title="statsError" icon="i-lucide-triangle-alert" />
@@ -226,7 +232,7 @@
 </template>
 
 <script setup lang="ts">
-import type { TabsItem } from '@nuxt/ui'
+import type { DropdownMenuItem, TabsItem } from '@nuxt/ui'
 import type { Video, VideoStatistics } from '~/composables/useVideos'
 
 definePageMeta({ middleware: 'admin' })
@@ -253,6 +259,24 @@ async function load() {
     loading.value = false
   }
 }
+
+// Pages about this video in other modules, grouped so the header stays short.
+const relatedItems = computed<DropdownMenuItem[][]>(() => {
+  const vid = video.value?.id
+  if (!vid) return []
+  return [
+    [
+      { label: 'Transcripts', icon: 'i-lucide-captions', to: `/transcripts?videoId=${vid}` },
+      { label: 'Subtitles', icon: 'i-lucide-subtitles', to: `/subtitles?videoId=${vid}` },
+      { label: 'Collections', icon: 'i-lucide-library', to: `/collections?videoId=${vid}` },
+      { label: 'Processing jobs', icon: 'i-lucide-cpu', to: `/processing-jobs?videoId=${vid}` }
+    ],
+    [
+      { label: 'AI Studio', icon: 'i-lucide-sparkles', to: `/ai/videos/${vid}` },
+      { label: 'AI chat', icon: 'i-lucide-messages-square', to: `/ai/videos/${vid}?tab=chat` }
+    ]
+  ]
+})
 
 // ── Tabs (the active one is kept in ?tab= so it can be linked to) ──────────
 const tabItems: TabsItem[] = [
@@ -311,13 +335,22 @@ const metadata = computed<MetadataItem[]>(() => {
 const stats = ref<VideoStatistics | null>(null)
 const statsLoading = ref(false)
 const statsError = ref('')
-const statDays = ref(30)
-const statDayOptions = [
-  { label: 'Last 7 days', value: 7 },
-  { label: 'Last 30 days', value: 30 },
-  { label: 'Last 90 days', value: 90 },
-  { label: 'Last 365 days', value: 365 }
-]
+// Opens with Settings › Video's window; the menu below offers the usual presets.
+const { settings: clientSettings } = useClientSettings()
+const statDays = ref(clientSettings.value?.statisticsDefaultDays ?? 30)
+// Settings may arrive after this page set up; adopt them unless a window was already picked.
+const statDaysPicked = ref(false)
+watch(
+  () => clientSettings.value?.statisticsDefaultDays,
+  (days) => {
+    if (days && !statDaysPicked.value && days !== statDays.value) statDays.value = days
+  }
+)
+const statDayOptions = computed(() => {
+  const presets = [7, 30, 90, 365]
+  const days = [...new Set([...presets, clientSettings.value?.statisticsDefaultDays ?? 30])].sort((a, b) => a - b)
+  return days.map((d) => ({ label: `Last ${d} days`, value: d }))
+})
 
 async function loadStats() {
   statsLoading.value = true

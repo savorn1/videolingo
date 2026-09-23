@@ -19,6 +19,8 @@
 import type { FieldDef } from '#shared/types'
 import type { Video } from '~/composables/useVideos'
 
+const { settings: clientSettings } = useClientSettings()
+
 const open = defineModel<boolean>({ default: false })
 const props = defineProps<{ video: Video | null }>()
 const emit = defineEmits<{ saved: [video: Video] }>()
@@ -49,6 +51,9 @@ const fields = computed<FieldDef[]>(() => [
     type: 'multiselect',
     options: categoryOptions(props.video?.categories.map((c) => c.id) ?? []),
     placeholder: categoryCatalog().length ? 'Choose categories' : 'No categories yet — add some under Categories',
+    // Settings › Video (enforced on save).
+    required: clientSettings.value?.requireCategory ?? false,
+    hint: `Up to ${clientSettings.value?.maxCategoriesPerVideo ?? 10}`,
     wrapper: 'full'
   }
 ])
