@@ -64,6 +64,8 @@
         :columns="columns"
         :loading="loading"
         :selectable="!filter.deleted"
+        :total-count="total"
+        @select-all-matching="selectAllMatching"
         refreshable
         exportable
         :export-filename="filter.deleted ? 'videos-trash' : 'videos'"
@@ -306,27 +308,47 @@ const columns = computed<ColumnDef<Video>[]>(() => [
   { key: 'actions', label: '' }
 ])
 
+/** The list's current filters, for both a page load and "select all". */
+function listFilter() {
+  return {
+    search: search.value.trim() || undefined,
+    deleted: filter.deleted,
+    enabled: filter.enabled,
+    language: filter.language,
+    categoryId: filter.categoryId,
+    tagId: filter.tagId,
+    ownerId: filter.ownerId,
+    createdFrom: filter.createdFrom || undefined,
+    createdTo: filter.createdTo || undefined,
+    sortBy: sort.value?.column,
+    sortOrder: sort.value?.direction
+  }
+}
+
+// "Select all N": every video matching the filters, up to a limit that keeps
+// bulk actions (one request per video) reasonable.
+const SELECT_ALL_LIMIT = 500
+async function selectAllMatching(done: () => void) {
+  try {
+    const res = await list({ ...listFilter(), page: 1, size: SELECT_ALL_LIMIT })
+    selected.value = res.data
+    if (res.metadata.totalCount > SELECT_ALL_LIMIT) {
+      toast.add({ title: `Selected the first ${SELECT_ALL_LIMIT}`, description: 'Narrow the filters to work on the rest.', color: 'warning' })
+    }
+  } catch (err) {
+    toast.add({ title: 'Could not select all', description: apiErrorMessage(err), color: 'error' })
+  } finally {
+    done()
+  }
+}
+
 let requestSeq = 0
 async function load() {
   const seq = ++requestSeq
   loading.value = true
   error.value = ''
   try {
-    const res = await list({
-      search: search.value.trim() || undefined,
-      deleted: filter.deleted,
-      enabled: filter.enabled,
-      language: filter.language,
-      categoryId: filter.categoryId,
-      tagId: filter.tagId,
-      ownerId: filter.ownerId,
-      createdFrom: filter.createdFrom || undefined,
-      createdTo: filter.createdTo || undefined,
-      sortBy: sort.value?.column,
-      sortOrder: sort.value?.direction,
-      page: page.value,
-      size: pageSize.value
-    })
+    const res = await list({ ...listFilter(), page: page.value, size: pageSize.value })
     if (seq !== requestSeq) return
     rows.value = res.data
     total.value = res.metadata.totalCount
@@ -348,6 +370,8 @@ watch(search, (value) => {
 // the load below runs once, with the page already reset.
 watch([() => ({ ...filter }), debouncedSearch, sort, pageSize], () => {
   page.value = 1
+  // A different list — what was selected may not even be in it. (Paging keeps the selection.)
+  selected.value = []
 })
 watch([() => ({ ...filter }), debouncedSearch, sort, page, pageSize], load)
 

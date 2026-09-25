@@ -7,6 +7,11 @@ export interface EmbedOptions {
   origin?: string
   /** Start playing as soon as it loads (the viewer already clicked play). */
   autoplay?: boolean
+  /**
+   * false hides YouTube's own full-screen button — the page offers its own,
+   * which keeps our captions and controls on screen. (Vimeo's can't be hidden.)
+   */
+  fullscreenButton?: boolean
 }
 
 const YOUTUBE_EMBED = /^(https?:\/\/)(?:www\.)?youtube(?:-nocookie)?\.com\/embed\//i
@@ -36,6 +41,7 @@ export function playerEmbedUrl(embedUrl: string, options: EmbedOptions = {}): st
     url.searchParams.set('enablejsapi', '1')
     if (options.origin) url.searchParams.set('origin', options.origin)
     if (options.autoplay) url.searchParams.set('autoplay', '1')
+    if (options.fullscreenButton === false) url.searchParams.set('fs', '0')
   } else if (isVimeoEmbed(embedUrl)) {
     if (options.autoplay) url.searchParams.set('autoplay', '1')
   } else if (/facebook\.com$/i.test(url.hostname)) {

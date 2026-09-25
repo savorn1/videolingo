@@ -30,7 +30,23 @@
       v-if="selectable && selected.length > 0"
       class="flex items-center justify-between gap-3 mb-3 rounded-lg bg-primary-50 dark:bg-primary-400/10 px-3 py-2"
     >
-      <span class="text-sm text-primary-700 dark:text-primary-300 font-medium"> {{ selected.length }} selected </span>
+      <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+        <span class="text-primary-700 dark:text-primary-300 font-medium">
+          {{ allMatchingSelected ? `All ${selected.length.toLocaleString()} selected` : `${selected.length.toLocaleString()} selected` }}
+          <span v-if="offPageCount" class="font-normal text-primary-600/80 dark:text-primary-300/70">({{ offPageCount }} on other pages)</span>
+        </span>
+        <UButton
+          v-if="canSelectAllMatching"
+          size="xs"
+          variant="link"
+          color="primary"
+          :padded="false"
+          :loading="selectingAll"
+          @click="selectAllMatching"
+        >
+          Select all {{ totalCount!.toLocaleString() }}
+        </UButton>
+      </div>
       <div class="flex items-center gap-2">
         <slot name="bulk-actions" :selected="selected" :clear="() => (selected = [])" />
         <UButton size="xs" variant="ghost" color="neutral" @click="selected = []"> Clear selection </UButton>
@@ -57,21 +73,25 @@
         :ui="tableUiWithHover"
         :meta="{ class: { tr: rowClass } }"
         class="hidden sm:block"
-        @select="(_e: Event, row: { original: T }) => emit('select', row.original)"
+        @select="onRowClick"
       >
         <template v-if="selectable" #__select-header>
           <UCheckbox
             :model-value="allSelected"
             :indeterminate="someSelected"
+            :aria-label="allSelected ? 'Unselect this page' : 'Select this page'"
             @update:model-value="(v: boolean | 'indeterminate') => toggleSelectAll(v === true)"
             @click.stop
           />
         </template>
         <template v-if="selectable" #__select-cell="{ row }">
+          <!-- Mouse clicks anywhere in this cell are handled by onRowClick (toggle,
+               Shift for a range) — the checkbox itself only takes keyboard input. -->
           <UCheckbox
             :model-value="isSelected(row.original)"
+            :aria-label="isSelected(row.original) ? 'Unselect row' : 'Select row'"
+            class="pointer-events-none"
             @update:model-value="(v: boolean | 'indeterminate') => toggleRow(row.original, v === true)"
-            @click.stop
           />
         </template>
 
@@ -105,10 +125,16 @@
         <div
           v-for="(row, index) in rows"
           :key="index"
-          class="rounded-lg border border-gray-200 dark:border-gray-800 p-3"
-          :class="{ 'active:bg-success/10 dark:active:bg-success/10': hasSelectListener }"
+          class="relative rounded-lg border p-3"
+          :class="[
+            { 'active:bg-success/10 dark:active:bg-success/10': hasSelectListener },
+            selectable && isSelected(row) ? 'border-primary-400 bg-primary-50/60 dark:bg-primary-400/10' : 'border-gray-200 dark:border-gray-800'
+          ]"
           @click="emit('select', row)"
         >
+          <div v-if="selectable" class="flex justify-end -mt-1 -mr-1 mb-1" @click.stop="toggleRow(row, !isSelected(row))">
+            <UCheckbox :model-value="isSelected(row)" :aria-label="isSelected(row) ? 'Unselect' : 'Select'" class="pointer-events-none p-1" />
+          </div>
           <div v-for="column in visibleColumns" :key="column.key" class="flex items-start justify-between gap-3 py-1 text-sm first:pt-0 last:pb-0">
             <span class="text-gray-500 dark:text-gray-400 shrink-0">{{ column.label ?? humanize(column.key) }}</span>
             <span class="text-right font-medium text-gray-900 dark:text-white min-w-0">
@@ -150,8 +176,14 @@ const props = withDefaults(
     /** Offset for numbering, e.g. `(page - 1) * pageSize` so it stays continuous across pages. */
     rowNumberStart?: number
     /** Adds a checkbox column and a "N selected" bulk-actions bar (see the
-     * `bulk-actions` slot) driven by `v-model:selected`. */
+     * `bulk-actions` slot) driven by `v-model:selected`. The selection is kept
+     * across pages and refreshes (rows are matched by `rowKey`). */
     selectable?: boolean
+    /** How rows are told apart for selection (default: `id`). */
+    rowKey?: keyof T | ((row: T) => unknown)
+    /** Rows matching the current filter on every page — with a
+     * `@select-all-matching` listener, offers "Select all N". */
+    totalCount?: number
     /** Shows an "Export" menu (CSV / Excel / PDF / Copy) that exports the
      * currently-loaded `rows` (not the full server-side dataset), formatted
      * the same way each column renders on screen. */
@@ -175,7 +207,7 @@ const toast = useToast()
 const selected = defineModel<T[]>('selected', { default: () => [] })
 const sort = defineModel<{ column: string; direction: 'asc' | 'desc' } | undefined>('sort')
 
-const emit = defineEmits<{ select: [row: T]; refresh: [] }>()
+const emit = defineEmits<{ select: [row: T]; refresh: []; selectAllMatching: [done: () => void] }>()
 
 // `select` is a declared emit, so Vue excludes its `onSelect` listener from
 // `useAttrs()` (declared-emit listeners are consumed as component events,
@@ -234,19 +266,83 @@ function sortIcon(key: string) {
   return sort.value.direction === 'asc' ? 'i-lucide-chevron-up' : 'i-lucide-chevron-down'
 }
 
+// ── Selection ──────────────────────────────────────────────────────────────
+// Matched by key rather than object identity: every reload brings new row
+// objects, and the selection should outlive paging and refreshes.
+function keyOf(row: T): unknown {
+  const k = props.rowKey ?? 'id'
+  return typeof k === 'function' ? k(row) : row[k as keyof T]
+}
+const selectedKeys = computed(() => new Set(selected.value.map(keyOf)))
+
 function isSelected(row: T) {
-  return selected.value.includes(row)
+  return selectedKeys.value.has(keyOf(row))
 }
 
 function toggleRow(row: T, value: boolean) {
-  selected.value = value ? [...selected.value, row] : selected.value.filter((r) => r !== row)
+  if (value === isSelected(row)) return
+  selected.value = value ? [...selected.value, row] : selected.value.filter((r) => keyOf(r) !== keyOf(row))
 }
 
-const allSelected = computed(() => props.rows.length > 0 && selected.value.length === props.rows.length)
-const someSelected = computed(() => selected.value.length > 0 && !allSelected.value)
+// The header checkbox is about this page: ticked when all of it is selected.
+const pageSelectedCount = computed(() => props.rows.filter(isSelected).length)
+const allSelected = computed(() => props.rows.length > 0 && pageSelectedCount.value === props.rows.length)
+const someSelected = computed(() => pageSelectedCount.value > 0 && !allSelected.value)
+const offPageCount = computed(() => selected.value.length - pageSelectedCount.value)
 
+/** Adds or removes this page's rows, leaving selections on other pages alone. */
 function toggleSelectAll(value: boolean) {
-  selected.value = value ? [...props.rows] : []
+  if (value) selected.value = [...selected.value, ...props.rows.filter((r) => !isSelected(r))]
+  else {
+    const page = new Set(props.rows.map(keyOf))
+    selected.value = selected.value.filter((r) => !page.has(keyOf(r)))
+  }
+}
+
+// Swap selected rows for their freshly loaded versions, so bulk actions see current data.
+watch(
+  () => props.rows,
+  (rows) => {
+    if (!selected.value.length) return
+    const fresh = new Map(rows.map((r) => [keyOf(r), r]))
+    if (selected.value.some((s) => fresh.has(keyOf(s)) && fresh.get(keyOf(s)) !== s)) {
+      selected.value = selected.value.map((s) => fresh.get(keyOf(s)) ?? s)
+    }
+  }
+)
+
+// Row clicks: a click anywhere in the checkbox cell toggles the row (never
+// opens it); Shift+click selects the whole range from the previous click.
+let lastClickedIndex: number | null = null
+function onRowClick(e: Event, row: { original: T; index: number }) {
+  const cell = (e.target as HTMLElement | null)?.closest('td')
+  if (props.selectable && cell && cell.cellIndex === 0) {
+    const value = !isSelected(row.original)
+    if ((e as MouseEvent).shiftKey && lastClickedIndex !== null) {
+      const [from, to] = [Math.min(lastClickedIndex, row.index), Math.max(lastClickedIndex, row.index)]
+      for (const r of props.rows.slice(from, to + 1)) toggleRow(r, value)
+      // Shift+click also selects the text in between; clear that.
+      window.getSelection()?.removeAllRanges()
+    } else {
+      toggleRow(row.original, value)
+    }
+    lastClickedIndex = row.index
+    return
+  }
+  emit('select', row.original)
+}
+watch(() => props.rows, () => (lastClickedIndex = null))
+
+// "Select all N matching" — the page loads every matching row and sets them.
+const hasSelectAllListener = computed(() => !!(instance?.vnode.props as { onSelectAllMatching?: unknown } | null)?.onSelectAllMatching)
+const allMatchingSelected = computed(() => !!props.totalCount && selected.value.length >= props.totalCount)
+const canSelectAllMatching = computed(
+  () => hasSelectAllListener.value && allSelected.value && !!props.totalCount && props.totalCount > selected.value.length
+)
+const selectingAll = ref(false)
+function selectAllMatching() {
+  selectingAll.value = true
+  emit('selectAllMatching', () => (selectingAll.value = false))
 }
 
 const ROW_NUMBER_KEY = '__rowNumber'
@@ -262,8 +358,9 @@ const { tableUi, rowEvenClass, sortButtonClass } = useTableTheme()
 // below) has higher specificity than a plain class on the `tr` itself, so a
 // `hover:bg-*` added here would compile but never actually win and silently
 // never render.
-function rowClass(row: { index: number }) {
-  const classes = [row.index % 2 === 1 ? rowEvenClass.value : '']
+function rowClass(row: { index: number; original: T }) {
+  const selectedRow = props.selectable && isSelected(row.original)
+  const classes = [selectedRow ? 'bg-primary-50/70 dark:bg-primary-400/10' : row.index % 2 === 1 ? rowEvenClass.value : '']
   if (hasSelectListener.value) {
     classes.push('cursor-pointer transition-colors')
   }
@@ -365,7 +462,7 @@ const exportItems = [
 // formatColumnText(), so there's nothing for TanStack itself to accessor.
 const uColumns = computed<TableColumn<T>[]>(() => {
   const cols: TableColumn<T>[] = []
-  if (props.selectable) cols.push({ id: SELECT_KEY })
+  if (props.selectable) cols.push({ id: SELECT_KEY, meta: { class: { td: 'w-10 cursor-pointer', th: 'w-10' } } })
   if (props.numbered) cols.push({ id: ROW_NUMBER_KEY })
   for (const c of visibleColumns.value) {
     const tdClass = typeof c.class === 'function' ? (cell: { row: { original: T } }) => (c.class as (row: T) => string)(cell.row.original) : c.class

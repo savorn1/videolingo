@@ -1,7 +1,7 @@
 <template>
   <div
-    class="relative bg-black rounded-lg overflow-hidden flex items-center justify-center"
-    :class="vertical ? 'aspect-[9/16] h-[min(70vh,720px)] max-w-full mx-auto' : 'w-full aspect-video'"
+    class="relative bg-black overflow-hidden flex items-center justify-center"
+    :class="fill ? 'w-full h-full' : vertical ? 'rounded-lg aspect-[9/16] h-[min(70vh,720px)] max-w-full mx-auto' : 'rounded-lg w-full aspect-video'"
   >
     <template v-if="embedUrl">
       <!-- Click-to-play cover: the platform's player (~1 MB of scripts) only loads once asked for. -->
@@ -38,6 +38,7 @@
         :src="videoUrl ?? undefined"
         :poster="poster ?? undefined"
         controls
+        :controlslist="ownFullscreen ? 'nofullscreen' : undefined"
         preload="metadata"
         class="w-full h-full"
         @error="playbackError = true"
@@ -47,19 +48,29 @@
         @seeked="reportTime(videoEl?.currentTime ?? 0)"
         @ended="onEnded"
         @ratechange="syncDubRate"
-      />
+        @webkitbeginfullscreen="setNativeTrack(true)"
+        @webkitendfullscreen="setNativeTrack(false)"
+      >
+        <!-- Only shown when the browser takes the video itself full screen (Safari / iPhone
+             always do): our own captions can't follow it there. Hidden otherwise. -->
+        <track v-if="trackUrl" :key="trackUrl" kind="subtitles" :src="trackUrl" :srclang="trackLanguage ?? undefined" label="Subtitles" />
+      </video>
     </template>
 
     <!-- Captions drawn by the page (it knows the cues); a second language sits on top. -->
     <div v-if="captionSecondary" class="pointer-events-none absolute inset-x-0 top-4 z-10 flex justify-center px-6">
-      <span class="rounded bg-black/60 px-2 py-0.5 text-center text-sm sm:text-base text-yellow-200 whitespace-pre-line leading-snug">{{
-        captionSecondary
-      }}</span>
+      <span
+        class="rounded bg-black/60 px-2 py-0.5 text-center text-yellow-200 whitespace-pre-line leading-snug"
+        :class="fill ? 'text-xl sm:text-2xl' : 'text-sm sm:text-base'"
+        >{{ captionSecondary }}</span
+      >
     </div>
-    <div v-if="caption" class="pointer-events-none absolute inset-x-0 bottom-14 z-10 flex justify-center px-6">
-      <span class="rounded bg-black/75 px-2 py-0.5 text-center text-base sm:text-lg text-white font-semibold whitespace-pre-line leading-snug">{{
-        caption
-      }}</span>
+    <div v-if="caption" class="pointer-events-none absolute inset-x-0 z-10 flex justify-center px-6" :class="fill ? 'bottom-20' : 'bottom-14'">
+      <span
+        class="rounded bg-black/75 px-2 py-0.5 text-center text-white font-semibold whitespace-pre-line leading-snug"
+        :class="fill ? 'text-2xl sm:text-4xl' : 'text-base sm:text-lg'"
+        >{{ caption }}</span
+      >
     </div>
 
     <!-- Voice-over track, played in place of the video's own sound. -->
@@ -124,6 +135,14 @@ const props = defineProps<{
   /** Subtitle line to show over the picture (and a second-language line above it). */
   caption?: string | null
   captionSecondary?: string | null
+  /** The page provides its own full-screen button: hide the video's / YouTube's, which would leave captions behind. */
+  ownFullscreen?: boolean
+  /** Fill the parent instead of keeping 16:9 (e.g. while the page is full screen). */
+  fill?: boolean
+  /** Cues for the browser's own subtitle display, used only in native full screen (files). */
+  trackCues?: { startMs: number; endMs: number; text: string }[] | null
+  trackSecondary?: { startMs: number; endMs: number; text: string }[] | null
+  trackLanguage?: string | null
 }>()
 const emit = defineEmits<{ duration: [seconds: number]; time: [ms: number]; ended: [] }>()
 
@@ -145,7 +164,7 @@ const coverImage = computed(() => props.poster || youTubeThumbnail(props.embedUr
 const frameSrc = computed(() => {
   if (!props.embedUrl) return ''
   if (!import.meta.client) return props.embedUrl
-  return playerEmbedUrl(props.embedUrl, { origin: window.location.origin, autoplay: clicked.value || !!props.autoplay })
+  return playerEmbedUrl(props.embedUrl, { origin: window.location.origin, autoplay: clicked.value || !!props.autoplay, fullscreenButton: !props.ownFullscreen })
 })
 
 // A position to jump to once the player is ready (a seek before it loaded).
@@ -280,6 +299,8 @@ interface YTPlayer {
   getCurrentTime(): number
   seekTo(seconds: number, allowSeekAhead: boolean): void
   playVideo(): void
+  pauseVideo(): void
+  setPlaybackRate(rate: number): void
   mute(): void
   unMute(): void
 }
@@ -300,6 +321,8 @@ interface VimeoPlayer {
   getDuration(): Promise<number>
   setCurrentTime(seconds: number): Promise<number>
   play(): Promise<void>
+  pause(): Promise<void>
+  setPlaybackRate(rate: number): Promise<number>
   on(event: 'timeupdate', cb: (e: { seconds: number }) => void): void
   on(event: 'play' | 'pause' | 'ended', cb: (e: { seconds: number }) => void): void
   off(event: string): void
@@ -365,6 +388,7 @@ async function connect() {
             ytPlayer = target
             readTime = () => ytPlayer?.getCurrentTime()
             applyOriginalMute()
+            if (rate.value !== 1) target.setPlaybackRate(rate.value)
             const d = target.getDuration()
             if (props.readDuration && d > 0) emit('duration', Math.round(d))
             const start = startPosition(d)
@@ -399,6 +423,7 @@ async function connect() {
       await player.ready()
       if (id !== connection) return
       vimeoPlayer = player
+      if (rate.value !== 1) player.setPlaybackRate(rate.value).catch(() => (rate.value = 1))
       // Vimeo reports the position ~4×/s itself; that's all its API offers.
       player.on('timeupdate', ({ seconds }) => reportTime(seconds))
       player.on('play', () => setPlaying(true))
@@ -500,18 +525,21 @@ watch(
 )
 watch(videoEl, () => applyOriginalMute(), { flush: 'post' })
 
-/** Jumps to `ms` and plays. Loads the player first when it's still a cover. */
-function seek(ms: number) {
+/**
+ * Jumps to `ms` — and plays, unless `play` is false (stepping while paused).
+ * Loads the player first when it's still a cover.
+ */
+function seek(ms: number, play = true) {
   const seconds = ms / 1000
   if (props.embedUrl) {
     if (!activated.value) return activate(seconds)
     if (ytPlayer) {
       ytPlayer.seekTo(seconds, true)
-      ytPlayer.playVideo()
+      if (play) ytPlayer.playVideo()
     } else if (vimeoPlayer) {
       vimeoPlayer
         .setCurrentTime(seconds)
-        .then(() => vimeoPlayer?.play())
+        .then(() => (play ? vimeoPlayer?.play() : undefined))
         .catch(() => {})
     } else {
       // Still connecting — onReady picks this up.
@@ -524,9 +552,70 @@ function seek(ms: number) {
   const el = videoEl.value
   if (!el) return
   el.currentTime = seconds
-  el.play().catch(() => {})
+  if (play) el.play().catch(() => {})
   reportTime(seconds)
 }
 
-defineExpose({ videoEl, seek, canSync })
+// ── Page-driven controls (sentence stepping, speed, shortcuts) ─────────────
+/** Whether play/pause/speed can be driven from outside for this source. */
+const canControl = computed(() => canSync.value)
+
+function play() {
+  if (props.embedUrl && !activated.value) return activate()
+  if (ytPlayer) ytPlayer.playVideo()
+  else if (vimeoPlayer) vimeoPlayer.play().catch(() => {})
+  else videoEl.value?.play().catch(() => {})
+}
+
+function pause() {
+  if (ytPlayer) ytPlayer.pauseVideo()
+  else if (vimeoPlayer) vimeoPlayer.pause().catch(() => {})
+  else videoEl.value?.pause()
+}
+
+function togglePlay() {
+  if (playing.value) pause()
+  else play()
+}
+
+const rate = ref(1)
+/** Playback speed. Vimeo only allows it on some plans — then it just stays at 1×. */
+function setRate(value: number) {
+  rate.value = value
+  if (videoEl.value) videoEl.value.playbackRate = value
+  ytPlayer?.setPlaybackRate(value)
+  vimeoPlayer?.setPlaybackRate(value).catch(() => (rate.value = 1))
+  // The voice-over follows (files do this through ratechange).
+  if (dubEl.value) dubEl.value.playbackRate = value
+}
+// A new file starts at normal speed; keep the chosen one. (Embeds get it in connect().)
+watch(videoEl, (el) => el && rate.value !== 1 && (el.playbackRate = rate.value), { flush: 'post' })
+
+// ── Native full screen (files) ─────────────────────────────────────────────
+const trackUrl = ref<string | null>(null)
+watch(
+  () => [props.trackCues, props.trackSecondary] as const,
+  ([cues, secondary]) => {
+    if (trackUrl.value) URL.revokeObjectURL(trackUrl.value)
+    trackUrl.value = import.meta.client && cues?.length ? URL.createObjectURL(new Blob([cuesToVtt(cues, secondary ?? [])], { type: 'text/vtt' })) : null
+    nextTick(() => setNativeTrack(nativeFullscreen()))
+  },
+  { immediate: true }
+)
+onBeforeUnmount(() => trackUrl.value && URL.revokeObjectURL(trackUrl.value))
+
+function nativeFullscreen() {
+  return import.meta.client && !!videoEl.value && document.fullscreenElement === videoEl.value
+}
+function setNativeTrack(show: boolean) {
+  const track = videoEl.value?.textTracks?.[0]
+  if (track) track.mode = show ? 'showing' : 'disabled'
+}
+function onFullscreenChange() {
+  setNativeTrack(nativeFullscreen())
+}
+onMounted(() => document.addEventListener('fullscreenchange', onFullscreenChange))
+onBeforeUnmount(() => document.removeEventListener('fullscreenchange', onFullscreenChange))
+
+defineExpose({ videoEl, seek, canSync, canControl, play, pause, togglePlay, setRate, rate, playing })
 </script>
