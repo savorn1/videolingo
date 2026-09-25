@@ -50,6 +50,18 @@
       />
     </template>
 
+    <!-- Captions drawn by the page (it knows the cues); a second language sits on top. -->
+    <div v-if="captionSecondary" class="pointer-events-none absolute inset-x-0 top-4 z-10 flex justify-center px-6">
+      <span class="rounded bg-black/60 px-2 py-0.5 text-center text-sm sm:text-base text-yellow-200 whitespace-pre-line leading-snug">{{
+        captionSecondary
+      }}</span>
+    </div>
+    <div v-if="caption" class="pointer-events-none absolute inset-x-0 bottom-14 z-10 flex justify-center px-6">
+      <span class="rounded bg-black/75 px-2 py-0.5 text-center text-base sm:text-lg text-white font-semibold whitespace-pre-line leading-snug">{{
+        caption
+      }}</span>
+    </div>
+
     <!-- Voice-over track, played in place of the video's own sound. -->
     <audio v-if="dubUrl" ref="dubEl" :key="dubUrl" :src="dubUrl" preload="auto" class="hidden" />
     <button
@@ -90,6 +102,9 @@
 //   from there next time.
 // - With `dubUrl`, plays that voice-over track in sync with the video and
 //   mutes the video's own sound (files, YouTube and Vimeo).
+// - With `autoplay`, starts on its own (no cover) — for playlists. Emits
+//   `ended` when the video finishes (files, YouTube and Vimeo; Facebook's
+//   player doesn't say).
 const props = defineProps<{
   embedUrl?: string | null
   /** The file to play — or, for embeds, the original link (offered when the embed fails). */
@@ -102,8 +117,15 @@ const props = defineProps<{
   resumeKey?: string | number | null
   /** Voice-over audio to play instead of the original sound. */
   dubUrl?: string | null
+  /** Start playing as soon as it loads (browsers may still ask for a click the first time). */
+  autoplay?: boolean
+  /** Where to resume, e.g. from the user's saved progress on the server; wins over `resumeKey`'s local copy. */
+  startAt?: number | null
+  /** Subtitle line to show over the picture (and a second-language line above it). */
+  caption?: string | null
+  captionSecondary?: string | null
 }>()
-const emit = defineEmits<{ duration: [seconds: number]; time: [ms: number] }>()
+const emit = defineEmits<{ duration: [seconds: number]; time: [ms: number]; ended: [] }>()
 
 const frame = ref<HTMLIFrameElement | null>(null)
 const videoEl = ref<HTMLVideoElement | null>(null)
@@ -116,14 +138,14 @@ const canSync = computed(() => (props.embedUrl ? isYouTube.value || isVimeo.valu
 
 // The cover waits for a click; readDuration needs the player loaded right away.
 const clicked = ref(false)
-const activated = computed(() => props.readDuration || clicked.value)
+const activated = computed(() => props.readDuration || props.autoplay || clicked.value)
 const coverImage = computed(() => props.poster || youTubeThumbnail(props.embedUrl))
 
 // Only built on the client: the YouTube API needs the page's origin.
 const frameSrc = computed(() => {
   if (!props.embedUrl) return ''
   if (!import.meta.client) return props.embedUrl
-  return playerEmbedUrl(props.embedUrl, { origin: window.location.origin, autoplay: clicked.value })
+  return playerEmbedUrl(props.embedUrl, { origin: window.location.origin, autoplay: clicked.value || !!props.autoplay })
 })
 
 // A position to jump to once the player is ready (a seek before it loaded).
@@ -178,7 +200,7 @@ function clearPosition() {
 function startPosition(durationSeconds?: number | null): number | null {
   const seek = pendingSeek
   pendingSeek = null
-  return seek ?? resumePosition(savedPosition(), durationSeconds)
+  return seek ?? resumePosition(props.startAt ?? savedPosition(), durationSeconds)
 }
 
 function reportTime(seconds: number) {
@@ -191,6 +213,7 @@ function onEnded() {
   stopClock()
   clearPosition()
   setPlaying(false)
+  emit('ended')
 }
 
 // ── Clock ──────────────────────────────────────────────────────────────────
@@ -223,6 +246,7 @@ function onVideoMetadata() {
     el.currentTime = start
     reportTime(start)
   }
+  if (props.autoplay) el.play().catch(() => {})
 }
 function onVideoPlay() {
   startClock()
@@ -356,7 +380,10 @@ async function connect() {
             else {
               stopClock()
               if (data === YT_PAUSED) savePosition(target.getCurrentTime(), true)
-              if (data === YT_ENDED) clearPosition()
+              if (data === YT_ENDED) {
+                clearPosition()
+                emit('ended')
+              }
             }
           },
           onError: ({ data }) => {
@@ -382,6 +409,7 @@ async function connect() {
       player.on('ended', () => {
         setPlaying(false)
         clearPosition()
+        emit('ended')
       })
       applyOriginalMute()
       const d = await player.getDuration()

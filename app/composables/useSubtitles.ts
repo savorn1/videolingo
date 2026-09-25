@@ -93,6 +93,8 @@ export interface SubtitleFilter {
   /** Video title or track label. */
   search?: string
   videoId?: number
+  /** Several videos at once (sent as repeated query params). */
+  videoIds?: number[]
   language?: string
   source?: SubtitleSource
   published?: boolean

@@ -97,7 +97,18 @@ const profileItems = computed<DropdownMenuItem[][]>(() => [
 // useAuth.can/middleware/admin.ts). Each group's `color` picks its accent hue
 // in SidebarNav (header icon, active-item background/border).
 const items = computed<SidebarItem[]>(() => [
-  { label: 'Dashboard', to: '/', icon: 'i-lucide-layout-dashboard' },
+  ...(hasAnyAccess.value ? [{ label: 'Dashboard', to: '/', icon: 'i-lucide-layout-dashboard' }] : []),
+  // Every signed-in account — learners' home.
+  {
+    label: 'Learn',
+    icon: 'i-lucide-graduation-cap',
+    color: 'emerald',
+    defaultOpen: true,
+    children: [
+      { label: 'Home', to: '/learn', icon: 'i-lucide-house' },
+      { label: 'My cards', to: '/learn/cards', icon: 'i-lucide-layers' }
+    ]
+  },
   ...(hasAnyAccess.value ? [{ label: 'Analytics', to: '/analytics', icon: 'i-lucide-chart-no-axes-combined' }] : []),
 
   ...(hasAnyAccess.value
@@ -108,6 +119,7 @@ const items = computed<SidebarItem[]>(() => [
           color: 'violet',
           defaultOpen: true,
           children: [
+            { label: 'Library', to: '/library', icon: 'i-lucide-layout-grid' },
             { label: 'Videos', to: '/videos', icon: 'i-lucide-video' },
             { label: 'Categories', to: '/categories', icon: 'i-lucide-folder-tree' },
             { label: 'Tags', to: '/tags', icon: 'i-lucide-hash' },
@@ -205,13 +217,20 @@ const allSearchGroups = computed(() => [...contentGroups.value, ...searchGroups.
 // sidebar — each top-level item is now a collapsible group with `children`,
 // so a page's section is whichever group's children contains its route.
 const pageCrumbs = usePageCrumbs()
+// The page sets its trail while it renders — after this layout's top bar has
+// already been rendered on the server — yet useState ships the final value to
+// the browser. Reading it only once mounted keeps the server HTML and the
+// browser's first render identical (no hydration mismatch); the trail then
+// fills in straight away.
+const mounted = ref(false)
+onMounted(() => (mounted.value = true))
 const breadcrumbItems = computed<BreadcrumbItem[]>(() => {
   const base = navCrumbs.value
   // On a record page the nav trail ends with a link back to the list, which
   // is also where the page's own trail starts — so keep the section and add
   // the record (Content › Videos › "Lesson 1"). Pages that are in the nav
   // themselves already end with their own name.
-  const page = pageCrumbs.value
+  const page = mounted.value ? pageCrumbs.value : null
   if (page?.path === route.path && page.items.length > 1 && base.at(-1)?.to) return [...base, ...page.items.slice(1)]
   return base
 })

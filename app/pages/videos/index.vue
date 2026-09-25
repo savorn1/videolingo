@@ -71,7 +71,15 @@
         @select="(row: Video) => navigateTo(`/videos/${row.id}`)"
       >
         <template #bulk-actions="{ selected: picked, clear }">
-          <VideoBulkActions :videos="picked" @done="() => { clear(); load() }" />
+          <VideoBulkActions
+            :videos="picked"
+            @done="
+              () => {
+                clear()
+                load()
+              }
+            "
+          />
         </template>
         <template #title-data="{ row }">
           <div class="flex items-center gap-3 min-w-0 max-w-xs">

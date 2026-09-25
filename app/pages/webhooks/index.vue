@@ -1,6 +1,9 @@
 <template>
   <div>
-    <PageHeader title="Webhooks" description="Tell other systems when something happens here — a job finishes, a subtitle is approved — by POSTing a signed JSON message to their URL.">
+    <PageHeader
+      title="Webhooks"
+      description="Tell other systems when something happens here — a job finishes, a subtitle is approved — by POSTing a signed JSON message to their URL."
+    >
       <template #actions>
         <UButton v-if="canWrite" icon="i-lucide-plus" @click="openForm(null)">New webhook</UButton>
       </template>
@@ -22,7 +25,15 @@
           </div>
         </template>
         <template #health-data="{ row }">
-          <UBadge v-if="!row.enabled" color="neutral" variant="subtle">Off</UBadge>
+          <UBadge
+            v-if="!row.enabled && row.consecutiveFailures >= 20"
+            color="warning"
+            variant="subtle"
+            :title="`Switched off automatically after ${row.consecutiveFailures} failed deliveries in a row`"
+          >
+            Paused — kept failing
+          </UBadge>
+          <UBadge v-else-if="!row.enabled" color="neutral" variant="subtle">Off</UBadge>
           <UBadge v-else-if="row.lastStatus === null" color="neutral" variant="subtle">Nothing sent yet</UBadge>
           <UBadge v-else-if="row.consecutiveFailures === 0" color="success" variant="subtle" :title="formatDateTime(row.lastDeliveryAt)">
             OK · {{ row.lastStatus }}
@@ -40,7 +51,11 @@
           </div>
         </template>
         <template #empty-state>
-          <EmptyState icon="i-lucide-webhook" title="No webhooks yet" description="Add one to push job results and review decisions to Slack, an LMS, or your own service.">
+          <EmptyState
+            icon="i-lucide-webhook"
+            title="No webhooks yet"
+            description="Add one to push job results and review decisions to Slack, an LMS, or your own service."
+          >
             <template v-if="canWrite" #action>
               <UButton icon="i-lucide-plus" @click="openForm(null)">New webhook</UButton>
             </template>
@@ -91,7 +106,13 @@
             <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-2">Signing secret</h3>
             <div class="flex gap-2">
               <UInput :model-value="revealSecret ? detail.secret : '•'.repeat(24)" readonly class="flex-1 font-mono" aria-label="Signing secret" />
-              <UButton color="neutral" variant="soft" :icon="revealSecret ? 'i-lucide-eye-off' : 'i-lucide-eye'" :aria-label="revealSecret ? 'Hide' : 'Show'" @click="revealSecret = !revealSecret" />
+              <UButton
+                color="neutral"
+                variant="soft"
+                :icon="revealSecret ? 'i-lucide-eye-off' : 'i-lucide-eye'"
+                :aria-label="revealSecret ? 'Hide' : 'Show'"
+                @click="revealSecret = !revealSecret"
+              />
               <UButton v-if="canWrite" color="neutral" variant="soft" icon="i-lucide-refresh-cw" @click="confirmRotate = true">Rotate</UButton>
             </div>
             <details class="mt-2 text-xs text-gray-600 dark:text-gray-300">
@@ -99,8 +120,8 @@
               <div class="mt-2 space-y-2">
                 <p>
                   Each request has an <code>X-VideoLingo-Signature: t=&lt;unix time&gt;,v1=&lt;hex&gt;</code> header. Recompute
-                  <code>HMAC-SHA256(secret, t + "." + rawBody)</code>, compare it with <code>v1</code>, and reject messages whose <code>t</code> is more than
-                  a few minutes old.
+                  <code>HMAC-SHA256(secret, t + "." + rawBody)</code>, compare it with <code>v1</code>, and reject messages whose <code>t</code> is more than a
+                  few minutes old.
                 </p>
                 <pre class="bg-gray-50 dark:bg-gray-900 rounded-lg p-3 overflow-x-auto"><code>{{ verifySnippet }}</code></pre>
               </div>
@@ -110,17 +131,25 @@
           <section>
             <div class="flex items-center justify-between mb-2">
               <h3 class="text-sm font-semibold text-gray-900 dark:text-white">Recent deliveries</h3>
-              <UButton size="xs" color="neutral" variant="ghost" icon="i-lucide-refresh-cw" :loading="deliveriesLoading" @click="loadDeliveries">Refresh</UButton>
+              <UButton size="xs" color="neutral" variant="ghost" icon="i-lucide-refresh-cw" :loading="deliveriesLoading" @click="loadDeliveries"
+                >Refresh</UButton
+              >
             </div>
             <p v-if="!deliveries.length && !deliveriesLoading" class="text-sm text-gray-500">Nothing sent yet — try “Send test”.</p>
             <ul class="space-y-2">
               <li v-for="d in deliveries" :key="d.id" class="rounded-lg border border-gray-200 dark:border-gray-800 text-sm">
                 <button type="button" class="w-full flex items-center gap-2 px-3 py-2 text-left" @click="expanded = expanded === d.id ? null : d.id">
-                  <UIcon :name="d.success ? 'i-lucide-check-circle' : 'i-lucide-x-circle'" :class="d.success ? 'text-success-500' : 'text-error-500'" class="w-4 h-4 shrink-0" />
+                  <UIcon
+                    :name="d.success ? 'i-lucide-check-circle' : 'i-lucide-x-circle'"
+                    :class="d.success ? 'text-success-500' : 'text-error-500'"
+                    class="w-4 h-4 shrink-0"
+                  />
                   <span class="font-medium">{{ eventLabel(d.event) }}</span>
                   <UBadge size="sm" :color="d.success ? 'success' : 'error'" variant="subtle">{{ d.status || 'No response' }}</UBadge>
                   <span v-if="d.attempt > 1" class="text-xs text-gray-500">attempt {{ d.attempt }}</span>
-                  <span class="ml-auto text-xs text-gray-500" :title="formatDateTime(d.createdAt)">{{ formatRelativeTime(d.createdAt) }} · {{ d.durationMs }} ms</span>
+                  <span class="ml-auto text-xs text-gray-500" :title="formatDateTime(d.createdAt)"
+                    >{{ formatRelativeTime(d.createdAt) }} · {{ d.durationMs }} ms</span
+                  >
                 </button>
                 <div v-if="expanded === d.id" class="border-t border-gray-100 dark:border-gray-800 px-3 py-2 space-y-2">
                   <p v-if="d.detail" class="text-xs text-gray-600 dark:text-gray-300 break-words">{{ d.detail }}</p>
@@ -241,7 +270,11 @@ async function onSubmit() {
     const payload = { name: form.name.trim(), url: form.url.trim(), events: form.events, enabled: form.enabled }
     if (editing.value) await update(editing.value.id, payload)
     else await create(payload)
-    toast.add({ title: editing.value ? 'Webhook saved' : 'Webhook created', description: editing.value ? undefined : 'Send a test to check the receiver.', color: 'success' })
+    toast.add({
+      title: editing.value ? 'Webhook saved' : 'Webhook created',
+      description: editing.value ? undefined : 'Send a test to check the receiver.',
+      color: 'success'
+    })
     showForm.value = false
     await load()
   } catch (err) {

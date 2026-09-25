@@ -53,11 +53,14 @@ export const AI_TASKS: AiTaskMeta[] = [
 export function aiFeatureLabel(feature: string | null | undefined): string {
   if (!feature) return '—'
   if (feature === 'CHAT') return 'Chat'
+  if (feature === 'TRANSLATION') return 'Translation'
+  if (feature === 'LOOKUP') return 'Word lookup'
   return AI_TASKS.find((t) => t.value === feature)?.label ?? feature
 }
 
 export function aiFeatureIcon(feature: string | null | undefined): string {
   if (feature === 'CHAT') return 'i-lucide-messages-square'
+  if (feature === 'LOOKUP') return 'i-lucide-book-open-text'
   return AI_TASKS.find((t) => t.value === feature)?.icon ?? 'i-lucide-sparkles'
 }
 

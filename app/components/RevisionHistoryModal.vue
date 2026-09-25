@@ -1,9 +1,20 @@
 <template>
-  <UModal v-model:open="open" title="Version history" :description="`Every save keeps a copy (the last 50). Compare any two, and bring an old one back.`" :ui="{ content: 'sm:max-w-5xl' }">
+  <UModal
+    v-model:open="open"
+    title="Version history"
+    :description="`Every save keeps a copy (the last 50). Compare any two, and bring an old one back.`"
+    :ui="{ content: 'sm:max-w-5xl' }"
+  >
     <template #body>
       <UAlert v-if="error" color="error" variant="subtle" :title="error" icon="i-lucide-triangle-alert" class="mb-3" />
       <div v-if="loading && !revisions.length" class="py-10 text-center text-sm text-gray-500">Loading history…</div>
-      <EmptyState v-else-if="!revisions.length" icon="i-lucide-history" title="No history yet" description="A copy is kept each time this is saved from now on." class="py-8" />
+      <EmptyState
+        v-else-if="!revisions.length"
+        icon="i-lucide-history"
+        title="No history yet"
+        description="A copy is kept each time this is saved from now on."
+        class="py-8"
+      />
 
       <div v-else class="grid grid-cols-1 md:grid-cols-3 gap-4">
         <!-- Revisions -->
@@ -21,7 +32,9 @@
                 <span class="ml-auto text-xs text-gray-400 tabular-nums">{{ r.itemCount }} {{ itemNoun }}</span>
               </div>
               <div class="text-gray-700 dark:text-gray-200 truncate">{{ r.summary }}</div>
-              <div class="text-xs text-gray-500" :title="formatDateTime(r.createdAt)">{{ r.createdBy ?? 'system' }} · {{ formatRelativeTime(r.createdAt) }}</div>
+              <div class="text-xs text-gray-500" :title="formatDateTime(r.createdAt)">
+                {{ r.createdBy ?? 'system' }} · {{ formatRelativeTime(r.createdAt) }}
+              </div>
             </button>
           </li>
         </ol>
@@ -43,7 +56,10 @@
               <UBadge color="neutral" variant="subtle">{{ summary.unchanged }} unchanged</UBadge>
             </div>
             <p v-if="!shownRows.length" class="py-6 text-center text-sm text-gray-500">No differences.</p>
-            <ol v-else class="max-h-[52vh] overflow-y-auto divide-y divide-gray-100 dark:divide-gray-800 rounded-lg border border-gray-200 dark:border-gray-800 text-sm">
+            <ol
+              v-else
+              class="max-h-[52vh] overflow-y-auto divide-y divide-gray-100 dark:divide-gray-800 rounded-lg border border-gray-200 dark:border-gray-800 text-sm"
+            >
               <li v-for="(row, k) in shownRows" :key="k" class="px-3 py-1.5" :class="ROW_CLASS[row.type]">
                 <template v-if="row.type === 'changed'">
                   <div class="flex gap-2 line-through decoration-error-400/70 text-gray-500">

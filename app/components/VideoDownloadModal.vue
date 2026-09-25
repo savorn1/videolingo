@@ -44,7 +44,9 @@
           <UFormField
             v-if="subtitleOptions.length > 1"
             label="Subtitles in the picture"
-            :description="clientSettings?.requireApprovalToPublish ? 'Only approved tracks can be burned in.' : 'Drawn into the video, so they show in any player.'"
+            :description="
+              clientSettings?.requireApprovalToPublish ? 'Only approved tracks can be burned in.' : 'Drawn into the video, so they show in any player.'
+            "
           >
             <USelect v-model="burnSubtitleId" :items="subtitleOptions" class="w-full" />
           </UFormField>
@@ -58,7 +60,15 @@
           />
 
           <!-- A file video with its own sound and no subtitles needs no job — it's already an MP4 somewhere. -->
-          <UButton v-if="!data.isLink && audio === ORIGINAL && burnSubtitleId === NONE" block color="neutral" variant="soft" icon="i-lucide-download" :to="video.videoUrl" target="_blank">
+          <UButton
+            v-if="!data.isLink && audio === ORIGINAL && burnSubtitleId === NONE"
+            block
+            color="neutral"
+            variant="soft"
+            icon="i-lucide-download"
+            :to="video.videoUrl"
+            target="_blank"
+          >
             Download the original file
           </UButton>
           <template v-else-if="canWrite">

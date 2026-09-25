@@ -50,6 +50,7 @@
         <!-- View Video -->
         <UCard class="xl:col-span-2 self-start xl:sticky xl:top-4" :ui="{ body: 'p-0 sm:p-0' }">
           <VideoPlayer
+            v-if="tracker.ready.value"
             ref="player"
             :embed-url="video.embedUrl"
             :video-url="video.videoUrl"
@@ -57,9 +58,12 @@
             :title="video.title"
             :vertical="!!video.width && !!video.height && video.height > video.width"
             :resume-key="video.id"
+            :start-at="tracker.startAt.value"
             :dub-url="dubUrl"
-            @time="(ms) => (currentMs = ms)"
+            @time="onPlayerTime"
+            @ended="tracker.onEnded"
           />
+          <div v-else class="w-full aspect-video bg-black rounded-lg" />
         </UCard>
 
         <div class="space-y-4 min-w-0">
@@ -259,6 +263,7 @@ async function load() {
   error.value = ''
   try {
     video.value = await get(id.value)
+    tracker.start(video.value.id, video.value.durationSeconds)
   } catch (err) {
     error.value = apiErrorMessage(err)
   } finally {
@@ -269,6 +274,12 @@ async function load() {
 // ── Player ↔ subtitle lines ────────────────────────────────────────────────
 const player = useTemplateRef('player')
 const currentMs = ref(0)
+// Saves this user's progress on the server and resumes from it on any device.
+const tracker = useProgressTracker()
+function onPlayerTime(ms: number) {
+  currentMs.value = ms
+  tracker.onTime(ms)
+}
 const canReadSubtitles = computed(() => can('subtitles', 'READ'))
 const canWriteVideos = computed(() => can('videos', 'WRITE'))
 /** The voice-over the player uses instead of the original sound (null = original). */

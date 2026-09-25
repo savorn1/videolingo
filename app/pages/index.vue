@@ -20,6 +20,8 @@
     </EmptyState>
 
     <template v-else>
+      <ContinueWatching />
+
       <!-- ── Headline numbers ─────────────────────────────────────────── -->
       <template v-if="canReadAnalytics">
         <UAlert v-if="analyticsError" color="error" variant="subtle" :title="analyticsError" icon="i-lucide-triangle-alert" />
@@ -300,16 +302,21 @@ const attention = computed(() => {
 })
 
 // Permissions can arrive just after the page mounts (right after sign-in).
+// Started once mounted: loading during setup would flip the loading flags
+// before hydration, so the browser's first render (skeletons) wouldn't match
+// the server's HTML (empty states) — a hydration mismatch.
 let loaded = false
-watch(
-  hasAnyAccess,
-  (access) => {
-    if (!access || loaded || !import.meta.client) return
-    loaded = true
-    loadAnalytics()
-    loadRecent()
-    loadAttention()
-  },
-  { immediate: true }
-)
+onMounted(() => {
+  watch(
+    hasAnyAccess,
+    (access) => {
+      if (!access || loaded) return
+      loaded = true
+      loadAnalytics()
+      loadRecent()
+      loadAttention()
+    },
+    { immediate: true }
+  )
+})
 </script>

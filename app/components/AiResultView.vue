@@ -104,7 +104,8 @@
 <script setup lang="ts">
 import type { AiGeneration, ChaptersContent, KeyPointsContent, QuestionsContent, QuizContent, SummaryContent } from '~/composables/useAi'
 
-const props = defineProps<{ generation: AiGeneration }>()
+// Only `type` and `content` are read, so learner study material (useLearn's StudyItem) renders here too.
+const props = defineProps<{ generation: Pick<AiGeneration, 'type' | 'content'> }>()
 
 // Only render a result whose content has the expected shape — a malformed or
 // older stored result falls through to "no content" instead of crashing.
@@ -123,7 +124,7 @@ const answers = ref<Record<number, number>>({})
 
 // A new result (regenerate / different language) starts fresh.
 watch(
-  () => props.generation.id,
+  () => props.generation,
   () => {
     revealed.value = new Set()
     answers.value = {}

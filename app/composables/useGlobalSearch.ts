@@ -96,9 +96,7 @@ export function useGlobalSearch(term: Ref<string>) {
     ]
     const settled = await Promise.allSettled(sources)
     if (mine !== seq) return
-    groups.value = settled
-      .map((s) => (s.status === 'fulfilled' ? s.value : null))
-      .filter((g): g is SearchResultGroup => !!g && g.items.length > 0)
+    groups.value = settled.map((s) => (s.status === 'fulfilled' ? s.value : null)).filter((g): g is SearchResultGroup => !!g && g.items.length > 0)
     loading.value = false
   }
 

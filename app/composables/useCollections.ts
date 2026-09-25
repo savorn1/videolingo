@@ -110,5 +110,10 @@ export function useCollections() {
     return (await api<ApiEnvelope<Collection>>(`${base}/${id}/videos/${videoId}`, { method: 'DELETE' })).data
   }
 
-  return { list, get, create, update, remove, videos, addVideos, removeVideo }
+  /** Saves a new order; `videoIds` must list exactly the collection's videos. */
+  async function reorder(id: number, videoIds: number[]) {
+    await api(`${base}/${id}/videos/order`, { method: 'PUT', body: { videoIds } })
+  }
+
+  return { list, get, create, update, remove, videos, addVideos, removeVideo, reorder }
 }

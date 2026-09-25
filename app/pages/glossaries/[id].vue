@@ -43,8 +43,8 @@
         </fieldset>
         <template #footer>
           <p class="text-xs text-gray-500 dark:text-gray-400">
-            Translations into {{ form.targetLanguage ? languageLabel(form.targetLanguage) : 'this language' }} follow these terms. Only the terms a
-            passage actually mentions are sent with it, so large glossaries stay cheap.
+            Translations into {{ form.targetLanguage ? languageLabel(form.targetLanguage) : 'this language' }} follow these terms. Only the terms a passage
+            actually mentions are sent with it, so large glossaries stay cheap.
           </p>
         </template>
       </UCard>
@@ -111,7 +111,15 @@
                   <UInput v-model="terms[i]!.note" size="sm" maxlength="300" :disabled="!canWrite" placeholder="optional" class="w-full" aria-label="Note" />
                 </td>
                 <td class="pr-3 py-1.5 align-top">
-                  <UButton v-if="canWrite" size="xs" color="error" variant="ghost" icon="i-lucide-trash-2" aria-label="Remove term" @click="terms.splice(i, 1)" />
+                  <UButton
+                    v-if="canWrite"
+                    size="xs"
+                    color="error"
+                    variant="ghost"
+                    icon="i-lucide-trash-2"
+                    aria-label="Remove term"
+                    @click="terms.splice(i, 1)"
+                  />
                 </td>
               </tr>
             </tbody>
@@ -129,7 +137,12 @@
             One term per line: <code class="text-xs">source,translation,note</code> — or copy two or three columns straight from a spreadsheet. Leave the
             translation blank (or write <code class="text-xs">=</code>) to keep a term as-is.
           </p>
-          <UTextarea v-model="pasteText" :rows="10" class="w-full font-mono text-xs" placeholder="dashboard,ផ្ទាំងគ្រប់គ្រង&#10;VideoLingo,=&#10;invoice,វិក្កយបត្រ,accounting" />
+          <UTextarea
+            v-model="pasteText"
+            :rows="10"
+            class="w-full font-mono text-xs"
+            placeholder="dashboard,ផ្ទាំងគ្រប់គ្រង&#10;VideoLingo,=&#10;invoice,វិក្កយបត្រ,accounting"
+          />
           <p class="text-xs text-gray-500">
             {{ pasted.length }} term(s) found<span v-if="pastedDuplicates">, {{ pastedDuplicates }} already in the list (they'll be updated)</span>.
           </p>
@@ -324,7 +337,13 @@ function openPaste() {
 function applyPaste() {
   const bySource = new Map(terms.value.map((t) => [t.source.trim().toLowerCase(), t]))
   for (const p of pasted.value) {
-    const row = { source: p.source, target: p.doNotTranslate ? '' : p.target, doNotTranslate: p.doNotTranslate, caseSensitive: p.caseSensitive, note: p.note ?? '' }
+    const row = {
+      source: p.source,
+      target: p.doNotTranslate ? '' : p.target,
+      doNotTranslate: p.doNotTranslate,
+      caseSensitive: p.caseSensitive,
+      note: p.note ?? ''
+    }
     const existing = bySource.get(p.source.toLowerCase())
     if (existing) Object.assign(existing, row)
     else {

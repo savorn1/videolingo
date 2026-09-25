@@ -116,7 +116,11 @@
       <template #body>
         <form class="space-y-4" @submit.prevent="onDecide">
           <p class="text-sm text-gray-600 dark:text-gray-300">{{ decisionHelp }}</p>
-          <UFormField :label="decision === 'reject' ? 'What needs to change?' : 'Note'" :required="decision === 'reject'" :hint="decision === 'reject' ? undefined : 'optional'">
+          <UFormField
+            :label="decision === 'reject' ? 'What needs to change?' : 'Note'"
+            :required="decision === 'reject'"
+            :hint="decision === 'reject' ? undefined : 'optional'"
+          >
             <UTextarea v-model="decisionNote" :rows="3" maxlength="1000" class="w-full" autofocus />
           </UFormField>
           <UAlert
@@ -129,7 +133,12 @@
           />
           <div class="flex justify-end gap-2">
             <UButton color="neutral" variant="ghost" @click="showDecision = false">Cancel</UButton>
-            <UButton type="submit" :color="decision === 'reject' ? 'warning' : decision === 'approve' ? 'success' : 'primary'" :loading="deciding" :disabled="decision === 'reject' && !decisionNote.trim()">
+            <UButton
+              type="submit"
+              :color="decision === 'reject' ? 'warning' : decision === 'approve' ? 'success' : 'primary'"
+              :loading="deciding"
+              :disabled="decision === 'reject' && !decisionNote.trim()"
+            >
               {{ decisionTitle }}
             </UButton>
           </div>
@@ -176,7 +185,9 @@ const statusText = computed(() => {
   }
 })
 const noteTitle = computed(() =>
-  props.subtitle.reviewStatus === 'IN_REVIEW' ? `Note from ${props.subtitle.reviewRequestedBy ?? 'the submitter'}` : `Note from ${props.subtitle.reviewedBy ?? 'the reviewer'}`
+  props.subtitle.reviewStatus === 'IN_REVIEW'
+    ? `Note from ${props.subtitle.reviewRequestedBy ?? 'the submitter'}`
+    : `Note from ${props.subtitle.reviewedBy ?? 'the reviewer'}`
 )
 
 // ── Comments ───────────────────────────────────────────────────────────────
@@ -185,9 +196,7 @@ const showResolved = ref(false)
 const openCount = computed(() => comments.value.filter((c) => !c.resolved).length)
 const resolvedCount = computed(() => comments.value.length - openCount.value)
 const visibleComments = computed(() =>
-  [...comments.value]
-    .filter((c) => showResolved.value || !c.resolved)
-    .sort((a, b) => (a.atMs ?? -1) - (b.atMs ?? -1) || a.createdAt.localeCompare(b.createdAt))
+  [...comments.value].filter((c) => showResolved.value || !c.resolved).sort((a, b) => (a.atMs ?? -1) - (b.atMs ?? -1) || a.createdAt.localeCompare(b.createdAt))
 )
 
 async function loadComments() {

@@ -185,7 +185,12 @@ const columns: ColumnDef<Subtitle>[] = [
   { key: 'label', label: 'Track', sortable: true },
   { key: 'language', sortable: true, value: (row) => languageLabel(row.language) },
   { key: 'source', sortable: true, value: (row) => sourceMeta(row.source).label },
-  { key: 'reviewStatus', label: 'Review', sortable: true, value: (row) => REVIEW_STATUSES.find((r) => r.value === row.reviewStatus)?.label ?? row.reviewStatus },
+  {
+    key: 'reviewStatus',
+    label: 'Review',
+    sortable: true,
+    value: (row) => REVIEW_STATUSES.find((r) => r.value === row.reviewStatus)?.label ?? row.reviewStatus
+  },
   { key: 'published', label: 'Visibility', sortable: true, value: (row) => (row.published ? 'Published' : 'Unpublished') },
   { key: 'cueCount', label: 'Cues', type: 'number', sortable: true, class: 'tabular-nums' },
   { key: 'issueCount', label: 'Warnings', sortable: true, value: (row) => String(row.issueCount) },

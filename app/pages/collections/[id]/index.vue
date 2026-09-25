@@ -2,7 +2,17 @@
   <div>
     <PageHeader :title="collection?.title ?? 'Collection'" :crumbs="[{ label: 'Collections', to: '/collections' }, { label: collection?.title ?? '…' }]">
       <template v-if="collection" #actions>
-        <UButton color="primary" icon="i-lucide-plus" @click="openAdd">Add videos</UButton>
+        <UButton v-if="items.some((i) => !i.deleted)" color="primary" icon="i-lucide-play" :to="`/collections/${collection.id}/play`">Play all</UButton>
+        <UButton
+          v-if="items.filter((i) => !i.deleted).length > 1"
+          color="neutral"
+          variant="soft"
+          icon="i-lucide-shuffle"
+          :to="`/collections/${collection.id}/play?shuffle=1`"
+        >
+          Shuffle
+        </UButton>
+        <UButton color="neutral" variant="soft" icon="i-lucide-plus" @click="openAdd">Add videos</UButton>
         <UButton color="neutral" variant="soft" icon="i-lucide-pencil" @click="showForm = true">Edit</UButton>
         <UButton color="error" variant="soft" icon="i-lucide-trash-2" @click="confirmDelete = true">Delete</UButton>
       </template>
@@ -56,6 +66,17 @@
           <div class="flex items-center gap-2">
             <h2 class="font-semibold text-gray-900 dark:text-white">Videos</h2>
             <UBadge color="neutral" variant="subtle" size="sm">{{ collection.videoCount }}</UBadge>
+            <UButton
+              v-if="collection.videoCount > 1"
+              size="xs"
+              color="neutral"
+              variant="soft"
+              icon="i-lucide-arrow-up-down"
+              class="ml-auto"
+              @click="showReorder = true"
+            >
+              Reorder
+            </UButton>
           </div>
         </template>
         <div v-if="videosLoading && !items.length" class="p-4 space-y-3">
@@ -91,6 +112,16 @@
             </div>
             <UBadge v-if="item.deleted" color="error" variant="subtle" size="sm" icon="i-lucide-trash-2">In trash</UBadge>
             <UBadge v-else-if="!item.enabled" color="warning" variant="subtle" size="sm" icon="i-lucide-eye-off">Disabled</UBadge>
+            <UTooltip v-if="!item.deleted" text="Play from here">
+              <UButton
+                size="xs"
+                color="primary"
+                variant="ghost"
+                icon="i-lucide-play"
+                :aria-label="`Play the collection from ${item.title ?? 'this video'}`"
+                :to="`/collections/${collection?.id}/play?v=${item.videoId}`"
+              />
+            </UTooltip>
             <UTooltip text="Remove from collection">
               <UButton
                 size="xs"
@@ -162,6 +193,7 @@
       :loading="busy"
       @confirm="onDelete"
     />
+    <CollectionReorderModal v-model:open="showReorder" :collection-id="id" @saved="loadItems" />
   </div>
 </template>
 
@@ -241,6 +273,8 @@ async function loadItems() {
   }
 }
 watch([itemsPage, itemsPageSize], loadItems)
+
+const showReorder = ref(false)
 
 // ── Remove video ───────────────────────────────────────────────────────────
 const confirmRemove = ref<CollectionVideo | null>(null)

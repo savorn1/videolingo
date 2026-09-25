@@ -14,7 +14,9 @@
     <UCard class="mb-4">
       <div class="text-sm text-gray-600 dark:text-gray-300 space-y-2">
         <p>Send the key in an <code class="text-xs">X-API-Key</code> header (or as <code class="text-xs">Authorization: Bearer vl_…</code>):</p>
-        <pre class="text-xs bg-gray-50 dark:bg-gray-900 rounded-lg p-3 overflow-x-auto"><code>curl -H "X-API-Key: vl_…" {{ origin }}/api/admin/videos</code></pre>
+        <pre
+          class="text-xs bg-gray-50 dark:bg-gray-900 rounded-lg p-3 overflow-x-auto"
+        ><code>curl -H "X-API-Key: vl_…" {{ origin }}/api/admin/videos</code></pre>
         <p class="text-xs text-gray-500">Calls made with a key show up in the audit log with a key icon. Keys can't create or revoke other keys.</p>
       </div>
     </UCard>
@@ -28,7 +30,9 @@
           </div>
         </template>
         <template #state-data="{ row }">
-          <UBadge v-if="row.revokedAt" color="cancelled" variant="subtle" :title="`Revoked by ${row.revokedBy} ${formatDateTime(row.revokedAt)}`">Revoked</UBadge>
+          <UBadge v-if="row.revokedAt" color="cancelled" variant="subtle" :title="`Revoked by ${row.revokedBy} ${formatDateTime(row.revokedAt)}`"
+            >Revoked</UBadge
+          >
           <UBadge v-else-if="!row.active" color="error" variant="subtle">Expired</UBadge>
           <UBadge v-else color="success" variant="subtle">Active</UBadge>
         </template>
@@ -42,7 +46,11 @@
           <UButton v-if="canWrite && !row.revokedAt" size="xs" color="error" variant="soft" icon="i-lucide-ban" @click="confirmRevoke = row">Revoke</UButton>
         </template>
         <template #empty-state>
-          <EmptyState icon="i-lucide-key-round" title="No API keys" description="Create one for each system that needs access, so you can revoke them separately.">
+          <EmptyState
+            icon="i-lucide-key-round"
+            title="No API keys"
+            description="Create one for each system that needs access, so you can revoke them separately."
+          >
             <template v-if="canWrite" #action>
               <UButton icon="i-lucide-plus" @click="openCreate">New key</UButton>
             </template>
@@ -55,7 +63,13 @@
     <UModal v-model:open="showCreate" :title="created ? 'Copy your new key' : 'New API key'" :ui="{ content: 'sm:max-w-lg' }" :dismissible="!created">
       <template #body>
         <div v-if="created" class="space-y-4">
-          <UAlert color="warning" variant="subtle" icon="i-lucide-eye-off" title="This is the only time the key is shown" description="Store it somewhere safe, like a secrets manager. If it's lost, revoke it and create another." />
+          <UAlert
+            color="warning"
+            variant="subtle"
+            icon="i-lucide-eye-off"
+            title="This is the only time the key is shown"
+            description="Store it somewhere safe, like a secrets manager. If it's lost, revoke it and create another."
+          />
           <div class="flex gap-2">
             <UInput :model-value="created" readonly class="flex-1 font-mono" aria-label="API key" />
             <UButton :icon="copied ? 'i-lucide-check' : 'i-lucide-copy'" @click="copy">{{ copied ? 'Copied' : 'Copy' }}</UButton>
@@ -71,7 +85,10 @@
           <UFormField label="Expires">
             <USelect v-model="form.expiresInDays" :items="expiryOptions" class="w-full" />
           </UFormField>
-          <p class="text-xs text-gray-500">It will act as <strong>{{ username }}</strong>{{ isAdmin ? ' (an administrator — it can do anything)' : ', with your role’s permissions' }}.</p>
+          <p class="text-xs text-gray-500">
+            It will act as <strong>{{ username }}</strong
+            >{{ isAdmin ? ' (an administrator — it can do anything)' : ', with your role’s permissions' }}.
+          </p>
           <UAlert v-if="formError" color="error" variant="subtle" :title="formError" icon="i-lucide-triangle-alert" />
           <div class="flex justify-end gap-2">
             <UButton color="neutral" variant="ghost" @click="showCreate = false">Cancel</UButton>

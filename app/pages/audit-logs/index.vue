@@ -42,7 +42,9 @@
           </div>
         </template>
         <template #status-data="{ row }">
-          <UBadge :color="OUTCOME_COLOR[auditOutcome(row.status)]" variant="subtle" class="tabular-nums">{{ row.status }} · {{ OUTCOME_LABEL[auditOutcome(row.status)] }}</UBadge>
+          <UBadge :color="OUTCOME_COLOR[auditOutcome(row.status)]" variant="subtle" class="tabular-nums"
+            >{{ row.status }} · {{ OUTCOME_LABEL[auditOutcome(row.status)] }}</UBadge
+          >
         </template>
         <template #ipAddress-data="{ row }">
           <span class="text-xs font-mono text-gray-500" :title="row.userAgent ?? undefined">{{ row.ipAddress ?? '—' }}</span>
@@ -100,10 +102,7 @@ const OUTCOME_LABEL = { success: 'OK', failed: 'Failed', denied: 'Denied' } as c
 
 const knownModules = ref<string[]>([])
 const moduleOptions = computed(() => [{ label: 'Every area', value: undefined }, ...knownModules.value.map((m) => ({ label: humanize(m), value: m }))])
-const methodOptions = [
-  { label: 'Any method', value: undefined },
-  ...['POST', 'PUT', 'PATCH', 'DELETE'].map((m) => ({ label: m, value: m }))
-]
+const methodOptions = [{ label: 'Any method', value: undefined }, ...['POST', 'PUT', 'PATCH', 'DELETE'].map((m) => ({ label: m, value: m }))]
 const outcomeOptions = [
   { label: 'Any outcome', value: undefined },
   { label: 'Succeeded', value: 'success' as const },

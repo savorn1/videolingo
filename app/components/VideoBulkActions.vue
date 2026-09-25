@@ -8,7 +8,12 @@
       Translate…
     </UButton>
 
-    <UModal v-model:open="show" :title="title" :description="`${videos.length} selected video${videos.length === 1 ? '' : 's'}`" :ui="{ content: 'sm:max-w-lg' }">
+    <UModal
+      v-model:open="show"
+      :title="title"
+      :description="`${videos.length} selected video${videos.length === 1 ? '' : 's'}`"
+      :ui="{ content: 'sm:max-w-lg' }"
+    >
       <template #body>
         <div class="space-y-4">
           <UFormField v-if="action === 'tags'" label="Tags" description="Videos that already have a tag keep it.">
@@ -55,14 +60,19 @@
           </template>
 
           <!-- Results -->
-          <div v-if="results.length" class="rounded-lg border border-gray-200 dark:border-gray-800 max-h-56 overflow-y-auto divide-y divide-gray-100 dark:divide-gray-800 text-sm">
+          <div
+            v-if="results.length"
+            class="rounded-lg border border-gray-200 dark:border-gray-800 max-h-56 overflow-y-auto divide-y divide-gray-100 dark:divide-gray-800 text-sm"
+          >
             <div v-for="(r, i) in results" :key="i" class="flex items-start gap-2 px-3 py-1.5">
               <UIcon
                 :name="r.outcome === 'ok' ? 'i-lucide-check-circle' : r.outcome === 'skipped' ? 'i-lucide-circle-minus' : 'i-lucide-x-circle'"
                 class="w-4 h-4 mt-0.5 shrink-0"
                 :class="r.outcome === 'ok' ? 'text-success-500' : r.outcome === 'skipped' ? 'text-gray-400' : 'text-error-500'"
               />
-              <span class="min-w-0"><span class="font-medium">{{ r.video }}</span> — {{ r.message }}</span>
+              <span class="min-w-0"
+                ><span class="font-medium">{{ r.video }}</span> — {{ r.message }}</span
+              >
             </div>
           </div>
 
@@ -118,9 +128,7 @@ const languageItems = computed(() =>
 const noLanguage = computed(() => props.videos.filter((v) => !v.language))
 const plannedJobs = computed(() => (props.videos.length - noLanguage.value.length) * targetLanguages.value.length)
 
-const ready = computed(() =>
-  action.value === 'tags' ? tagIds.value.length > 0 : action.value === 'collection' ? !!collectionId.value : plannedJobs.value > 0
-)
+const ready = computed(() => (action.value === 'tags' ? tagIds.value.length > 0 : action.value === 'collection' ? !!collectionId.value : plannedJobs.value > 0))
 
 async function openAction(a: Action) {
   action.value = a
@@ -132,7 +140,8 @@ async function openAction(a: Action) {
   if (a === 'translate') return
   optionsLoading.value = true
   try {
-    if (a === 'tags') tagOptions.value = (await listTags({ size: 500, sortBy: 'name', sortOrder: 'asc' })).data.map((t) => ({ label: `#${t.name}`, value: t.id }))
+    if (a === 'tags')
+      tagOptions.value = (await listTags({ size: 500, sortBy: 'name', sortOrder: 'asc' })).data.map((t) => ({ label: `#${t.name}`, value: t.id }))
     else collectionOptions.value = (await listCollections({ size: 500 })).data.map((c) => ({ label: c.title, value: c.id }))
   } catch (err) {
     toast.add({ title: 'Could not load the options', description: apiErrorMessage(err), color: 'error' })
@@ -158,7 +167,10 @@ async function run() {
     } else if (action.value === 'collection') {
       // One request for all of them.
       try {
-        await addVideos(collectionId.value!, props.videos.map((v) => v.id))
+        await addVideos(
+          collectionId.value!,
+          props.videos.map((v) => v.id)
+        )
         push(`${props.videos.length} video(s)`, 'ok', `added to “${collectionOptions.value.find((c) => c.value === collectionId.value)?.label}”`)
       } catch (err) {
         push(`${props.videos.length} video(s)`, 'failed', apiErrorMessage(err))

@@ -47,7 +47,12 @@
           </div>
         </template>
         <template #empty-state>
-          <EmptyState v-if="hasActiveFilter" icon="i-lucide-search-x" title="No glossaries match your filters" description="Try a different search or clear your filters.">
+          <EmptyState
+            v-if="hasActiveFilter"
+            icon="i-lucide-search-x"
+            title="No glossaries match your filters"
+            description="Try a different search or clear your filters."
+          >
             <template #action>
               <UButton color="neutral" variant="soft" icon="i-lucide-x" @click="clearFilters">Clear filters</UButton>
             </template>

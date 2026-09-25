@@ -43,13 +43,26 @@
     </div>
     <div v-else-if="rows.length" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
       <UCard v-for="c in rows" :key="c.id" :ui="{ body: 'p-0 sm:p-0' }" class="overflow-hidden flex flex-col group">
-        <NuxtLink :to="`/collections/${c.id}`" class="block">
-          <CollectionCover :src="c.coverUrl">
-            <span class="absolute bottom-2 right-2 rounded bg-black/70 px-1.5 py-0.5 text-xs font-semibold text-white">
-              {{ c.videoCount }} video{{ c.videoCount === 1 ? '' : 's' }}
-            </span>
-          </CollectionCover>
-        </NuxtLink>
+        <div class="relative">
+          <NuxtLink :to="`/collections/${c.id}`" class="block">
+            <CollectionCover :src="c.coverUrl">
+              <span class="absolute inset-0 bg-black/0 group-hover:bg-black/25 transition-colors" />
+              <span class="absolute bottom-2 right-2 rounded bg-black/70 px-1.5 py-0.5 text-xs font-semibold text-white">
+                {{ c.videoCount }} video{{ c.videoCount === 1 ? '' : 's' }}
+              </span>
+            </CollectionCover>
+          </NuxtLink>
+          <!-- A sibling of the card link, not inside it: links can't nest. -->
+          <div v-if="c.videoCount" class="pointer-events-none absolute inset-0 flex items-center justify-center">
+            <NuxtLink
+              :to="`/collections/${c.id}/play`"
+              :aria-label="`Play ${c.title}`"
+              class="pointer-events-auto flex items-center justify-center w-12 h-12 rounded-full bg-primary-600 text-white shadow-lg opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity"
+            >
+              <UIcon name="i-lucide-play" class="w-6 h-6 ml-0.5" />
+            </NuxtLink>
+          </div>
+        </div>
         <div class="p-4 flex-1 flex flex-col gap-2">
           <div class="flex items-start justify-between gap-2">
             <NuxtLink :to="`/collections/${c.id}`" class="font-semibold text-gray-900 dark:text-white hover:underline line-clamp-2">{{ c.title }}</NuxtLink>
@@ -207,6 +220,12 @@ function openForm(c: Collection | null) {
 function menu(c: Collection): DropdownMenuItem[][] {
   return [
     [
+      ...(c.videoCount
+        ? [
+            { label: 'Play', icon: 'i-lucide-play', onSelect: () => navigateTo(`/collections/${c.id}/play`) },
+            { label: 'Shuffle play', icon: 'i-lucide-shuffle', onSelect: () => navigateTo(`/collections/${c.id}/play?shuffle=1`) }
+          ]
+        : []),
       { label: 'Open', icon: 'i-lucide-list-video', onSelect: () => navigateTo(`/collections/${c.id}`) },
       { label: 'Edit details', icon: 'i-lucide-pencil', onSelect: () => openForm(c) }
     ],

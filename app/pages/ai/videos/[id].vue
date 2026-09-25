@@ -95,7 +95,10 @@
                       >Off in Settings</UBadge
                     >
                     <UTooltip v-else-if="estimates[task.value]" :text="estimateBasis(estimates[task.value]!)">
-                      <p class="mt-1 text-xs tabular-nums" :class="estimates[task.value]!.wouldExceedBudget ? 'text-warning-600 dark:text-warning-400' : 'text-gray-500'">
+                      <p
+                        class="mt-1 text-xs tabular-nums"
+                        :class="estimates[task.value]!.wouldExceedBudget ? 'text-warning-600 dark:text-warning-400' : 'text-gray-500'"
+                      >
                         <UIcon name="i-lucide-coins" class="w-3 h-3 align-[-2px]" />
                         ≈ {{ estimates[task.value]!.costUsd !== null ? formatUsd(estimates[task.value]!.costUsd) : 'unpriced model' }} ·
                         {{ formatTokens(estimates[task.value]!.inputTokens) }} in / {{ formatTokens(estimates[task.value]!.outputTokens) }} out
