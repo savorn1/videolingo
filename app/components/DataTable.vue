@@ -28,26 +28,18 @@
 
     <div
       v-if="selectable && selected.length > 0"
-      class="flex items-center justify-between gap-3 mb-3 rounded-lg bg-primary-50 dark:bg-primary-400/10 px-3 py-2"
+      class="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 mb-3 rounded-lg bg-primary-50 dark:bg-primary-400/10 px-3 py-2"
     >
       <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
         <span class="text-primary-700 dark:text-primary-300 font-medium">
           {{ allMatchingSelected ? `All ${selected.length.toLocaleString()} selected` : `${selected.length.toLocaleString()} selected` }}
           <span v-if="offPageCount" class="font-normal text-primary-600/80 dark:text-primary-300/70">({{ offPageCount }} on other pages)</span>
         </span>
-        <UButton
-          v-if="canSelectAllMatching"
-          size="xs"
-          variant="link"
-          color="primary"
-          :padded="false"
-          :loading="selectingAll"
-          @click="selectAllMatching"
-        >
+        <UButton v-if="canSelectAllMatching" size="xs" variant="link" color="primary" :padded="false" :loading="selectingAll" @click="selectAllMatching">
           Select all {{ totalCount!.toLocaleString() }}
         </UButton>
       </div>
-      <div class="flex items-center gap-2">
+      <div class="flex flex-wrap items-center gap-2">
         <slot name="bulk-actions" :selected="selected" :clear="() => (selected = [])" />
         <UButton size="xs" variant="ghost" color="neutral" @click="selected = []"> Clear selection </UButton>
       </div>
@@ -132,7 +124,7 @@
           ]"
           @click="emit('select', row)"
         >
-          <div v-if="selectable" class="flex justify-end -mt-1 -mr-1 mb-1" @click.stop="toggleRow(row, !isSelected(row))">
+          <div v-if="selectable" class="flex justify-end mb-1" @click.stop="toggleRow(row, !isSelected(row))">
             <UCheckbox :model-value="isSelected(row)" :aria-label="isSelected(row) ? 'Unselect' : 'Select'" class="pointer-events-none p-1" />
           </div>
           <div v-for="column in visibleColumns" :key="column.key" class="flex items-start justify-between gap-3 py-1 text-sm first:pt-0 last:pb-0">
@@ -320,7 +312,11 @@ function onRowClick(e: Event, row: { original: T; index: number }) {
     const value = !isSelected(row.original)
     if ((e as MouseEvent).shiftKey && lastClickedIndex !== null) {
       const [from, to] = [Math.min(lastClickedIndex, row.index), Math.max(lastClickedIndex, row.index)]
-      for (const r of props.rows.slice(from, to + 1)) toggleRow(r, value)
+      // One assignment: `selected` is a v-model, so it only reflects a write
+      // after the parent re-renders — toggling row by row would lose all but the last.
+      const range = props.rows.slice(from, to + 1)
+      const rangeKeys = new Set(range.map(keyOf))
+      selected.value = value ? [...selected.value, ...range.filter((r) => !isSelected(r))] : selected.value.filter((r) => !rangeKeys.has(keyOf(r)))
       // Shift+click also selects the text in between; clear that.
       window.getSelection()?.removeAllRanges()
     } else {
@@ -331,14 +327,17 @@ function onRowClick(e: Event, row: { original: T; index: number }) {
   }
   emit('select', row.original)
 }
-watch(() => props.rows, () => (lastClickedIndex = null))
+// A Shift+click range only makes sense on the same rows: forget the anchor when
+// the page shows different ones (a plain reload of the same page keeps it).
+watch(
+  () => props.rows.map(keyOf).join('|'),
+  () => (lastClickedIndex = null)
+)
 
 // "Select all N matching" — the page loads every matching row and sets them.
 const hasSelectAllListener = computed(() => !!(instance?.vnode.props as { onSelectAllMatching?: unknown } | null)?.onSelectAllMatching)
 const allMatchingSelected = computed(() => !!props.totalCount && selected.value.length >= props.totalCount)
-const canSelectAllMatching = computed(
-  () => hasSelectAllListener.value && allSelected.value && !!props.totalCount && props.totalCount > selected.value.length
-)
+const canSelectAllMatching = computed(() => hasSelectAllListener.value && allSelected.value && !!props.totalCount && props.totalCount > selected.value.length)
 const selectingAll = ref(false)
 function selectAllMatching() {
   selectingAll.value = true
@@ -462,7 +461,13 @@ const exportItems = [
 // formatColumnText(), so there's nothing for TanStack itself to accessor.
 const uColumns = computed<TableColumn<T>[]>(() => {
   const cols: TableColumn<T>[] = []
-  if (props.selectable) cols.push({ id: SELECT_KEY, meta: { class: { td: 'w-10 cursor-pointer', th: 'w-10' } } })
+  // Nuxt UI drops the end padding of any cell holding a checkbox
+  // ([&:has([role=checkbox])]:pe-0), which left ours flush against the next
+  // column. Same variant, so it replaces that rule: equal space either side.
+  if (props.selectable) {
+    const pad = 'w-12 [&:has([role=checkbox])]:pe-4'
+    cols.push({ id: SELECT_KEY, meta: { class: { td: `${pad} cursor-pointer`, th: pad } } })
+  }
   if (props.numbered) cols.push({ id: ROW_NUMBER_KEY })
   for (const c of visibleColumns.value) {
     const tdClass = typeof c.class === 'function' ? (cell: { row: { original: T } }) => (c.class as (row: T) => string)(cell.row.original) : c.class
