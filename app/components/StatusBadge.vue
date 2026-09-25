@@ -44,6 +44,10 @@ const STATUS_META: Record<string, { color: StatusColor; icon: string }> = {
   CANCELLED: { color: 'cancelled', icon: 'i-lucide-ban' },
   VOIDED: { color: 'cancelled', icon: 'i-lucide-ban' },
   DRAFT: { color: 'neutral', icon: 'i-lucide-pencil' },
+  // Subtitle review workflow (useSubtitles' ReviewStatus) — DRAFT/APPROVED
+  // already covered above.
+  IN_REVIEW: { color: 'info', icon: 'i-lucide-eye' },
+  CHANGES_REQUESTED: { color: 'warning', icon: 'i-lucide-message-square-warning' },
   UP: { color: 'success', icon: 'i-lucide-check-circle' },
   DOWN: { color: 'error', icon: 'i-lucide-x-circle' },
   DISABLED: { color: 'neutral', icon: 'i-lucide-power-off' },

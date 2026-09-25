@@ -94,6 +94,14 @@
                     <UBadge v-if="!featureOn(task.value)" color="neutral" variant="subtle" size="sm" icon="i-lucide-power-off" class="mt-1"
                       >Off in Settings</UBadge
                     >
+                    <UTooltip v-else-if="estimates[task.value]" :text="estimateBasis(estimates[task.value]!)">
+                      <p class="mt-1 text-xs tabular-nums" :class="estimates[task.value]!.wouldExceedBudget ? 'text-warning-600 dark:text-warning-400' : 'text-gray-500'">
+                        <UIcon name="i-lucide-coins" class="w-3 h-3 align-[-2px]" />
+                        ≈ {{ estimates[task.value]!.costUsd !== null ? formatUsd(estimates[task.value]!.costUsd) : 'unpriced model' }} ·
+                        {{ formatTokens(estimates[task.value]!.inputTokens) }} in / {{ formatTokens(estimates[task.value]!.outputTokens) }} out
+                        <template v-if="estimates[task.value]!.wouldExceedBudget"> · over this month's budget</template>
+                      </p>
+                    </UTooltip>
                   </div>
                 </div>
                 <div class="flex items-center gap-1.5 shrink-0">
@@ -204,7 +212,7 @@
 <script setup lang="ts">
 import type { TabsItem } from '@nuxt/ui'
 import type { AiTaskType } from '#shared/utils/ai'
-import type { AiGeneration, AiStatus } from '~/composables/useAi'
+import type { AiEstimate, AiGeneration, AiStatus } from '~/composables/useAi'
 import type { Transcript } from '~/composables/useTranscripts'
 import type { Video } from '~/composables/useVideos'
 
@@ -303,6 +311,38 @@ async function load() {
   }
 }
 
+// ── Cost estimates (per task, for the chosen transcript and count) ──────────
+const estimates = reactive<Partial<Record<AiTaskType, AiEstimate>>>({})
+let estimateTimer: ReturnType<typeof setTimeout> | undefined
+function refreshEstimates() {
+  clearTimeout(estimateTimer)
+  estimateTimer = setTimeout(async () => {
+    if (!transcriptId.value) return
+    const tid = transcriptId.value
+    await Promise.all(
+      AI_TASKS.map(async (task) => {
+        try {
+          const e = await ai.estimate(videoId.value, { type: task.value, transcriptId: tid, count: task.defaultCount !== null ? counts[task.value] : null })
+          if (transcriptId.value === tid) estimates[task.value] = e
+        } catch {
+          delete estimates[task.value]
+        }
+      })
+    )
+  }, 400)
+}
+watch([transcriptId, () => ({ ...counts })], refreshEstimates)
+
+function estimateBasis(e: AiEstimate) {
+  const input = e.inputMeasured ? 'input measured from an earlier run on this transcript' : 'input estimated from the transcript’s length'
+  const output = e.outputSamples ? `output averaged over the last ${e.outputSamples} run(s)` : 'a typical output size (no runs yet)'
+  const budget =
+    e.monthlyBudgetUsd !== null
+      ? ` Spent ${formatUsd(e.monthSpendUsd)} of ${formatUsd(e.monthlyBudgetUsd)} this month${e.budgetEnforced && e.wouldExceedBudget ? ' — the budget is enforced, so this will be refused' : ''}.`
+      : ''
+  return `Estimate on ${e.model}: ${input}; ${output}. Assumes the transcript isn't cached yet, so a repeat within 5 minutes costs less.${budget}`
+}
+
 async function generate(type: AiTaskType) {
   running[type] = true
   const meta = AI_TASKS.find((t) => t.value === type)!
@@ -316,6 +356,7 @@ async function generate(type: AiTaskType) {
     generations.value = [result, ...generations.value.filter((g) => !(g.type === result.type && g.outputLanguage === result.outputLanguage))]
     toast.add({ title: `${meta.label} ready`, description: result.usage ? `Cost ${formatUsd(result.usage.costUsd)}` : undefined, color: 'success' })
     refreshStatus()
+    refreshEstimates()
   } catch (err) {
     toast.add({ title: `Could not generate ${meta.label.toLowerCase()}`, description: apiErrorMessage(err), color: 'error' })
     refreshStatus()

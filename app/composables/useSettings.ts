@@ -26,6 +26,8 @@ export interface TranslationSettings {
   compactRules: SubtitleRules
   compactLanguages: string[]
   blockPublishWithIssues: boolean
+  /** Tracks must be approved in review before they can be published. */
+  requireApprovalToPublish: boolean
 }
 
 export interface AiSettings {
@@ -88,6 +90,7 @@ export interface ClientSettings {
   maxVideoUploadMb: number
   defaultTargetLanguages: string[]
   blockPublishWithIssues: boolean
+  requireApprovalToPublish: boolean
   maxUploadMb: number
   allowedUploadTypes: string[]
   maxSubtitleUploadMb: number

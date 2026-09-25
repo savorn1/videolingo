@@ -3,7 +3,12 @@
     <!-- Cmd/Ctrl+K anywhere in the app — items are derived straight from the
          sidebar nav below, so it can never list a page the sidebar doesn't
          also have (see searchGroups). -->
-    <UDashboardSearch :groups="searchGroups" />
+    <UDashboardSearch
+      v-model:search-term="searchTerm"
+      :groups="allSearchGroups"
+      :loading="contentLoading"
+      placeholder="Search pages, videos, subtitles, or anything said in a video…"
+    />
 
     <!-- Deliberately always dark, independent of the app's own light/dark
          toggle — the `dark` class forces every Nuxt UI component inside
@@ -109,6 +114,7 @@ const items = computed<SidebarItem[]>(() => [
             { label: 'Collections', to: '/collections', icon: 'i-lucide-library' },
             { label: 'Transcripts', to: '/transcripts', icon: 'i-lucide-captions' },
             { label: 'Subtitles', to: '/subtitles', icon: 'i-lucide-subtitles' },
+            { label: 'Glossaries', to: '/glossaries', icon: 'i-lucide-book-a' },
             { label: 'Processing jobs', to: '/processing-jobs', icon: 'i-lucide-cpu' }
           ]
         },
@@ -142,6 +148,9 @@ const items = computed<SidebarItem[]>(() => [
           children: [
             { label: 'Users', to: '/users', icon: 'i-lucide-users' },
             { label: 'Languages', to: '/languages', icon: 'i-lucide-languages' },
+            { label: 'Audit log', to: '/audit-logs', icon: 'i-lucide-scroll-text' },
+            { label: 'API keys', to: '/api-keys', icon: 'i-lucide-key-round' },
+            { label: 'Webhooks', to: '/webhooks', icon: 'i-lucide-webhook' },
             { label: 'Settings', to: '/settings', icon: 'i-lucide-settings' }
           ]
         }
@@ -185,6 +194,12 @@ const searchGroups = computed(() => {
   if (topLevel.length > 0) groups.unshift({ id: 'top', items: topLevel })
   return groups
 })
+
+// Typing 2+ characters also searches content on the server (useGlobalSearch);
+// those results come first, the matching pages after.
+const searchTerm = ref('')
+const { groups: contentGroups, loading: contentLoading } = useGlobalSearch(searchTerm)
+const allSearchGroups = computed(() => [...contentGroups.value, ...searchGroups.value])
 
 // Derived from the same nav list so it can never drift out of sync with the
 // sidebar — each top-level item is now a collapsible group with `children`,

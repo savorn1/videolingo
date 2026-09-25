@@ -16,6 +16,7 @@
         <USelect v-model="filter.source" :items="sourceFilterOptions" placeholder="Source" class="w-40" />
         <USelect v-model="filter.published" :items="publishedFilterOptions" placeholder="Visibility" class="w-40" />
         <USelect v-model="filter.hasIssues" :items="issueFilterOptions" placeholder="Readability" class="w-44" />
+        <USelect v-model="filter.reviewStatus" :items="reviewFilterOptions" placeholder="Review" class="w-44" />
         <UBadge v-if="filter.videoId" color="neutral" variant="subtle" size="lg" class="gap-1">
           Video #{{ filter.videoId }}
           <UButton
@@ -67,9 +68,12 @@
           <UBadge :color="sourceMeta(row.source).color" variant="subtle" :icon="sourceMeta(row.source).icon">{{ sourceMeta(row.source).label }}</UBadge>
         </template>
 
+        <template #reviewStatus-data="{ row }">
+          <StatusBadge :status="row.reviewStatus" />
+        </template>
         <template #published-data="{ row }">
           <UBadge :color="row.published ? 'success' : 'neutral'" variant="subtle" :icon="row.published ? 'i-lucide-eye' : 'i-lucide-eye-off'">
-            {{ row.published ? 'Published' : 'Draft' }}
+            {{ row.published ? 'Published' : 'Unpublished' }}
           </UBadge>
         </template>
 
@@ -131,7 +135,7 @@
 
 <script setup lang="ts">
 import type { ColumnDef, RowAction } from '#shared/types'
-import { SUBTITLE_SOURCES, type Subtitle, type SubtitleFormat, type SubtitleSource } from '~/composables/useSubtitles'
+import { REVIEW_STATUSES, SUBTITLE_SOURCES, type ReviewStatus, type Subtitle, type SubtitleFormat, type SubtitleSource } from '~/composables/useSubtitles'
 
 definePageMeta({ middleware: 'admin' })
 
@@ -149,8 +153,9 @@ const filter = reactive<{
   source: SubtitleSource | undefined
   published: boolean | undefined
   hasIssues: boolean | undefined
+  reviewStatus: ReviewStatus | undefined
   videoId: number | undefined
-}>({ language: undefined, source: undefined, published: undefined, hasIssues: undefined, videoId: undefined })
+}>({ language: undefined, source: undefined, published: undefined, hasIssues: undefined, reviewStatus: undefined, videoId: undefined })
 const search = ref('')
 const page = ref(1)
 const pageSize = ref(10)
@@ -163,8 +168,9 @@ const sourceFilterOptions = [{ label: 'All sources', value: undefined }, ...SUBT
 const publishedFilterOptions = [
   { label: 'All', value: undefined },
   { label: 'Published', value: true },
-  { label: 'Draft', value: false }
+  { label: 'Unpublished', value: false }
 ]
+const reviewFilterOptions = [{ label: 'Any review status', value: undefined }, ...REVIEW_STATUSES]
 const issueFilterOptions = [
   { label: 'Any readability', value: undefined },
   { label: 'Has warnings', value: true },
@@ -179,7 +185,8 @@ const columns: ColumnDef<Subtitle>[] = [
   { key: 'label', label: 'Track', sortable: true },
   { key: 'language', sortable: true, value: (row) => languageLabel(row.language) },
   { key: 'source', sortable: true, value: (row) => sourceMeta(row.source).label },
-  { key: 'published', label: 'Visibility', sortable: true, value: (row) => (row.published ? 'Published' : 'Draft') },
+  { key: 'reviewStatus', label: 'Review', sortable: true, value: (row) => REVIEW_STATUSES.find((r) => r.value === row.reviewStatus)?.label ?? row.reviewStatus },
+  { key: 'published', label: 'Visibility', sortable: true, value: (row) => (row.published ? 'Published' : 'Unpublished') },
   { key: 'cueCount', label: 'Cues', type: 'number', sortable: true, class: 'tabular-nums' },
   { key: 'issueCount', label: 'Warnings', sortable: true, value: (row) => String(row.issueCount) },
   { key: 'updatedAt', label: 'Updated', type: 'datetime', sortable: true },
@@ -228,12 +235,13 @@ const hasActiveFilter = computed(
     !!filter.source ||
     filter.published !== undefined ||
     filter.hasIssues !== undefined ||
+    filter.reviewStatus !== undefined ||
     filter.videoId !== undefined
 )
 function clearFilters() {
   search.value = ''
   debouncedSearch.value = ''
-  Object.assign(filter, { language: undefined, source: undefined, published: undefined, hasIssues: undefined, videoId: undefined })
+  Object.assign(filter, { language: undefined, source: undefined, published: undefined, hasIssues: undefined, reviewStatus: undefined, videoId: undefined })
 }
 
 onMounted(load)

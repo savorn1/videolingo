@@ -7,6 +7,39 @@ import type { SubtitleIssue, SubtitleRules } from '#shared/utils/subtitleQuality
 export type SubtitleSource = 'GENERATED' | 'UPLOADED' | 'MANUAL'
 export type SubtitleKind = 'SUBTITLES' | 'CAPTIONS'
 export type SubtitleFormat = 'vtt' | 'srt'
+/** Review workflow — see ReviewStatus on the backend. */
+export type ReviewStatus = 'DRAFT' | 'IN_REVIEW' | 'CHANGES_REQUESTED' | 'APPROVED'
+
+export const REVIEW_STATUSES: { value: ReviewStatus; label: string }[] = [
+  { value: 'DRAFT', label: 'Draft' },
+  { value: 'IN_REVIEW', label: 'In review' },
+  { value: 'CHANGES_REQUESTED', label: 'Changes requested' },
+  { value: 'APPROVED', label: 'Approved' }
+]
+
+export interface SubtitleComment {
+  id: number
+  subtitleId: number
+  /** The moment it's about; null = the whole track. */
+  atMs: number | null
+  /** The cue's text when the comment was written. */
+  cueText: string | null
+  body: string
+  author: string
+  resolved: boolean
+  resolvedBy: string | null
+  resolvedAt: string | null
+  createdAt: string
+}
+
+/** What a revision of a subtitle track holds. */
+export interface SubtitleSnapshot {
+  label: string
+  language: string
+  kind: SubtitleKind
+  rules: SubtitleRules | null
+  cues: SubtitleCue[] | null
+}
 
 export interface SubtitleCue {
   id?: number
@@ -39,6 +72,16 @@ export interface Subtitle {
   createdAt: string | null
   updatedAt: string | null
   version: number
+  reviewStatus: ReviewStatus
+  /** Who sent it for review (and is told the decision). */
+  reviewRequestedBy: string | null
+  reviewRequestedAt: string | null
+  reviewedBy: string | null
+  reviewedAt: string | null
+  /** The submitter's note while in review; the reviewer's once decided. */
+  reviewNote: string | null
+  /** Detail only: unresolved comments. */
+  openComments: number | null
   /** Detail only. */
   cues: SubtitleCue[] | null
   issues: SubtitleIssue[] | null
@@ -53,6 +96,7 @@ export interface SubtitleFilter {
   language?: string
   source?: SubtitleSource
   published?: boolean
+  reviewStatus?: ReviewStatus
   hasIssues?: boolean
   sortBy?: string
   sortOrder?: 'asc' | 'desc'
@@ -152,5 +196,53 @@ export function useSubtitles() {
     return filename
   }
 
-  return { list, get, create, upload, update, setDefault, regenerate, remove, download }
+  // ── Review (submit = WRITE; approve / reject = APPROVE) ────────────────
+  async function submitForReview(id: number, note?: string) {
+    return (await api<ApiEnvelope<Subtitle>>(`${base}/${id}/submit`, { method: 'POST', body: { note } })).data
+  }
+
+  async function approve(id: number, note?: string) {
+    return (await api<ApiEnvelope<Subtitle>>(`${base}/${id}/approve`, { method: 'POST', body: { note } })).data
+  }
+
+  /** "Request changes" — the note is required. */
+  async function requestChanges(id: number, note: string) {
+    return (await api<ApiEnvelope<Subtitle>>(`${base}/${id}/reject`, { method: 'POST', body: { note } })).data
+  }
+
+  // ── Comments ──────────────────────────────────────────────────────────
+  async function comments(id: number) {
+    return (await api<ApiEnvelope<SubtitleComment[]>>(`${base}/${id}/comments`)).data
+  }
+
+  async function addComment(id: number, body: string, atMs: number | null) {
+    return (await api<ApiEnvelope<SubtitleComment>>(`${base}/${id}/comments`, { method: 'POST', body: { body, atMs } })).data
+  }
+
+  async function resolveComment(id: number, commentId: number, resolved: boolean) {
+    return (await api<ApiEnvelope<SubtitleComment>>(`${base}/${id}/comments/${commentId}`, { method: 'PUT', body: { resolved } })).data
+  }
+
+  async function removeComment(id: number, commentId: number) {
+    await api(`${base}/${id}/comments/${commentId}`, { method: 'DELETE' })
+  }
+
+  return {
+    list,
+    get,
+    create,
+    upload,
+    update,
+    setDefault,
+    regenerate,
+    remove,
+    download,
+    submitForReview,
+    approve,
+    requestChanges,
+    comments,
+    addComment,
+    resolveComment,
+    removeComment
+  }
 }

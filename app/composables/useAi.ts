@@ -178,6 +178,24 @@ export interface AiUsageFilter {
   size?: number
 }
 
+/** Expected size and cost of a generation, before running it (AiEstimateService). */
+export interface AiEstimate {
+  type: string
+  model: string
+  inputTokens: number
+  outputTokens: number
+  /** Input size measured from an earlier call on this transcript (else estimated from its text). */
+  inputMeasured: boolean
+  /** Recent calls the output size is averaged from; 0 = a typical size was assumed. */
+  outputSamples: number
+  /** Null when the model has no configured price. */
+  costUsd: number | null
+  monthSpendUsd: number
+  monthlyBudgetUsd: number | null
+  budgetEnforced: boolean
+  wouldExceedBudget: boolean
+}
+
 export function useAi() {
   const api = useApi()
   const base = '/api/admin/ai'
@@ -189,6 +207,10 @@ export function useAi() {
   /** Generate Summary / Chapters / Key Points / Questions / Quiz. Can take a minute. */
   async function generate(videoId: number, body: AiGenerateRequest) {
     return (await api<ApiEnvelope<AiGeneration>>(`${base}/videos/${videoId}/generate`, { method: 'POST', body, timeout: 600_000 })).data
+  }
+
+  async function estimate(videoId: number, params: { type: string; transcriptId?: number | null; count?: number | null }) {
+    return (await api<ApiEnvelope<AiEstimate>>(`${base}/videos/${videoId}/estimate`, { query: params })).data
   }
 
   /** Newest result per (type, output language). */
@@ -232,5 +254,5 @@ export function useAi() {
     return (await api<ApiEnvelope<AiUsageSummary>>(`${base}/usage/summary`, { query: { from, to } })).data
   }
 
-  return { status, generate, latest, history, removeGeneration, chats, createChat, getChat, send, removeChat, usage, usageSummary }
+  return { status, generate, estimate, latest, history, removeGeneration, chats, createChat, getChat, send, removeChat, usage, usageSummary }
 }

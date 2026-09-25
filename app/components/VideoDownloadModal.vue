@@ -41,15 +41,31 @@
           <UFormField v-if="audioOptions.length > 1" label="Sound">
             <USelect v-model="audio" :items="audioOptions" class="w-full" />
           </UFormField>
+          <UFormField
+            v-if="subtitleOptions.length > 1"
+            label="Subtitles in the picture"
+            :description="clientSettings?.requireApprovalToPublish ? 'Only approved tracks can be burned in.' : 'Drawn into the video, so they show in any player.'"
+          >
+            <USelect v-model="burnSubtitleId" :items="subtitleOptions" class="w-full" />
+          </UFormField>
+          <UAlert
+            v-if="selectedTrack && selectedTrack.reviewStatus !== 'APPROVED'"
+            color="warning"
+            variant="subtle"
+            icon="i-lucide-shield-alert"
+            :title="`“${selectedTrack.label}” hasn't been approved in review`"
+            description="Whatever it says now is baked into the file."
+          />
 
-          <!-- A file video with its own sound needs no job — it's already an MP4 somewhere. -->
-          <UButton v-if="!data.isLink && audio === ORIGINAL" block color="neutral" variant="soft" icon="i-lucide-download" :to="video.videoUrl" target="_blank">
+          <!-- A file video with its own sound and no subtitles needs no job — it's already an MP4 somewhere. -->
+          <UButton v-if="!data.isLink && audio === ORIGINAL && burnSubtitleId === NONE" block color="neutral" variant="soft" icon="i-lucide-download" :to="video.videoUrl" target="_blank">
             Download the original file
           </UButton>
           <template v-else-if="canWrite">
             <p class="text-xs text-gray-500 dark:text-gray-400">
               {{ data.isLink ? `Fetched from ${sourceLabel} at up to 720p.` : 'Made from the video file.' }}
               {{ audio !== ORIGINAL ? 'The voice-over replaces the original sound.' : '' }}
+              {{ burnSubtitleId !== NONE ? 'Burning in subtitles re-encodes the picture, so it takes longer.' : '' }}
               Ready in a few minutes and kept for 24 hours.
             </p>
             <UButton block icon="i-lucide-file-video" :loading="starting === 'FILE'" :disabled="!allowed || busy" @click="onStart('FILE')">
@@ -64,6 +80,7 @@
                 <p class="text-sm font-medium text-gray-900 dark:text-white truncate" :title="file.fileName">{{ file.fileName }}</p>
                 <p class="text-xs text-gray-500 dark:text-gray-400">
                   {{ formatFileSize(file.sizeBytes) }} · {{ file.audioLanguage ? `${languageLabel(file.audioLanguage)} voice-over` : 'original sound' }} ·
+                  <template v-if="file.subtitleLabel">“{{ file.subtitleLabel }}” subtitles · </template>
                   <span :title="formatDateTime(file.expiresAt)">expires {{ formatRelativeTime(file.expiresAt) }}</span>
                 </p>
               </div>
@@ -108,6 +125,7 @@ import type { DownloadMode, DownloadOverview, VideoExport } from '~/composables/
 import type { ProcessingJob } from '~/composables/useProcessingJobs'
 import type { VideoDub } from '~/composables/useDubs'
 import type { Video } from '~/composables/useVideos'
+import type { Subtitle } from '~/composables/useSubtitles'
 
 const open = defineModel<boolean>({ default: false })
 const props = defineProps<{ video: Video; canWrite: boolean }>()
@@ -116,6 +134,8 @@ const emit = defineEmits<{ imported: [] }>()
 const toast = useToast()
 const { overview, start, remove } = useVideoDownloads()
 const { overview: dubOverview } = useDubs()
+const { list: listSubtitles } = useSubtitles()
+const { settings: clientSettings } = useClientSettings()
 
 const data = ref<DownloadOverview | null>(null)
 const dubs = ref<VideoDub[]>([])
@@ -137,11 +157,25 @@ async function loadDubs() {
   }
 }
 
+// Tracks that can be burned in: approved first, then the rest by name.
+const tracks = ref<Subtitle[]>([])
+async function loadTracks() {
+  try {
+    tracks.value = (await listSubtitles({ videoId: props.video.id, size: 50, sortBy: 'label', sortOrder: 'asc' })).data
+      .filter((t) => t.cueCount > 0 && (!clientSettings.value?.requireApprovalToPublish || t.reviewStatus === 'APPROVED'))
+      .sort((a, b) => Number(b.reviewStatus === 'APPROVED') - Number(a.reviewStatus === 'APPROVED'))
+  } catch {
+    tracks.value = []
+  }
+}
+
 watch(open, (isOpen) => {
   if (!isOpen) return
   rightsConfirmed.value = false
+  burnSubtitleId.value = NONE
   load()
   loadDubs()
+  loadTracks()
 })
 
 const sourceLabel = computed(() => videoSourceMeta(props.video.source).label)
@@ -153,6 +187,13 @@ const audioOptions = computed(() => [
   { label: 'Original sound', value: ORIGINAL },
   ...dubs.value.map((d) => ({ label: `${d.languageName} voice-over · ${d.voiceName}`, value: d.language }))
 ])
+const NONE = 0
+const burnSubtitleId = ref<number>(NONE)
+const subtitleOptions = computed(() => [
+  { label: 'None', value: NONE },
+  ...tracks.value.map((t) => ({ label: `${t.label}${t.reviewStatus === 'APPROVED' ? ' · approved' : ''}`, value: t.id }))
+])
+const selectedTrack = computed(() => tracks.value.find((t) => t.id === burnSubtitleId.value) ?? null)
 const rightsConfirmed = ref(false)
 const allowed = computed(() => !data.value?.isLink || rightsConfirmed.value)
 
@@ -207,6 +248,7 @@ async function onStart(mode: DownloadMode) {
     const job = await start(props.video.id, {
       mode,
       audio: mode === 'FILE' && audio.value !== ORIGINAL ? audio.value : null,
+      subtitleId: mode === 'FILE' && burnSubtitleId.value !== NONE ? burnSubtitleId.value : null,
       rightsConfirmed: rightsConfirmed.value
     })
     toast.add({ title: `${mode === 'IMPORT' ? 'Import' : 'Download'} queued — job #${job.id}`, color: 'success' })

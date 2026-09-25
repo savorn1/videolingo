@@ -141,6 +141,12 @@ export function useTranscripts() {
   return { list, get, create, update, remove, regenerate, search, exportFile }
 }
 
+/** What a revision of a transcript holds. */
+export interface TranscriptSnapshot {
+  language: string
+  segments: TranscriptSegment[] | null
+}
+
 // Prefers the RFC 5987 `filename*` (UTF-8, so non-Latin titles survive) over
 // the ASCII `filename` fallback.
 function filenameFromDisposition(header: string | null): string | null {

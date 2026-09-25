@@ -59,15 +59,20 @@
     <UCard>
       <DataTable
         v-model:sort="sort"
+        v-model:selected="selected"
         :rows="rows"
         :columns="columns"
         :loading="loading"
+        :selectable="!filter.deleted"
         refreshable
         exportable
         :export-filename="filter.deleted ? 'videos-trash' : 'videos'"
         @refresh="load"
         @select="(row: Video) => navigateTo(`/videos/${row.id}`)"
       >
+        <template #bulk-actions="{ selected: picked, clear }">
+          <VideoBulkActions :videos="picked" @done="() => { clear(); load() }" />
+        </template>
         <template #title-data="{ row }">
           <div class="flex items-center gap-3 min-w-0 max-w-xs">
             <div class="relative w-24 aspect-video shrink-0 rounded-md overflow-hidden bg-gray-100 dark:bg-gray-800">
@@ -179,6 +184,8 @@ import type { Video } from '~/composables/useVideos'
 definePageMeta({ middleware: 'admin' })
 
 const { list, updateStatus, remove, restore } = useVideos()
+// Rows ticked for bulk actions (VideoBulkActions).
+const selected = ref<Video[]>([])
 const { list: listUsers } = useUsers()
 const { list: listTags } = useTags()
 const toast = useToast()

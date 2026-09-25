@@ -14,8 +14,8 @@
           variant="soft"
           icon="i-lucide-eye"
           :loading="busy"
-          :disabled="publishBlocked"
-          :title="publishBlocked ? 'Fix the readability issues first — Settings › Translation blocks publishing tracks with issues' : undefined"
+          :disabled="!!publishBlocked"
+          :title="publishBlocked || undefined"
           @click="togglePublished"
         >
           Publish
@@ -144,6 +144,15 @@
               </div>
             </dl>
           </UCard>
+
+          <SubtitleReviewPanel
+            v-model:comments="comments"
+            :subtitle="subtitle"
+            :current-ms="currentMs"
+            :editing="editing"
+            @update:subtitle="(s) => (subtitle = s)"
+            @seek="(ms) => seek(ms, true)"
+          />
         </div>
 
         <!-- ── Cues ────────────────────────────────────────────────────── -->
@@ -157,8 +166,11 @@
                 <UBadge v-if="liveIssues.length" color="warning" variant="subtle" size="sm" icon="i-lucide-triangle-alert"
                   >{{ liveIssues.length }} warning{{ liveIssues.length === 1 ? '' : 's' }}</UBadge
                 >
+                <UTooltip v-if="glossaryHits.length" :text="`Terms left untranslated — glossaries into ${languageLabel(subtitle.language)}`">
+                  <UBadge color="info" variant="subtle" size="sm" icon="i-lucide-book-a">{{ glossaryHits.length }} glossary</UBadge>
+                </UTooltip>
               </div>
-              <USwitch v-if="liveIssues.length" v-model="onlyIssues" size="sm" label="Only with warnings" />
+              <USwitch v-if="liveIssues.length || glossaryHits.length" v-model="onlyIssues" size="sm" label="Only with warnings" />
             </div>
           </template>
 
@@ -193,6 +205,12 @@
                       >
                       <UTooltip v-for="issue in issuesByCue.get(i) ?? []" :key="issue.type" :text="issue.message">
                         <UBadge size="sm" color="warning" variant="subtle">{{ ISSUE_LABELS[issue.type] }}</UBadge>
+                      </UTooltip>
+                      <UTooltip v-for="hit in glossaryByCue.get(i) ?? []" :key="hit.source" :text="hit.message">
+                        <UBadge size="sm" color="info" variant="subtle" icon="i-lucide-book-a">{{ hit.source }}</UBadge>
+                      </UTooltip>
+                      <UTooltip v-if="commentsByCue.get(i)" :text="`${commentsByCue.get(i)} open comment(s) — see Review`">
+                        <UBadge size="sm" color="primary" variant="subtle" icon="i-lucide-message-square">{{ commentsByCue.get(i) }}</UBadge>
                       </UTooltip>
                     </div>
                   </div>
@@ -261,8 +279,11 @@
                   </div>
                   <UTextarea v-model="draft[i]!.text" :rows="2" autoresize :maxrows="5" class="w-full" aria-label="Cue text (Enter for a new line)" />
                   <p v-if="rowErrors[i]" class="text-xs text-error-600 dark:text-error-400">{{ rowErrors[i] }}</p>
-                  <div v-else-if="issuesByCue.get(i)?.length" class="flex flex-wrap gap-1.5">
-                    <UBadge v-for="issue in issuesByCue.get(i)" :key="issue.type" size="sm" color="warning" variant="subtle">{{ issue.message }}</UBadge>
+                  <div v-else-if="issuesByCue.get(i)?.length || glossaryByCue.get(i)?.length" class="flex flex-wrap gap-1.5">
+                    <UBadge v-for="issue in issuesByCue.get(i) ?? []" :key="issue.type" size="sm" color="warning" variant="subtle">{{ issue.message }}</UBadge>
+                    <UBadge v-for="hit in glossaryByCue.get(i) ?? []" :key="hit.source" size="sm" color="info" variant="subtle" icon="i-lucide-book-a">{{
+                      hit.message
+                    }}</UBadge>
                   </div>
                 </li>
               </ol>
@@ -313,6 +334,16 @@
       </template>
     </UModal>
 
+    <RevisionHistoryModal
+      v-if="subtitle"
+      v-model:open="showHistory"
+      resource="subtitles"
+      :entity-id="subtitle.id"
+      :version="subtitle.version"
+      :can-restore="can('subtitles', 'WRITE') && !editing"
+      @restored="onRestored"
+    />
+
     <ConfirmModal
       v-model="confirmDelete"
       title="Delete subtitle track"
@@ -328,7 +359,18 @@
 <script setup lang="ts">
 import type { DropdownMenuItem } from '@nuxt/ui'
 import type { SubtitleIssue, SubtitleRules } from '#shared/utils/subtitleQuality'
-import { SUBTITLE_KINDS, SUBTITLE_SOURCES, type Subtitle, type SubtitleCue, type SubtitleFormat, type SubtitleKind } from '~/composables/useSubtitles'
+import type { GlossaryHit } from '#shared/utils/glossary'
+import type { ApplicableTerm } from '~/composables/useGlossaries'
+import {
+  REVIEW_STATUSES,
+  SUBTITLE_KINDS,
+  SUBTITLE_SOURCES,
+  type Subtitle,
+  type SubtitleComment,
+  type SubtitleCue,
+  type SubtitleFormat,
+  type SubtitleKind
+} from '~/composables/useSubtitles'
 
 definePageMeta({ middleware: 'admin' })
 
@@ -337,11 +379,22 @@ const router = useRouter()
 const toast = useToast()
 const { get, list, update, setDefault, regenerate, remove, download } = useSubtitles()
 const { list: listTranscripts } = useTranscripts()
+const { applicableTerms } = useGlossaries()
+const { can } = useAuth()
 
 const id = computed(() => Number(route.params.id))
 const subtitle = ref<Subtitle | null>(null)
 const { settings: clientSettings } = useClientSettings()
-const publishBlocked = computed(() => !!clientSettings.value?.blockPublishWithIssues && (subtitle.value?.issueCount ?? 0) > 0)
+// Why Publish is unavailable, or '' when it isn't blocked.
+const publishBlocked = computed(() => {
+  const s = subtitle.value
+  if (!s) return ''
+  if (clientSettings.value?.requireApprovalToPublish && s.reviewStatus !== 'APPROVED')
+    return 'Get this track approved first — Settings › Translation requires review before publishing'
+  if (clientSettings.value?.blockPublishWithIssues && s.issueCount > 0)
+    return 'Fix the readability issues first — Settings › Translation blocks publishing tracks with issues'
+  return ''
+})
 const loading = ref(false)
 const error = ref('')
 const busy = ref(false)
@@ -364,8 +417,9 @@ const headerDescription = computed(() => {
   const s = subtitle.value
   if (!s) return undefined
   const kind = s.kind === 'CAPTIONS' ? 'captions' : 'subtitles'
-  const state = s.published ? (s.isDefault ? 'Published · default track' : 'Published') : 'Draft'
-  return `${languageLabel(s.language)} ${kind} for “${s.videoTitle ?? `video #${s.videoId}`}” · ${state}`
+  const state = s.published ? (s.isDefault ? 'Published · default track' : 'Published') : 'Not published'
+  const review = REVIEW_STATUSES.find((r) => r.value === s.reviewStatus)?.label ?? 'Draft'
+  return `${languageLabel(s.language)} ${kind} for “${s.videoTitle ?? `video #${s.videoId}`}” · ${state} · ${review}`
 })
 
 const facts = computed(() => {
@@ -522,11 +576,47 @@ const issuesByCue = computed(() => {
   for (const issue of liveIssues.value) map.set(issue.cueIndex, [...(map.get(issue.cueIndex) ?? []), issue])
   return map
 })
+// ── Glossary (terms left untranslated) ─────────────────────────────────────
+// Best effort: someone without the "glossaries" permission just doesn't get the check.
+const glossaryTerms = ref<ApplicableTerm[]>([])
+async function loadGlossary() {
+  const s = subtitle.value
+  if (!s) return
+  try {
+    const source = s.transcriptLanguage && s.transcriptLanguage !== s.language ? s.transcriptLanguage : null
+    glossaryTerms.value = await applicableTerms(s.language, source)
+  } catch {
+    glossaryTerms.value = []
+  }
+}
+watch(() => subtitle.value?.language, loadGlossary)
+const glossaryHits = computed<GlossaryHit[]>(() => {
+  if (!glossaryTerms.value.length) return []
+  return checkGlossary(editing.value ? draft.value : cues.value, glossaryTerms.value)
+})
+const glossaryByCue = computed(() => {
+  const map = new Map<number, GlossaryHit[]>()
+  for (const hit of glossaryHits.value) map.set(hit.cueIndex, [...(map.get(hit.cueIndex) ?? []), hit])
+  return map
+})
+
+// ── Review comments (loaded by SubtitleReviewPanel) ────────────────────────
+const comments = ref<SubtitleComment[]>([])
+const commentsByCue = computed(() => {
+  const map = new Map<number, number>()
+  for (const c of comments.value) {
+    if (c.resolved || c.atMs === null) continue
+    const i = cues.value.findIndex((cue) => cue.startMs <= c.atMs! && c.atMs! < cue.endMs)
+    if (i >= 0) map.set(i, (map.get(i) ?? 0) + 1)
+  }
+  return map
+})
+
 const onlyIssues = ref(false)
 const visibleIndexes = computed(() => {
   const count = editing.value ? draft.value.length : cues.value.length
   const all = Array.from({ length: count }, (_, i) => i)
-  return onlyIssues.value ? all.filter((i) => issuesByCue.value.has(i) || (editing.value && rowErrors.value[i])) : all
+  return onlyIssues.value ? all.filter((i) => issuesByCue.value.has(i) || glossaryByCue.value.has(i) || (editing.value && rowErrors.value[i])) : all
 })
 
 // ── Editing ────────────────────────────────────────────────────────────────
@@ -586,13 +676,19 @@ async function save() {
       // Only send cues if they changed — a settings-only save keeps the source (Generated/Uploaded).
       cues: cuesChanged ? draft.value.map((r) => ({ startMs: parseTimestamp(r.start)!, endMs: parseTimestamp(r.end)!, text: r.text.trim() })) : undefined
     })
+    const wasApproved = s.reviewStatus === 'APPROVED'
     subtitle.value = saved
     editing.value = false
     draft.value = []
     if (route.query.edit) router.replace({ query: { ...route.query, edit: undefined } })
     toast.add({
       title: 'Subtitle track saved',
-      description: saved.issueCount ? `${saved.issueCount} readability warning(s) remain` : 'No readability warnings',
+      description: [
+        saved.issueCount ? `${saved.issueCount} readability warning(s) remain` : 'No readability warnings',
+        wasApproved && saved.reviewStatus === 'DRAFT' ? 'The approval was cleared — send it for review again.' : ''
+      ]
+        .filter(Boolean)
+        .join(' · '),
       color: saved.issueCount ? 'warning' : 'success'
     })
   } catch (err) {
@@ -632,7 +728,8 @@ const moreItems = computed<DropdownMenuItem[][]>(() => {
   return [
     [
       ...(s.published && !s.isDefault ? [{ label: 'Make default track', icon: 'i-lucide-star', onSelect: () => onSetDefault() }] : []),
-      { label: 'Regenerate from transcript…', icon: 'i-lucide-refresh-cw', onSelect: () => openRegenerate() }
+      { label: 'Regenerate from transcript…', icon: 'i-lucide-refresh-cw', onSelect: () => openRegenerate() },
+      { label: 'Version history…', icon: 'i-lucide-history', onSelect: () => (showHistory.value = true) }
     ],
     [
       { label: 'Download .vtt', icon: 'i-lucide-download', onSelect: () => onDownload('vtt') },
@@ -660,6 +757,11 @@ async function onDownload(format: SubtitleFormat) {
   } catch (err) {
     toast.add({ title: 'Download failed', description: apiErrorMessage(err), color: 'error' })
   }
+}
+
+const showHistory = ref(false)
+function onRestored(restored: unknown) {
+  subtitle.value = restored as Subtitle
 }
 
 const confirmDelete = ref(false)

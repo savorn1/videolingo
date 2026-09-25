@@ -53,6 +53,11 @@
         label="Don't publish subtitles with readability issues"
         description="Publishing a track fails while it has lines that break its rules (too long, too fast, too short on screen…)."
       />
+      <USwitch
+        v-model="form.requireApprovalToPublish"
+        label="Require review before publishing"
+        description="A track can only be published once a reviewer has approved it. Editing an approved track sends it back for review."
+      />
     </template>
   </SettingsPanel>
 </template>

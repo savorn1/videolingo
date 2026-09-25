@@ -12,6 +12,7 @@
             >Export</UButton
           >
         </UDropdownMenu>
+        <UButton color="neutral" variant="soft" icon="i-lucide-history" @click="showHistory = true">History</UButton>
         <UButton color="neutral" variant="soft" icon="i-lucide-refresh-cw" :disabled="regenerating" @click="confirmRegenerate = true">Regenerate</UButton>
         <UButton color="error" variant="soft" icon="i-lucide-trash-2" :disabled="regenerating" @click="confirmDelete = true">Delete</UButton>
       </template>
@@ -264,6 +265,16 @@
       </div>
     </template>
 
+    <RevisionHistoryModal
+      v-if="transcript"
+      v-model:open="showHistory"
+      resource="transcripts"
+      :entity-id="transcript.id"
+      :version="transcript.version"
+      :can-restore="can('transcripts', 'WRITE') && !regenerating"
+      @restored="(t) => (transcript = t as Transcript)"
+    />
+
     <ConfirmModal
       v-model="confirmRegenerate"
       title="Regenerate transcript"
@@ -296,6 +307,8 @@ const router = useRouter()
 const toast = useToast()
 const { get, update, remove, regenerate, exportFile } = useTranscripts()
 const { progress: jobProgress } = useProcessingJobs()
+const { can } = useAuth()
+const showHistory = ref(false)
 
 const id = computed(() => Number(route.params.id))
 const transcript = ref<Transcript | null>(null)

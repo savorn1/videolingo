@@ -16,6 +16,8 @@ export interface VideoExport {
   jobId: number | null
   /** Voice-over language used as the sound; null = original sound. */
   audioLanguage: string | null
+  /** Label of the subtitle track burned into the picture, if any. */
+  subtitleLabel: string | null
   fileName: string
   url: string
   sizeBytes: number
@@ -42,7 +44,8 @@ export function useVideoDownloads() {
     return (await api<ApiEnvelope<DownloadOverview>>(base(videoId))).data
   }
 
-  async function start(videoId: number, body: { mode: DownloadMode; audio?: string | null; rightsConfirmed?: boolean }) {
+  /** `subtitleId` burns that track's cues into the picture (FILE only; re-encodes, so it's slower). */
+  async function start(videoId: number, body: { mode: DownloadMode; audio?: string | null; rightsConfirmed?: boolean; subtitleId?: number | null }) {
     return (await api<ApiEnvelope<ProcessingJob>>(base(videoId), { method: 'POST', body })).data
   }
 
