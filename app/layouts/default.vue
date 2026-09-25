@@ -64,6 +64,7 @@
 <script setup lang="ts">
 import type { BreadcrumbItem, DropdownMenuItem } from '@nuxt/ui'
 import type { SidebarItem } from '~/components/SidebarNav.vue'
+import { usePageCrumbs } from '~/composables/usePageCrumbs'
 
 const { username, role, hasAnyAccess, logout } = useAuth()
 // Settings › General
@@ -188,7 +189,19 @@ const searchGroups = computed(() => {
 // Derived from the same nav list so it can never drift out of sync with the
 // sidebar — each top-level item is now a collapsible group with `children`,
 // so a page's section is whichever group's children contains its route.
+const pageCrumbs = usePageCrumbs()
 const breadcrumbItems = computed<BreadcrumbItem[]>(() => {
+  const base = navCrumbs.value
+  // On a record page the nav trail ends with a link back to the list, which
+  // is also where the page's own trail starts — so keep the section and add
+  // the record (Content › Videos › "Lesson 1"). Pages that are in the nav
+  // themselves already end with their own name.
+  const page = pageCrumbs.value
+  if (page?.path === route.path && page.items.length > 1 && base.at(-1)?.to) return [...base, ...page.items.slice(1)]
+  return base
+})
+
+const navCrumbs = computed<BreadcrumbItem[]>(() => {
   for (const item of items.value) {
     if ('to' in item) {
       if (item.to === route.path) return [{ label: item.label, icon: item.icon }]

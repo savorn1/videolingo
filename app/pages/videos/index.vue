@@ -1,15 +1,33 @@
 <template>
   <div>
-    <PageHeader title="Videos" description="Learning videos uploaded to VideoLingo." />
+    <PageHeader title="Videos" description="Learning videos — uploaded, linked from YouTube, Vimeo or Facebook, or hosted elsewhere.">
+      <template #actions>
+        <UButton icon="i-lucide-plus" to="/videos/new">Add video</UButton>
+      </template>
+    </PageHeader>
 
     <UTabs v-model="view" :items="viewItems" :content="false" class="mb-4 w-full sm:w-80" />
 
     <UCard class="mb-4">
       <div class="flex flex-wrap gap-3">
-        <UInput v-model="search" placeholder="Search title or description" icon="i-lucide-search" class="w-64" />
+        <UInput v-model="search" placeholder="Search title or description" icon="i-lucide-search" class="w-full sm:w-64" />
         <USelect v-if="!filter.deleted" v-model="filter.enabled" :items="statusFilterOptions" placeholder="Status" class="w-36" />
-        <USelect v-model="filter.language" :items="languageFilterOptions" placeholder="Language" class="w-40" />
         <USelect v-model="filter.categoryId" :items="categoryFilterOptions" placeholder="Category" class="w-44" />
+        <UButton
+          color="neutral"
+          :variant="showMoreFilters ? 'soft' : 'ghost'"
+          icon="i-lucide-sliders-horizontal"
+          :trailing-icon="showMoreFilters ? 'i-lucide-chevron-up' : 'i-lucide-chevron-down'"
+          :aria-expanded="showMoreFilters"
+          @click="showMoreFilters = !showMoreFilters"
+        >
+          More filters
+          <UBadge v-if="moreFilterCount" size="sm" variant="solid">{{ moreFilterCount }}</UBadge>
+        </UButton>
+        <UButton v-if="hasActiveFilter" size="sm" color="neutral" variant="ghost" icon="i-lucide-x" @click="clearFilters">Clear filters</UButton>
+      </div>
+      <div v-if="showMoreFilters" class="flex flex-wrap gap-3 mt-3 pt-3 border-t border-gray-100 dark:border-gray-800">
+        <USelect v-model="filter.language" :items="languageFilterOptions" placeholder="Language" class="w-40" />
         <USelectMenu
           v-model="filter.tagId"
           :items="tagFilterOptions"
@@ -33,7 +51,6 @@
           <span class="text-sm text-gray-400">–</span>
           <UInput v-model="filter.createdTo" type="date" aria-label="Uploaded to" class="w-40" :min="filter.createdFrom" />
         </div>
-        <UButton v-if="hasActiveFilter" size="sm" color="neutral" variant="ghost" icon="i-lucide-x" @click="clearFilters">Clear filters</UButton>
       </div>
     </UCard>
 
@@ -112,7 +129,16 @@
             title="Trash is empty"
             description="Deleted videos show up here and can be restored."
           />
-          <EmptyState v-else icon="i-lucide-clapperboard" title="No videos yet" description="Videos appear here once learners or creators upload them." />
+          <EmptyState
+            v-else
+            icon="i-lucide-clapperboard"
+            title="No videos yet"
+            description="Upload a file or paste a YouTube, Vimeo or Facebook link to add your first video."
+          >
+            <template #action>
+              <UButton icon="i-lucide-plus" to="/videos/new">Add video</UButton>
+            </template>
+          </EmptyState>
         </template>
       </DataTable>
 
@@ -309,6 +335,13 @@ watch([() => ({ ...filter }), debouncedSearch, sort, pageSize], () => {
   page.value = 1
 })
 watch([() => ({ ...filter }), debouncedSearch, sort, page, pageSize], load)
+
+// Less-used filters sit behind "More filters"; it opens by itself when a
+// link (or a return from a video) arrives with one of them set.
+const moreFilterCount = computed(
+  () => [filter.language, filter.tagId, filter.ownerId].filter((v) => v !== undefined).length + (filter.createdFrom || filter.createdTo ? 1 : 0)
+)
+const showMoreFilters = ref(moreFilterCount.value > 0)
 
 const hasActiveFilter = computed(
   () =>

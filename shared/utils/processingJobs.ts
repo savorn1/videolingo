@@ -3,7 +3,7 @@
 // canDelete on each job) — these helpers only cover presentation.
 
 export type JobStatus = 'QUEUED' | 'RUNNING' | 'SUCCEEDED' | 'FAILED' | 'CANCELLED'
-export type JobType = 'TRANSCODE' | 'TRANSCRIBE' | 'TRANSLATE' | 'GENERATE_SUBTITLES' | 'GENERATE_THUMBNAIL'
+export type JobType = 'TRANSCODE' | 'TRANSCRIBE' | 'TRANSLATE' | 'GENERATE_SUBTITLES' | 'GENERATE_THUMBNAIL' | 'DUB' | 'DOWNLOAD'
 
 export const JOB_STATUSES: { value: JobStatus; label: string; icon: string }[] = [
   { value: 'QUEUED', label: 'Queued', icon: 'i-lucide-hourglass' },
@@ -18,7 +18,9 @@ export const JOB_TYPES: { value: JobType; label: string; icon: string }[] = [
   { value: 'TRANSCRIBE', label: 'Transcribe', icon: 'i-lucide-audio-lines' },
   { value: 'TRANSLATE', label: 'Translate', icon: 'i-lucide-languages' },
   { value: 'GENERATE_SUBTITLES', label: 'Generate subtitles', icon: 'i-lucide-captions' },
-  { value: 'GENERATE_THUMBNAIL', label: 'Generate thumbnail', icon: 'i-lucide-image' }
+  { value: 'GENERATE_THUMBNAIL', label: 'Generate thumbnail', icon: 'i-lucide-image' },
+  { value: 'DUB', label: 'Voice-over', icon: 'i-lucide-mic' },
+  { value: 'DOWNLOAD', label: 'Download / import', icon: 'i-lucide-download' }
 ]
 
 export function jobTypeMeta(type: string): { label: string; icon: string } {

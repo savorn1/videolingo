@@ -16,6 +16,8 @@ export interface VideoSettings {
   maxCategoriesPerVideo: number
   requireCategory: boolean
   statisticsDefaultDays: number
+  /** Uploads go straight to storage, so this isn't bound by the server's request cap. */
+  maxVideoUploadMb: number
 }
 
 export interface TranslationSettings {
@@ -83,6 +85,7 @@ export interface ClientSettings {
   maxCategoriesPerVideo: number
   requireCategory: boolean
   statisticsDefaultDays: number
+  maxVideoUploadMb: number
   defaultTargetLanguages: string[]
   blockPublishWithIssues: boolean
   maxUploadMb: number

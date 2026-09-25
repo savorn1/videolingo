@@ -15,6 +15,14 @@
         description="Saving a video's details fails until it has at least one category. Existing videos aren't changed until someone edits them."
       />
       <UFormField
+        label="Largest video upload (MB)"
+        :error="errors.maxVideoUploadMb"
+        :hint="`Default: ${defaults.maxVideoUploadMb} MB`"
+        description="Video files are sent straight to storage, so this isn't limited by the server's request size (1–51,200 MB)."
+      >
+        <UInputNumber v-model="form.maxVideoUploadMb" :min="1" :max="51200" :step="256" class="w-40" />
+      </UFormField>
+      <UFormField
         label="Statistics window"
         :error="errors.statisticsDefaultDays"
         :hint="`Default: ${defaults.statisticsDefaultDays} days`"

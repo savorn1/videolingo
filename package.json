@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@iconify-json/lucide": "^1.2.125",
+    "@iconify-json/simple-icons": "^1.2.97",
     "@nuxt/ui": "^4.11.0",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.8",

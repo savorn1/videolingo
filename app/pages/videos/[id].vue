@@ -5,6 +5,7 @@
         <UDropdownMenu :items="relatedItems" :content="{ align: 'end' }">
           <UButton color="neutral" variant="soft" icon="i-lucide-layers" trailing-icon="i-lucide-chevron-down">Related</UButton>
         </UDropdownMenu>
+        <UButton v-if="!video.deleted" color="neutral" variant="soft" icon="i-lucide-download" @click="showDownload = true">Download</UButton>
         <template v-if="video.deleted">
           <UButton color="success" variant="soft" icon="i-lucide-rotate-ccw" :loading="busy" @click="onRestore">Restore</UButton>
         </template>
@@ -47,52 +48,55 @@
 
       <div class="grid grid-cols-1 xl:grid-cols-3 gap-4 mb-4">
         <!-- View Video -->
-        <UCard class="xl:col-span-2" :ui="{ body: 'p-0 sm:p-0' }">
-          <div class="relative aspect-video bg-black rounded-lg overflow-hidden">
-            <video
-              v-if="!playbackError"
-              :key="video.videoUrl"
-              :src="video.videoUrl"
-              :poster="video.thumbnailUrl ?? undefined"
-              controls
-              preload="metadata"
-              class="w-full h-full"
-              @error="playbackError = true"
-            />
-            <div v-else class="absolute inset-0 flex flex-col items-center justify-center gap-2 p-6 text-center text-white/80">
-              <UIcon name="i-lucide-circle-alert" class="w-8 h-8" />
-              <p class="font-semibold">This video can't be played here</p>
-              <p class="text-sm text-white/60 max-w-sm">The file may be missing, or its format isn't supported by this browser.</p>
-              <UButton size="xs" color="neutral" variant="soft" :to="video.videoUrl" target="_blank" icon="i-lucide-external-link" class="mt-2"
-                >Open file URL</UButton
-              >
-            </div>
-          </div>
+        <UCard class="xl:col-span-2 self-start xl:sticky xl:top-4" :ui="{ body: 'p-0 sm:p-0' }">
+          <VideoPlayer
+            ref="player"
+            :embed-url="video.embedUrl"
+            :video-url="video.videoUrl"
+            :poster="video.thumbnailUrl"
+            :title="video.title"
+            :vertical="!!video.width && !!video.height && video.height > video.width"
+            :resume-key="video.id"
+            :dub-url="dubUrl"
+            @time="(ms) => (currentMs = ms)"
+          />
         </UCard>
 
-        <UCard>
-          <dl class="space-y-3 text-sm">
-            <div class="flex flex-wrap gap-2 pb-1">
-              <UBadge v-if="video.deleted" color="error" variant="subtle">In trash</UBadge>
-              <UBadge v-else :color="video.enabled ? 'success' : 'warning'" variant="subtle">{{ video.enabled ? 'Enabled' : 'Disabled' }}</UBadge>
-              <UBadge v-if="video.language" color="neutral" variant="subtle" icon="i-lucide-languages">{{ languageLabel(video.language) }}</UBadge>
-              <CategoryBadge v-for="c in video.categories" :key="c.id" :name="c.name" :color="c.color" :enabled="c.enabled" />
-            </div>
-            <div class="pb-2 border-b border-gray-100 dark:border-gray-800">
-              <dt class="text-gray-500 dark:text-gray-400 mb-1.5">Tags</dt>
-              <dd>
-                <TagInput :video="video" :disabled="video.deleted" @updated="(v) => video && (video = { ...video, tags: v.tags })" />
-              </dd>
-            </div>
-            <div v-for="item in summary" :key="item.label" class="flex justify-between gap-4">
-              <dt class="text-gray-500 dark:text-gray-400">{{ item.label }}</dt>
-              <dd class="font-semibold text-gray-900 dark:text-white text-right tabular-nums" :title="item.title">
-                <NuxtLink v-if="item.to" :to="item.to" class="text-primary-600 dark:text-primary-400 hover:underline">{{ item.value }}</NuxtLink>
-                <template v-else>{{ item.value }}</template>
-              </dd>
-            </div>
-          </dl>
-        </UCard>
+        <div class="space-y-4 min-w-0">
+          <UCard>
+            <dl class="space-y-3 text-sm">
+              <div class="flex flex-wrap gap-2 pb-1">
+                <UBadge v-if="video.deleted" color="error" variant="subtle">In trash</UBadge>
+                <UBadge v-else :color="video.enabled ? 'success' : 'warning'" variant="subtle">{{ video.enabled ? 'Enabled' : 'Disabled' }}</UBadge>
+                <UBadge v-if="video.language" color="neutral" variant="subtle" icon="i-lucide-languages">{{ languageLabel(video.language) }}</UBadge>
+                <CategoryBadge v-for="c in video.categories" :key="c.id" :name="c.name" :color="c.color" :enabled="c.enabled" />
+              </div>
+              <div class="pb-2 border-b border-gray-100 dark:border-gray-800">
+                <dt class="text-gray-500 dark:text-gray-400 mb-1.5">Tags</dt>
+                <dd>
+                  <TagInput :video="video" :disabled="video.deleted" @updated="(v) => video && (video = { ...video, tags: v.tags })" />
+                </dd>
+              </div>
+              <div v-for="item in summary" :key="item.label" class="flex justify-between gap-4">
+                <dt class="text-gray-500 dark:text-gray-400">{{ item.label }}</dt>
+                <dd class="font-semibold text-gray-900 dark:text-white text-right tabular-nums" :title="item.title">
+                  <NuxtLink v-if="item.to" :to="item.to" class="text-primary-600 dark:text-primary-400 hover:underline">{{ item.value }}</NuxtLink>
+                  <template v-else>{{ item.value }}</template>
+                </dd>
+              </div>
+            </dl>
+          </UCard>
+
+          <VideoSubtitlePanel
+            v-if="canReadSubtitles"
+            :video-id="video.id"
+            :current-ms="currentMs"
+            :can-seek="!!player?.canSync"
+            @seek="(ms) => player?.seek(ms)"
+          />
+
+          <VideoDubPanel v-model="dubUrl" :video-id="video.id" :can-write="canWriteVideos && !video.deleted" />
+        </div>
       </div>
 
       <UTabs v-model="tab" :items="tabItems" variant="link" class="w-full" :ui="{ list: 'mb-4' }">
@@ -209,6 +213,7 @@
     </template>
 
     <VideoEditModal v-model="showEdit" :video="video" @saved="(saved) => (video = saved)" />
+    <VideoDownloadModal v-if="video" v-model="showDownload" :video="video" :can-write="canWriteVideos" @imported="load" />
 
     <ConfirmModal
       v-model="confirmDisable"
@@ -242,11 +247,12 @@ const router = useRouter()
 const toast = useToast()
 const { get, statistics, updateStatus, remove, restore } = useVideos()
 
+const { can } = useAuth()
+
 const id = computed(() => Number(route.params.id))
 const video = ref<Video | null>(null)
 const loading = ref(false)
 const error = ref('')
-const playbackError = ref(false)
 
 async function load() {
   loading.value = true
@@ -259,6 +265,14 @@ async function load() {
     loading.value = false
   }
 }
+
+// ── Player ↔ subtitle lines ────────────────────────────────────────────────
+const player = useTemplateRef('player')
+const currentMs = ref(0)
+const canReadSubtitles = computed(() => can('subtitles', 'READ'))
+const canWriteVideos = computed(() => can('videos', 'WRITE'))
+/** The voice-over the player uses instead of the original sound (null = original). */
+const dubUrl = ref<string | null>(null)
 
 // Pages about this video in other modules, grouped so the header stays short.
 const relatedItems = computed<DropdownMenuItem[][]>(() => {
@@ -321,9 +335,11 @@ const metadata = computed<MetadataItem[]>(() => {
     { label: 'File size', value: v.fileSize === null ? '—' : `${formatFileSize(v.fileSize)} (${v.fileSize.toLocaleString()} bytes)` },
     { label: 'Format', value: v.mimeType ?? '—', mono: true },
     { label: 'Spoken language', value: v.language ? `${languageLabel(v.language)} (${v.language})` : '—' },
-    { label: 'Storage', value: v.storageKey ? 'Uploaded file' : 'External URL' },
-    { label: 'Storage key', value: v.storageKey ?? '—', mono: true },
-    { label: 'Video URL', value: v.videoUrl, href: v.videoUrl, mono: true },
+    { label: 'Source', value: videoSourceMeta(v.source).label + (v.sourceAuthor ? ` · ${v.sourceAuthor}` : '') },
+    ...(v.source === 'UPLOAD' ? [{ label: 'Storage key', value: v.storageKey ?? '—', mono: true }] : []),
+    ...(v.externalId ? [{ label: `${videoSourceMeta(v.source).label} ID`, value: v.externalId, mono: true }] : []),
+    { label: v.embedUrl ? 'Original link' : 'Video URL', value: v.videoUrl, href: v.videoUrl, mono: true },
+    ...(v.importedFrom ? [{ label: 'Imported from', value: v.importedFrom, href: v.importedFrom, mono: true }] : []),
     { label: 'Thumbnail URL', value: v.thumbnailUrl ?? '—', href: v.thumbnailUrl ?? undefined, mono: true },
     { label: 'Uploaded', value: formatDateTime(v.createdAt) },
     { label: 'Last updated', value: formatDateTime(v.updatedAt) },
@@ -375,6 +391,7 @@ onMounted(() => {
 
 // ── Actions ────────────────────────────────────────────────────────────────
 const showEdit = ref(false)
+const showDownload = ref(false)
 const busy = ref(false)
 const confirmDisable = ref(false)
 const confirmDelete = ref(false)
