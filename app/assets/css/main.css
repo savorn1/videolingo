@@ -1,6 +1,9 @@
 @import 'tailwindcss';
 @import '@nuxt/ui';
 
+/* Class names also live in shared/utils (e.g. the source brand colours in videoSources.ts). */
+@source '../../../shared';
+
 /* "Blueprint" brand palette — a muted drafting-table blue rather than
    Tailwind's stock vibrant `blue`, plus two supporting accents. Referenced
    by name from app.config.ts's ui.colors (primary/info/cancelled). Ramps

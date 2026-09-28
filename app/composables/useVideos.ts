@@ -176,7 +176,7 @@ export function useVideos() {
   }
 
   /** A signed, size-locked PUT straight to storage. */
-  async function requestUpload(kind: 'VIDEO' | 'THUMBNAIL', file: { name: string; type: string; size: number }) {
+  async function requestUpload(kind: 'VIDEO' | 'THUMBNAIL' | 'AUDIO', file: { name: string; type: string; size: number }) {
     return (
       await api<ApiEnvelope<UploadTicket>>('/api/admin/videos/uploads', {
         method: 'POST',

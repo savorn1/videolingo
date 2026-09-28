@@ -191,58 +191,58 @@
               {{ sectionLabel(n) }}
             </li>
             <li>
-            <button
-              type="button"
-              class="w-full flex items-center gap-3 px-3 py-2 text-left transition-colors"
-              :class="[
-                i === current ? 'bg-primary-50 dark:bg-primary-950/40' : 'hover:bg-gray-50 dark:hover:bg-gray-800/40',
-                items[i]!.deleted ? 'opacity-50 cursor-not-allowed' : ''
-              ]"
-              :disabled="items[i]!.deleted"
-              :data-current="i === current || undefined"
-              @click="playItem(i)"
-            >
-              <span class="w-6 shrink-0 text-center text-xs tabular-nums text-gray-400">
-                <UIcon v-if="i === current" name="i-lucide-audio-lines" class="w-4 h-4 text-primary-500" />
-                <UIcon v-else-if="progressOf(i)?.completed" name="i-lucide-circle-check" class="w-4 h-4 text-success-500" aria-label="Watched" />
-                <template v-else>{{ n + 1 }}</template>
-              </span>
-              <span class="relative w-24 aspect-video shrink-0 rounded overflow-hidden bg-gray-100 dark:bg-gray-800">
-                <img
-                  v-if="items[i]!.thumbnailUrl && !brokenThumbs.has(items[i]!.videoId)"
-                  :src="items[i]!.thumbnailUrl!"
-                  alt=""
-                  loading="lazy"
-                  class="w-full h-full object-cover"
-                  @error="brokenThumbs.add(items[i]!.videoId)"
-                />
-                <UIcon v-else name="i-lucide-clapperboard" class="absolute inset-0 m-auto w-4 h-4 text-gray-400" />
-                <span
-                  v-if="progressOf(i) && !progressOf(i)!.completed && progressOf(i)!.percent"
-                  class="absolute bottom-0 left-0 h-0.5 bg-primary-500"
-                  :style="{ width: `${progressOf(i)!.percent}%` }"
-                />
-                <span
-                  v-if="items[i]!.durationSeconds"
-                  class="absolute bottom-0.5 right-0.5 rounded bg-black/75 px-1 text-[10px] font-semibold text-white tabular-nums"
-                >
-                  {{ formatDuration(items[i]!.durationSeconds) }}
+              <button
+                type="button"
+                class="w-full flex items-center gap-3 px-3 py-2 text-left transition-colors"
+                :class="[
+                  i === current ? 'bg-primary-50 dark:bg-primary-950/40' : 'hover:bg-gray-50 dark:hover:bg-gray-800/40',
+                  items[i]!.deleted ? 'opacity-50 cursor-not-allowed' : ''
+                ]"
+                :disabled="items[i]!.deleted"
+                :data-current="i === current || undefined"
+                @click="playItem(i)"
+              >
+                <span class="w-6 shrink-0 text-center text-xs tabular-nums text-gray-400">
+                  <UIcon v-if="i === current" name="i-lucide-audio-lines" class="w-4 h-4 text-primary-500" />
+                  <UIcon v-else-if="progressOf(i)?.completed" name="i-lucide-circle-check" class="w-4 h-4 text-success-500" aria-label="Watched" />
+                  <template v-else>{{ n + 1 }}</template>
                 </span>
-              </span>
-              <span class="min-w-0 flex-1">
-                <span
-                  class="block text-sm font-medium truncate"
-                  :class="i === current ? 'text-primary-700 dark:text-primary-300' : 'text-gray-900 dark:text-white'"
-                >
-                  {{ items[i]!.title ?? `Video #${items[i]!.videoId}` }}
+                <span class="relative w-24 aspect-video shrink-0 rounded overflow-hidden bg-gray-100 dark:bg-gray-800">
+                  <img
+                    v-if="items[i]!.thumbnailUrl && !brokenThumbs.has(items[i]!.videoId)"
+                    :src="items[i]!.thumbnailUrl!"
+                    alt=""
+                    loading="lazy"
+                    class="w-full h-full object-cover"
+                    @error="brokenThumbs.add(items[i]!.videoId)"
+                  />
+                  <UIcon v-else name="i-lucide-clapperboard" class="absolute inset-0 m-auto w-4 h-4 text-gray-400" />
+                  <span
+                    v-if="progressOf(i) && !progressOf(i)!.completed && progressOf(i)!.percent"
+                    class="absolute bottom-0 left-0 h-0.5 bg-primary-500"
+                    :style="{ width: `${progressOf(i)!.percent}%` }"
+                  />
+                  <span
+                    v-if="items[i]!.durationSeconds"
+                    class="absolute bottom-0.5 right-0.5 rounded bg-black/75 px-1 text-[10px] font-semibold text-white tabular-nums"
+                  >
+                    {{ formatDuration(items[i]!.durationSeconds) }}
+                  </span>
                 </span>
-                <span class="block text-xs text-gray-500 truncate">
-                  <template v-if="items[i]!.deleted">In the trash — skipped</template>
-                  <template v-else-if="i === current">Now playing</template>
-                  <template v-else>{{ languageLabel(items[i]!.language) }}</template>
+                <span class="min-w-0 flex-1">
+                  <span
+                    class="block text-sm font-medium truncate"
+                    :class="i === current ? 'text-primary-700 dark:text-primary-300' : 'text-gray-900 dark:text-white'"
+                  >
+                    {{ items[i]!.title ?? `Video #${items[i]!.videoId}` }}
+                  </span>
+                  <span class="block text-xs text-gray-500 truncate">
+                    <template v-if="items[i]!.deleted">In the trash — skipped</template>
+                    <template v-else-if="i === current">Now playing</template>
+                    <template v-else>{{ languageLabel(items[i]!.language) }}</template>
+                  </span>
                 </span>
-              </span>
-            </button>
+              </button>
             </li>
           </template>
         </ol>

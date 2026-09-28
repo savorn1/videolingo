@@ -44,16 +44,9 @@ export function useApi() {
     }
   }
 
-  // `any` here matches ofetch's own loosely-typed FetchOptions second parameter —
-  // callers still get full inference on the return type via request<T>(...).
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   function request<T>(url: string, opts?: any): Promise<T> {
     return withRefresh(() => client<T>(url, opts))
   }
-
-  // Full response (headers + body) — for downloads that need the server's
-  // Content-Disposition filename.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   request.raw = <T>(url: string, opts?: any) => withRefresh(() => client.raw<T>(url, opts))
 
   return request

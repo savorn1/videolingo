@@ -6,7 +6,7 @@
           <UButton color="neutral" variant="soft" icon="i-lucide-layers" trailing-icon="i-lucide-chevron-down">Related</UButton>
         </UDropdownMenu>
         <UButton v-if="!video.deleted" color="neutral" variant="soft" icon="i-lucide-download" @click="showDownload = true">Download</UButton>
-        <UButton v-if="!video.deleted" color="neutral" variant="soft" icon="i-lucide-scissors" @click="showClip = true">Edit video</UButton>
+        <UButton v-if="!video.deleted" color="neutral" variant="soft" icon="i-lucide-scissors" :to="`/videos/${video.id}/editor`">Edit video</UButton>
         <template v-if="video.deleted">
           <UButton color="success" variant="soft" icon="i-lucide-rotate-ccw" :loading="busy" @click="onRestore">Restore</UButton>
         </template>
@@ -141,6 +141,9 @@
                   <a v-if="item.href" :href="item.href" target="_blank" rel="noopener" class="text-primary-600 dark:text-primary-400 hover:underline">{{
                     item.value
                   }}</a>
+                  <span v-else-if="item.icon" class="inline-flex items-center gap-1.5">
+                    <UIcon :name="item.icon" class="w-4 h-4 shrink-0" :class="item.iconClass" />{{ item.value }}
+                  </span>
                   <template v-else>{{ item.value }}</template>
                 </dd>
               </div>
@@ -246,9 +249,7 @@
     </template>
 
     <VideoEditModal v-model="showEdit" :video="video" @saved="(saved) => (video = saved)" />
-    <VideoDownloadModal v-if="video" v-model="showDownload" :video="video" :can-write="canWriteVideos" @imported="load" />
-    <VideoClipModal v-if="video" v-model="showClip" :video="video" :can-write="canWriteVideos" @replaced="load" @created="onClipPromotedToNewVideo" />
-    <VideoReplaceModal v-if="video" v-model="showReplace" :video="video" @replaced="(v) => (video = v)" />
+    <VideoDownloadModal v-if="video" v-model="showDownload" :video="video" :can-write="canWriteVideos" @imported="load" />    <VideoReplaceModal v-if="video" v-model="showReplace" :video="video" @replaced="(v) => (video = v)" />
     <VideoMoveModal v-if="video" v-model="showMove" :video="video" @moved="(v) => (video = v)" />
 
     <ConfirmModal
@@ -382,6 +383,8 @@ interface MetadataItem {
   title?: string
   href?: string
   mono?: boolean
+  icon?: string
+  iconClass?: string
 }
 
 const metadata = computed<MetadataItem[]>(() => {
@@ -395,7 +398,12 @@ const metadata = computed<MetadataItem[]>(() => {
     { label: 'File size', value: v.fileSize === null ? '—' : `${formatFileSize(v.fileSize)} (${v.fileSize.toLocaleString()} bytes)` },
     { label: 'Format', value: v.mimeType ?? '—', mono: true },
     { label: 'Spoken language', value: v.language ? `${languageLabel(v.language)} (${v.language})` : '—' },
-    { label: 'Source', value: videoSourceMeta(v.source).label + (v.sourceAuthor ? ` · ${v.sourceAuthor}` : '') },
+    {
+      label: 'Source',
+      value: videoSourceMeta(v.source).label + (v.sourceAuthor ? ` · ${v.sourceAuthor}` : ''),
+      icon: videoSourceMeta(v.source).icon,
+      iconClass: videoSourceMeta(v.source).iconClass
+    },
     ...(v.source === 'UPLOAD' ? [{ label: 'Storage key', value: v.storageKey ?? '—', mono: true }] : []),
     ...(v.externalId ? [{ label: `${videoSourceMeta(v.source).label} ID`, value: v.externalId, mono: true }] : []),
     { label: v.embedUrl ? 'Original link' : 'Video URL', value: v.videoUrl, href: v.videoUrl, mono: true },
@@ -452,7 +460,6 @@ onMounted(() => {
 // ── Actions ────────────────────────────────────────────────────────────────
 const showEdit = ref(false)
 const showDownload = ref(false)
-const showClip = ref(false)
 const busy = ref(false)
 const confirmDisable = ref(false)
 const confirmDelete = ref(false)
@@ -486,11 +493,6 @@ async function onDelete() {
   } finally {
     busy.value = false
   }
-}
-
-function onClipPromotedToNewVideo(newVideoId: number) {
-  toast.add({ title: 'New video created', description: "It's disabled until you review it — opening it now.", color: 'success' })
-  navigateTo(`/videos/${newVideoId}`)
 }
 
 async function onRestore() {

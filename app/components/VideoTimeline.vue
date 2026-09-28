@@ -3,13 +3,22 @@
     <UAlert v-if="error" color="error" variant="subtle" :title="error" icon="i-lucide-triangle-alert" />
     <template v-else>
       <div class="rounded-lg overflow-hidden bg-black max-w-2xl">
-        <VideoPlayer ref="player" :video-url="video.videoUrl" :poster="video.thumbnailUrl" :dub-url="selectedDub?.audioUrl ?? null" read-duration
-          @time="onTime" @duration="onDuration" />
+        <VideoPlayer
+          ref="player"
+          :video-url="video.videoUrl"
+          :poster="video.thumbnailUrl"
+          :dub-url="selectedDub?.audioUrl ?? null"
+          read-duration
+          @time="onTime"
+          @duration="onDuration"
+        />
       </div>
 
       <!-- Toolbar -->
       <div class="flex flex-wrap items-center gap-2">
-        <UTooltip text="Zoom out"><UButton size="sm" color="neutral" variant="soft" icon="i-lucide-zoom-out" aria-label="Zoom out" @click="zoomOut" /></UTooltip>
+        <UTooltip text="Zoom out"
+          ><UButton size="sm" color="neutral" variant="soft" icon="i-lucide-zoom-out" aria-label="Zoom out" @click="zoomOut"
+        /></UTooltip>
         <span class="text-xs text-gray-500 w-20 text-center tabular-nums">{{ Math.round(pxPerSec) }} px/s</span>
         <UTooltip text="Zoom in"><UButton size="sm" color="neutral" variant="soft" icon="i-lucide-zoom-in" aria-label="Zoom in" @click="zoomIn" /></UTooltip>
         <span class="text-sm font-medium tabular-nums text-gray-900 dark:text-white ml-2">
@@ -39,7 +48,12 @@
               @click="toggleVideoMute"
             />
           </div>
-          <div v-for="dub in dubs" :key="dub.id" v-show="!hidden.has(`dub-${dub.id}`)" class="h-10 border-b border-gray-100 dark:border-gray-800 flex items-center gap-1 px-2">
+          <div
+            v-for="dub in dubs"
+            :key="dub.id"
+            v-show="!hidden.has(`dub-${dub.id}`)"
+            class="h-10 border-b border-gray-100 dark:border-gray-800 flex items-center gap-1 px-2"
+          >
             <UIcon name="i-lucide-mic" class="w-3.5 h-3.5 text-gray-400 shrink-0" />
             <span class="text-xs font-medium truncate flex-1" :title="`${dub.languageName} · ${dub.voiceName}`">{{ dub.languageName }}</span>
             <UButton
@@ -61,7 +75,12 @@
             />
             <UButton size="xs" color="neutral" variant="ghost" icon="i-lucide-eye-off" aria-label="Hide track" @click="toggleHidden(`dub-${dub.id}`)" />
           </div>
-          <div v-for="t in subtitleTracks" :key="t.id" v-show="!hidden.has(`sub-${t.id}`)" class="h-10 border-b border-gray-100 dark:border-gray-800 flex items-center gap-1 px-2">
+          <div
+            v-for="t in subtitleTracks"
+            :key="t.id"
+            v-show="!hidden.has(`sub-${t.id}`)"
+            class="h-10 border-b border-gray-100 dark:border-gray-800 flex items-center gap-1 px-2"
+          >
             <UIcon name="i-lucide-captions" class="w-3.5 h-3.5 text-gray-400 shrink-0" />
             <span class="text-xs font-medium truncate flex-1" :title="t.label">{{ t.label }}</span>
             <UButton size="xs" color="neutral" variant="ghost" icon="i-lucide-eye-off" aria-label="Hide track" @click="toggleHidden(`sub-${t.id}`)" />
@@ -122,7 +141,12 @@
             </div>
 
             <!-- Subtitle tracks -->
-            <div v-for="t in subtitleTracks" :key="t.id" v-show="!hidden.has(`sub-${t.id}`)" class="relative h-10 border-b border-gray-100 dark:border-gray-800">
+            <div
+              v-for="t in subtitleTracks"
+              :key="t.id"
+              v-show="!hidden.has(`sub-${t.id}`)"
+              class="relative h-10 border-b border-gray-100 dark:border-gray-800"
+            >
               <div
                 v-for="(cue, i) in t.cues ?? []"
                 :key="i"

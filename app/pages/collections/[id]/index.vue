@@ -67,14 +67,7 @@
           <div class="flex flex-wrap items-center gap-2">
             <h2 class="font-semibold text-gray-900 dark:text-white">Videos</h2>
             <UBadge color="neutral" variant="subtle" size="sm">{{ collection.videoCount }}</UBadge>
-            <UInput
-              v-if="items.length > 8"
-              v-model="itemSearch"
-              size="sm"
-              icon="i-lucide-search"
-              placeholder="Search this collection's videos"
-              class="w-56"
-            />
+            <UInput v-if="items.length > 8" v-model="itemSearch" size="sm" icon="i-lucide-search" placeholder="Search this collection's videos" class="w-56" />
             <UButton
               v-if="collection.videoCount > 1"
               size="xs"
@@ -93,7 +86,10 @@
         </div>
         <div v-else-if="filteredItems.length" class="max-h-[70vh] overflow-y-auto">
           <template v-for="group in groupedItems" :key="group.label ?? '__none__'">
-            <div v-if="group.label" class="sticky top-0 z-10 bg-gray-50 dark:bg-gray-900/90 backdrop-blur px-4 py-1.5 text-xs font-semibold text-gray-500 dark:text-gray-400 border-y border-gray-100 dark:border-gray-800">
+            <div
+              v-if="group.label"
+              class="sticky top-0 z-10 bg-gray-50 dark:bg-gray-900/90 backdrop-blur px-4 py-1.5 text-xs font-semibold text-gray-500 dark:text-gray-400 border-y border-gray-100 dark:border-gray-800"
+            >
               {{ group.label }}
             </div>
             <ol class="divide-y divide-gray-100 dark:divide-gray-800">
@@ -151,13 +147,7 @@
             </ol>
           </template>
         </div>
-        <EmptyState
-          v-else-if="itemSearch"
-          icon="i-lucide-search-x"
-          title="No videos match your search"
-          description="Try a different title."
-          class="py-10"
-        />
+        <EmptyState v-else-if="itemSearch" icon="i-lucide-search-x" title="No videos match your search" description="Try a different title." class="py-10" />
         <EmptyState v-else icon="i-lucide-list-video" title="No videos in this collection" description="Add videos to start building it." class="py-10">
           <template #action>
             <UButton icon="i-lucide-plus" @click="openAdd">Add videos</UButton>

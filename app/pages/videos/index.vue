@@ -480,8 +480,11 @@ function onRestore(row: Video) {
 }
 
 function onArchiveToggle(row: Video, archived: boolean) {
-  run(() => (archived ? archive(row.id) : unarchive(row.id)), archived ? 'Video archived' : 'Video unarchived',
-    `Could not ${archived ? 'archive' : 'unarchive'} video`)
+  run(
+    () => (archived ? archive(row.id) : unarchive(row.id)),
+    archived ? 'Video archived' : 'Video unarchived',
+    `Could not ${archived ? 'archive' : 'unarchive'} video`
+  )
 }
 
 const duplicating = ref<number | null>(null)

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatDuration, formatFileSize, formatRelativeTime, formatWatchTime } from './format'
+import { formatDuration, formatFileSize, formatRelativeTime, formatTimeUntil, formatWatchTime } from './format'
 
 describe('formatDuration', () => {
   it('shows minutes and zero-padded seconds', () => {
@@ -69,6 +69,19 @@ describe('formatRelativeTime', () => {
   it('handles missing or unparseable values', () => {
     expect(formatRelativeTime(null)).toBe('—')
     expect(formatRelativeTime('not a date')).toBe('—')
+  })
+})
+
+describe('formatTimeUntil', () => {
+  it('counts down to a future time', () => {
+    expect(formatTimeUntil(localBackendString(-72 * 3600 * 1000))).toBe('in 3d')
+    expect(formatTimeUntil(localBackendString(-5 * 3600 * 1000))).toBe('in 5h')
+    expect(formatTimeUntil(localBackendString(-12 * 60 * 1000))).toBe('in 12m')
+  })
+  it('says soon for past or imminent times, and handles junk', () => {
+    expect(formatTimeUntil(localBackendString(60 * 1000))).toBe('soon')
+    expect(formatTimeUntil(null)).toBe('—')
+    expect(formatTimeUntil('nope')).toBe('—')
   })
 })
 

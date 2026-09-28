@@ -82,13 +82,7 @@
       <template v-if="watchedCount === videos.length && videos.length && moreCourses.length">
         <h2 class="mt-6 mb-3 font-semibold text-gray-900 dark:text-white">More courses</h2>
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          <VideoCard
-            v-for="c in moreCourses"
-            :key="c.id"
-            :to="`/learn/collections/${c.id}`"
-            :title="c.title"
-            :thumbnail-url="c.coverUrl"
-          >
+          <VideoCard v-for="c in moreCourses" :key="c.id" :to="`/learn/collections/${c.id}`" :title="c.title" :thumbnail-url="c.coverUrl">
             <p class="text-xs text-gray-500">{{ c.videoCount }} video{{ c.videoCount === 1 ? '' : 's' }}</p>
           </VideoCard>
         </div>

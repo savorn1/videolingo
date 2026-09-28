@@ -15,7 +15,8 @@
             Makes a full copy of each — same videos, sections and visibility.
           </p>
           <p v-else class="text-sm text-gray-600 dark:text-gray-300">
-            Sets every selected collection to <span class="font-medium">{{ visibilityLabel }}</span>.
+            Sets every selected collection to <span class="font-medium">{{ visibilityLabel }}</span
+            >.
           </p>
 
           <div
@@ -28,7 +29,9 @@
                 class="w-4 h-4 mt-0.5 shrink-0"
                 :class="r.outcome === 'ok' ? 'text-success-500' : 'text-error-500'"
               />
-              <span class="min-w-0"><span class="font-medium">{{ r.title }}</span> — {{ r.message }}</span>
+              <span class="min-w-0"
+                ><span class="font-medium">{{ r.title }}</span> — {{ r.message }}</span
+              >
             </div>
           </div>
 
@@ -78,7 +81,13 @@ async function run() {
   for (const c of props.collections) {
     try {
       if (action.value === 'visibility') {
-        await update(c.id, { title: c.title, slug: c.slug, description: c.description ?? undefined, coverUrl: c.coverUrl ?? undefined, visibility: targetVisibility.value! })
+        await update(c.id, {
+          title: c.title,
+          slug: c.slug,
+          description: c.description ?? undefined,
+          coverUrl: c.coverUrl ?? undefined,
+          visibility: targetVisibility.value!
+        })
         results.value.push({ title: c.title, outcome: 'ok', message: `set to ${visibilityLabel.value}` })
       } else if (action.value === 'duplicate') {
         const copy = await duplicate(c.id)

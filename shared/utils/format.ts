@@ -92,6 +92,20 @@ export function formatRelativeTime(value: string | null | undefined): string {
   return formatDate(value)
 }
 
+/** How long until a future time ("in 3d", "in 5h", "in 12m"), e.g. an expiry. Past or imminent: "soon". */
+export function formatTimeUntil(value: string | null | undefined): string {
+  if (!value) return '—'
+  const hasZone = /(Z|[+-]\d{2}:?\d{2})$/.test(value)
+  const then = new Date(hasZone ? value : value.replace(' ', 'T')).getTime()
+  if (Number.isNaN(then)) return '—'
+  const minutes = Math.round((then - Date.now()) / 60_000)
+  if (minutes < 1) return 'soon'
+  if (minutes < 60) return `in ${minutes}m`
+  const hours = Math.round(minutes / 60)
+  if (hours < 48) return `in ${hours}h`
+  return `in ${Math.round(hours / 24)}d`
+}
+
 // 'PAST_DUE' / 'past_due' both become 'Past due' — shared by <ColumnValue>'s
 // 'enum' column type and any backend enum value shown as plain text.
 export function formatEnum(value: string | null | undefined): string {

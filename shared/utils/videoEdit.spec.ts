@@ -41,7 +41,12 @@ describe('validateSegments', () => {
   it('needs at least one segment and at most the cap', () => {
     expect(validateSegments([], null)).not.toBeNull()
     expect(validateSegments([{ startMs: 0, endMs: 1000 }], 10000)).toBeNull()
-    expect(validateSegments(Array.from({ length: MAX_SEGMENTS + 1 }, () => ({ startMs: 0, endMs: 100 })), null)).not.toBeNull()
+    expect(
+      validateSegments(
+        Array.from({ length: MAX_SEGMENTS + 1 }, () => ({ startMs: 0, endMs: 100 })),
+        null
+      )
+    ).not.toBeNull()
   })
   it('validates each range individually, naming which one failed', () => {
     const error = validateSegments(

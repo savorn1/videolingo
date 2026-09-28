@@ -2,12 +2,7 @@
   <div>
     <PageHeader title="Collections" description="Ordered sets of videos — playlists, course units, staff picks.">
       <template #actions>
-        <UButton
-          :color="selectMode ? 'primary' : 'neutral'"
-          :variant="selectMode ? 'soft' : 'ghost'"
-          icon="i-lucide-square-check"
-          @click="toggleSelectMode"
-        >
+        <UButton :color="selectMode ? 'primary' : 'neutral'" :variant="selectMode ? 'soft' : 'ghost'" icon="i-lucide-square-check" @click="toggleSelectMode">
           Select
         </UButton>
         <UButton icon="i-lucide-plus" @click="openForm(null)">New collection</UButton>
@@ -83,11 +78,7 @@
             </NuxtLink>
           </div>
           <div v-if="selectMode" class="absolute top-2 left-2 rounded bg-black/40 p-1">
-            <UCheckbox
-              :model-value="selected.has(c.id)"
-              :aria-label="`Select ${c.title}`"
-              @update:model-value="() => toggleOne(c.id)"
-            />
+            <UCheckbox :model-value="selected.has(c.id)" :aria-label="`Select ${c.title}`" @update:model-value="() => toggleOne(c.id)" />
           </div>
         </div>
         <div class="p-4 flex-1 flex flex-col gap-2">

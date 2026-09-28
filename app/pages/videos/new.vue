@@ -52,15 +52,11 @@
               <li
                 v-for="s in linkSources"
                 :key="s.value"
-                class="flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs"
-                :class="
-                  inspected?.source === s.value
-                    ? 'border-primary-400 bg-primary-50 dark:bg-primary-950/40 text-primary-700 dark:text-primary-300'
-                    : 'border-gray-200 dark:border-gray-800 text-gray-600 dark:text-gray-400'
-                "
+                class="flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors"
+                :class="inspected?.source === s.value ? `${s.activeClass} font-medium` : 'border-gray-200 dark:border-gray-800 text-gray-600 dark:text-gray-400'"
                 :title="s.hint"
               >
-                <UIcon :name="s.icon" class="w-3.5 h-3.5" />
+                <UIcon :name="s.icon" class="w-3.5 h-3.5" :class="s.iconClass" />
                 {{ s.label }}
               </li>
             </ul>
@@ -254,7 +250,7 @@
           <template v-for="f in facts" :key="f.label">
             <dt class="text-gray-500">{{ f.label }}</dt>
             <dd class="text-gray-900 dark:text-white min-w-0 truncate" :title="f.value">
-              <span class="inline-flex items-center gap-1.5"><UIcon v-if="f.icon" :name="f.icon" class="w-4 h-4" />{{ f.value }}</span>
+              <span class="inline-flex items-center gap-1.5"><UIcon v-if="f.icon" :name="f.icon" class="w-4 h-4" :class="f.iconClass" />{{ f.value }}</span>
             </dd>
           </template>
         </dl>
@@ -614,17 +610,17 @@ function onPlayerDuration(seconds: number) {
 }
 
 const facts = computed(() => {
-  const out: { label: string; value: string; icon?: string }[] = []
+  const out: { label: string; value: string; icon?: string; iconClass?: string }[] = []
   if (mode.value === 'link' && inspected.value) {
     const r = inspected.value
     const meta = videoSourceMeta(r.source)
     const kind = r.kind === 'SHORT' ? ' Short' : r.kind === 'REEL' ? ' Reel' : r.kind === 'LIVE' ? ' live stream' : r.kind === 'FILE' ? '' : ' video'
-    out.push({ label: 'Source', value: `${meta.label}${kind}`, icon: meta.icon })
+    out.push({ label: 'Source', value: `${meta.label}${kind}`, icon: meta.icon, iconClass: meta.iconClass })
     if (r.author) out.push({ label: 'By', value: r.author })
     if (r.externalId) out.push({ label: 'ID', value: r.externalId })
     if (r.fileSize) out.push({ label: 'Size', value: formatFileSize(r.fileSize) })
   } else if (file.value) {
-    out.push({ label: 'Source', value: 'Upload', icon: 'i-lucide-upload' })
+    out.push({ label: 'Source', value: 'Upload', icon: 'i-lucide-upload', iconClass: videoSourceMeta('UPLOAD').iconClass })
     out.push({ label: 'Size', value: formatFileSize(file.value.size) })
     if (file.value.type) out.push({ label: 'Format', value: file.value.type })
   }
