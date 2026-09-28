@@ -18,6 +18,7 @@
 <script setup lang="ts">
 import type { FieldDef } from '#shared/types'
 import type { Video } from '~/composables/useVideos'
+import { VIDEO_VISIBILITIES } from '~/composables/useVideos'
 
 const { settings: clientSettings } = useClientSettings()
 
@@ -46,6 +47,11 @@ const fields = computed<FieldDef[]>(() => [
   },
   { name: 'thumbnailUrl', label: 'Thumbnail URL', type: 'url', placeholder: 'https://…' },
   {
+    name: 'visibility',
+    type: 'select',
+    options: VIDEO_VISIBILITIES.map((v) => ({ label: `${v.label} — ${v.description}`, value: v.value }))
+  },
+  {
     name: 'categoryIds',
     label: 'Categories',
     type: 'multiselect',
@@ -67,6 +73,7 @@ watch(open, (value) => {
     description: props.video.description ?? '',
     language: props.video.language ?? undefined,
     thumbnailUrl: props.video.thumbnailUrl ?? '',
+    visibility: props.video.visibility,
     categoryIds: props.video.categories.map((c) => c.id)
   }
   error.value = ''
@@ -83,6 +90,7 @@ async function onSubmit(values: Record<string, any>) {
       description: values.description || undefined,
       language: values.language || undefined,
       thumbnailUrl: values.thumbnailUrl || undefined,
+      visibility: values.visibility || undefined,
       categoryIds: values.categoryIds ?? []
     })
     toast.add({ title: 'Video updated', color: 'success' })

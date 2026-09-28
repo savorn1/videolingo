@@ -2,9 +2,29 @@
   <div>
     <PageHeader title="Collections" description="Ordered sets of videos — playlists, course units, staff picks.">
       <template #actions>
+        <UButton
+          :color="selectMode ? 'primary' : 'neutral'"
+          :variant="selectMode ? 'soft' : 'ghost'"
+          icon="i-lucide-square-check"
+          @click="toggleSelectMode"
+        >
+          Select
+        </UButton>
         <UButton icon="i-lucide-plus" @click="openForm(null)">New collection</UButton>
       </template>
     </PageHeader>
+
+    <UCard v-if="selectMode" class="mb-4" :ui="{ body: 'flex flex-wrap items-center gap-3 py-3' }">
+      <UCheckbox
+        :model-value="rows.length > 0 && selected.size === rows.length"
+        :indeterminate="selected.size > 0 && selected.size < rows.length"
+        label="Select all on this page"
+        @update:model-value="toggleSelectAll"
+      />
+      <span class="text-sm text-gray-500">{{ selected.size }} selected</span>
+      <CollectionBulkActions v-if="selected.size" :collections="selectedCollections" class="ml-auto" @done="onBulkDone" />
+      <UButton v-if="selected.size" size="xs" color="neutral" variant="ghost" icon="i-lucide-x" @click="selected.clear()">Clear</UButton>
+    </UCard>
 
     <UCard class="mb-4">
       <div class="flex flex-wrap gap-3">
@@ -53,7 +73,7 @@
             </CollectionCover>
           </NuxtLink>
           <!-- A sibling of the card link, not inside it: links can't nest. -->
-          <div v-if="c.videoCount" class="pointer-events-none absolute inset-0 flex items-center justify-center">
+          <div v-if="c.videoCount && !selectMode" class="pointer-events-none absolute inset-0 flex items-center justify-center">
             <NuxtLink
               :to="`/collections/${c.id}/play`"
               :aria-label="`Play ${c.title}`"
@@ -61,6 +81,13 @@
             >
               <UIcon name="i-lucide-play" class="w-6 h-6 ml-0.5" />
             </NuxtLink>
+          </div>
+          <div v-if="selectMode" class="absolute top-2 left-2 rounded bg-black/40 p-1">
+            <UCheckbox
+              :model-value="selected.has(c.id)"
+              :aria-label="`Select ${c.title}`"
+              @update:model-value="() => toggleOne(c.id)"
+            />
           </div>
         </div>
         <div class="p-4 flex-1 flex flex-col gap-2">
@@ -128,7 +155,7 @@ import { COLLECTION_VISIBILITIES, type Collection, type CollectionVisibility } f
 
 definePageMeta({ middleware: 'admin' })
 
-const { list, remove } = useCollections()
+const { list, remove, duplicate } = useCollections()
 const { list: listUsers } = useUsers()
 const toast = useToast()
 
@@ -227,11 +254,47 @@ function menu(c: Collection): DropdownMenuItem[][] {
           ]
         : []),
       { label: 'Open', icon: 'i-lucide-list-video', onSelect: () => navigateTo(`/collections/${c.id}`) },
-      { label: 'Edit details', icon: 'i-lucide-pencil', onSelect: () => openForm(c) }
+      { label: 'Edit details', icon: 'i-lucide-pencil', onSelect: () => openForm(c) },
+      { label: 'Duplicate', icon: 'i-lucide-copy', onSelect: () => onDuplicate(c) }
     ],
     [{ label: 'Delete', icon: 'i-lucide-trash-2', color: 'error' as const, onSelect: () => (confirmDelete.value = c) }]
   ]
 }
+
+async function onDuplicate(c: Collection) {
+  try {
+    const copy = await duplicate(c.id)
+    toast.add({ title: `Duplicated as “${copy.title}”`, color: 'success' })
+    await load()
+  } catch (err) {
+    toast.add({ title: 'Could not duplicate collection', description: apiErrorMessage(err), color: 'error' })
+  }
+}
+
+// ── Bulk select ───────────────────────────────────────────────────────────
+const selectMode = ref(false)
+const selected = reactive(new Set<number>())
+function toggleSelectMode() {
+  selectMode.value = !selectMode.value
+  selected.clear()
+}
+function toggleOne(id: number) {
+  if (selected.has(id)) selected.delete(id)
+  else selected.add(id)
+}
+function toggleSelectAll(checked: boolean | 'indeterminate') {
+  if (checked === true) rows.value.forEach((c) => selected.add(c.id))
+  else selected.clear()
+}
+const selectedCollections = computed(() => rows.value.filter((c) => selected.has(c.id)))
+async function onBulkDone() {
+  selected.clear()
+  await load()
+}
+watch(rows, () => {
+  const ids = new Set(rows.value.map((c) => c.id))
+  for (const id of [...selected]) if (!ids.has(id)) selected.delete(id)
+})
 
 const busy = ref(false)
 const confirmDelete = ref<Collection | null>(null)

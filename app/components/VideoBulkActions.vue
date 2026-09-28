@@ -7,6 +7,11 @@
     <UButton v-if="can('transcripts', 'WRITE')" size="xs" color="primary" variant="soft" icon="i-lucide-languages" @click="openAction('translate')">
       Translate…
     </UButton>
+    <UButton v-if="can('videos', 'WRITE')" size="xs" color="neutral" variant="soft" icon="i-lucide-copy" @click="openAction('duplicate')">Duplicate</UButton>
+    <UButton v-if="can('videos', 'WRITE')" size="xs" color="neutral" variant="soft" icon="i-lucide-archive" @click="openAction('archive')">Archive</UButton>
+    <UButton v-if="can('videos', 'WRITE')" size="xs" color="neutral" variant="soft" icon="i-lucide-archive-restore" @click="openAction('unarchive')">
+      Unarchive
+    </UButton>
 
     <UModal
       v-model:open="show"
@@ -59,6 +64,14 @@
             </p>
           </template>
 
+          <p v-else-if="action === 'duplicate'" class="text-sm text-gray-600 dark:text-gray-300">
+            Makes a full copy of each — same file, metadata, categories and tags — disabled until reviewed.
+          </p>
+          <p v-else-if="action === 'archive'" class="text-sm text-gray-600 dark:text-gray-300">
+            Puts each aside, out of the active library. Learners can't watch them either way.
+          </p>
+          <p v-else-if="action === 'unarchive'" class="text-sm text-gray-600 dark:text-gray-300">Brings each back into the active library.</p>
+
           <!-- Results -->
           <div
             v-if="results.length"
@@ -99,18 +112,39 @@ const { can } = useAuth()
 const { list: listTags, assignToVideo } = useTags()
 const { list: listCollections, addVideos } = useCollections()
 const { list: listTranscripts, create: createTranscript, regenerate } = useTranscripts()
+const { duplicate, archive, unarchive } = useVideos()
 const { settings: clientSettings } = useClientSettings()
 const toast = useToast()
 
-type Action = 'tags' | 'collection' | 'translate'
+type Action = 'tags' | 'collection' | 'translate' | 'duplicate' | 'archive' | 'unarchive'
 const action = ref<Action>('tags')
 const show = ref(false)
 const running = ref(false)
 const optionsLoading = ref(false)
 const results = ref<{ video: string; outcome: 'ok' | 'skipped' | 'failed'; message: string }[]>([])
 
-const title = computed(() => ({ tags: 'Add tags', collection: 'Add to collection', translate: 'Queue translations' })[action.value])
-const icon = computed(() => ({ tags: 'i-lucide-hash', collection: 'i-lucide-library', translate: 'i-lucide-languages' })[action.value])
+const title = computed(
+  () =>
+    ({
+      tags: 'Add tags',
+      collection: 'Add to collection',
+      translate: 'Queue translations',
+      duplicate: 'Duplicate videos',
+      archive: 'Archive videos',
+      unarchive: 'Unarchive videos'
+    })[action.value]
+)
+const icon = computed(
+  () =>
+    ({
+      tags: 'i-lucide-hash',
+      collection: 'i-lucide-library',
+      translate: 'i-lucide-languages',
+      duplicate: 'i-lucide-copy',
+      archive: 'i-lucide-archive',
+      unarchive: 'i-lucide-archive-restore'
+    })[action.value]
+)
 
 const tagIds = ref<number[]>([])
 const tagOptions = ref<{ label: string; value: number }[]>([])
@@ -128,7 +162,15 @@ const languageItems = computed(() =>
 const noLanguage = computed(() => props.videos.filter((v) => !v.language))
 const plannedJobs = computed(() => (props.videos.length - noLanguage.value.length) * targetLanguages.value.length)
 
-const ready = computed(() => (action.value === 'tags' ? tagIds.value.length > 0 : action.value === 'collection' ? !!collectionId.value : plannedJobs.value > 0))
+const ready = computed(() =>
+  action.value === 'tags'
+    ? tagIds.value.length > 0
+    : action.value === 'collection'
+      ? !!collectionId.value
+      : action.value === 'translate'
+        ? plannedJobs.value > 0
+        : true
+)
 
 async function openAction(a: Action) {
   action.value = a
@@ -137,7 +179,7 @@ async function openAction(a: Action) {
   collectionId.value = undefined
   targetLanguages.value = [...suggested.value]
   show.value = true
-  if (a === 'translate') return
+  if (a !== 'tags' && a !== 'collection') return
   optionsLoading.value = true
   try {
     if (a === 'tags')
@@ -174,6 +216,25 @@ async function run() {
         push(`${props.videos.length} video(s)`, 'ok', `added to “${collectionOptions.value.find((c) => c.value === collectionId.value)?.label}”`)
       } catch (err) {
         push(`${props.videos.length} video(s)`, 'failed', apiErrorMessage(err))
+      }
+    } else if (action.value === 'duplicate') {
+      for (const v of props.videos) {
+        try {
+          const copy = await duplicate(v.id)
+          push(v.title, 'ok', `duplicated as “${copy.title}”`)
+        } catch (err) {
+          push(v.title, 'failed', apiErrorMessage(err))
+        }
+      }
+    } else if (action.value === 'archive' || action.value === 'unarchive') {
+      for (const v of props.videos) {
+        try {
+          if (action.value === 'archive') await archive(v.id)
+          else await unarchive(v.id)
+          push(v.title, 'ok', action.value === 'archive' ? 'archived' : 'unarchived')
+        } catch (err) {
+          push(v.title, 'failed', apiErrorMessage(err))
+        }
       }
     } else {
       for (const v of props.videos) {

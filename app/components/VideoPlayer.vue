@@ -50,28 +50,18 @@
         @ratechange="syncDubRate"
         @webkitbeginfullscreen="setNativeTrack(true)"
         @webkitendfullscreen="setNativeTrack(false)"
+        @enterpictureinpicture="setNativeTrack(true)"
+        @leavepictureinpicture="setNativeTrack(false)"
       >
-        <!-- Only shown when the browser takes the video itself full screen (Safari / iPhone
-             always do): our own captions can't follow it there. Hidden otherwise. -->
+        <!-- Only shown when the video leaves the page — native full screen (Safari /
+             iPhone always use it) or picture-in-picture — where the page's own captions
+             can't follow. Hidden otherwise. -->
         <track v-if="trackUrl" :key="trackUrl" kind="subtitles" :src="trackUrl" :srclang="trackLanguage ?? undefined" label="Subtitles" />
       </video>
     </template>
 
-    <!-- Captions drawn by the page (it knows the cues); a second language sits on top. -->
-    <div v-if="captionSecondary" class="pointer-events-none absolute inset-x-0 top-4 z-10 flex justify-center px-6">
-      <span
-        class="rounded bg-black/60 px-2 py-0.5 text-center text-yellow-200 whitespace-pre-line leading-snug"
-        :class="fill ? 'text-xl sm:text-2xl' : 'text-sm sm:text-base'"
-        >{{ captionSecondary }}</span
-      >
-    </div>
-    <div v-if="caption" class="pointer-events-none absolute inset-x-0 z-10 flex justify-center px-6" :class="fill ? 'bottom-20' : 'bottom-14'">
-      <span
-        class="rounded bg-black/75 px-2 py-0.5 text-center text-white font-semibold whitespace-pre-line leading-snug"
-        :class="fill ? 'text-2xl sm:text-4xl' : 'text-base sm:text-lg'"
-        >{{ caption }}</span
-      >
-    </div>
+    <!-- Captions and other overlays drawn by the page (it knows the cues and the time). -->
+    <slot name="overlay" :fill="fill" />
 
     <!-- Voice-over track, played in place of the video's own sound. -->
     <audio v-if="dubUrl" ref="dubEl" :key="dubUrl" :src="dubUrl" preload="auto" class="hidden" />
@@ -132,14 +122,11 @@ const props = defineProps<{
   autoplay?: boolean
   /** Where to resume, e.g. from the user's saved progress on the server; wins over `resumeKey`'s local copy. */
   startAt?: number | null
-  /** Subtitle line to show over the picture (and a second-language line above it). */
-  caption?: string | null
-  captionSecondary?: string | null
   /** The page provides its own full-screen button: hide the video's / YouTube's, which would leave captions behind. */
   ownFullscreen?: boolean
   /** Fill the parent instead of keeping 16:9 (e.g. while the page is full screen). */
   fill?: boolean
-  /** Cues for the browser's own subtitle display, used only in native full screen (files). */
+  /** Cues for the browser's own subtitle display, used only in native full screen and picture-in-picture (files). */
   trackCues?: { startMs: number; endMs: number; text: string }[] | null
   trackSecondary?: { startMs: number; endMs: number; text: string }[] | null
   trackLanguage?: string | null

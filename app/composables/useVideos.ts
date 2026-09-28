@@ -6,6 +6,20 @@
 import type { ApiEnvelope, PageEnvelope } from '#shared/types'
 import type { VideoSourceKind } from '#shared/utils/videoSources'
 
+export type VideoVisibility = 'PUBLIC' | 'UNLISTED' | 'PRIVATE'
+
+export const VIDEO_VISIBILITIES: {
+  value: VideoVisibility
+  label: string
+  description: string
+  icon: string
+  color: 'success' | 'info' | 'neutral'
+}[] = [
+  { value: 'PUBLIC', label: 'Public', description: 'Listed for all learners', icon: 'i-lucide-globe', color: 'success' },
+  { value: 'UNLISTED', label: 'Unlisted', description: 'Anyone with the link', icon: 'i-lucide-link', color: 'info' },
+  { value: 'PRIVATE', label: 'Private', description: 'Only the owner', icon: 'i-lucide-lock', color: 'neutral' }
+]
+
 export interface Video {
   id: number
   title: string
@@ -34,6 +48,9 @@ export interface Video {
   fileSize: number | null
   mimeType: string | null
   enabled: boolean
+  archived: boolean
+  archivedAt: string | null
+  visibility: VideoVisibility
   deleted: boolean
   deletedAt: string | null
   createdAt: string | null
@@ -53,8 +70,11 @@ export interface VideoFilter {
   enabled?: boolean
   categoryId?: number
   tagId?: number
+  visibility?: VideoVisibility
   /** false (default) = live videos, true = trash. */
   deleted?: boolean
+  /** false (default) hides archived videos; true lists only archived ones. Ignored when deleted=true. */
+  archived?: boolean
   /** yyyy-mm-dd, inclusive. */
   createdFrom?: string
   createdTo?: string
@@ -69,6 +89,7 @@ export interface UpdateVideoPayload {
   description?: string
   language?: string
   thumbnailUrl?: string
+  visibility?: VideoVisibility
   /** Replaces the video's categories; omit to leave them unchanged. */
   categoryIds?: number[]
 }
@@ -120,6 +141,29 @@ export function useVideos() {
     return (await api<ApiEnvelope<Video>>(`/api/admin/videos/${id}/restore`, { method: 'POST' })).data
   }
 
+  async function archive(id: number) {
+    return (await api<ApiEnvelope<Video>>(`/api/admin/videos/${id}/archive`, { method: 'POST' })).data
+  }
+
+  async function unarchive(id: number) {
+    return (await api<ApiEnvelope<Video>>(`/api/admin/videos/${id}/unarchive`, { method: 'POST' })).data
+  }
+
+  /** Reassigns the video to another user; null clears ownership. */
+  async function moveOwner(id: number, ownerId: number | null) {
+    return (await api<ApiEnvelope<Video>>(`/api/admin/videos/${id}/owner`, { method: 'PUT', body: { ownerId } })).data
+  }
+
+  /** A full copy — same file, metadata, categories and tags — disabled until reviewed. */
+  async function duplicate(id: number) {
+    return (await api<ApiEnvelope<Video>>(`/api/admin/videos/${id}/duplicate`, { method: 'POST' })).data
+  }
+
+  /** Swaps the video's file for a freshly uploaded one; the old file is kept as a version. */
+  async function replace(id: number, payload: { storageKey: string; durationSeconds?: number; width?: number; height?: number }) {
+    return (await api<ApiEnvelope<Video>>(`/api/admin/videos/${id}/replace`, { method: 'POST', body: payload })).data
+  }
+
   // ── Add Video ────────────────────────────────────────────────────────────
 
   /** Checks a pasted link and fetches what the platform says about it. */
@@ -145,7 +189,24 @@ export function useVideos() {
     return (await api<ApiEnvelope<Video>>('/api/admin/videos', { method: 'POST', body: payload })).data
   }
 
-  return { list, get, statistics, update, updateStatus, remove, restore, inspect, detectLanguage, requestUpload, create }
+  return {
+    list,
+    get,
+    statistics,
+    update,
+    updateStatus,
+    remove,
+    restore,
+    archive,
+    unarchive,
+    moveOwner,
+    duplicate,
+    replace,
+    inspect,
+    detectLanguage,
+    requestUpload,
+    create
+  }
 }
 
 export interface LanguageGuess {

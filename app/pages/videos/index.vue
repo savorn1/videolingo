@@ -145,6 +145,12 @@
             description="Deleted videos show up here and can be restored."
           />
           <EmptyState
+            v-else-if="filter.archived"
+            icon="i-lucide-archive"
+            title="No archived videos"
+            description="Videos you archive show up here, put aside but not in the trash."
+          />
+          <EmptyState
             v-else
             icon="i-lucide-clapperboard"
             title="No videos yet"
@@ -193,7 +199,7 @@ import type { Video } from '~/composables/useVideos'
 
 definePageMeta({ middleware: 'admin' })
 
-const { list, updateStatus, remove, restore } = useVideos()
+const { list, updateStatus, remove, restore, archive, unarchive, duplicate } = useVideos()
 // Rows ticked for bulk actions (VideoBulkActions).
 const selected = ref<Video[]>([])
 const { list: listUsers } = useUsers()
@@ -211,6 +217,7 @@ const error = ref('')
 // ── Filters (server-side) ──────────────────────────────────────────────────
 const filter = reactive<{
   deleted: boolean
+  archived: boolean
   enabled: boolean | undefined
   language: string | undefined
   categoryId: number | undefined
@@ -220,6 +227,7 @@ const filter = reactive<{
   createdTo: string | undefined
 }>({
   deleted: false,
+  archived: false,
   enabled: undefined,
   language: undefined,
   categoryId: undefined,
@@ -237,12 +245,14 @@ useListQuerySync({ filter, search, page })
 
 const viewItems = [
   { label: 'Videos', value: 'active', icon: 'i-lucide-clapperboard' },
+  { label: 'Archived', value: 'archived', icon: 'i-lucide-archive' },
   { label: 'Trash', value: 'trash', icon: 'i-lucide-trash-2' }
 ]
 const view = computed({
-  get: () => (filter.deleted ? 'trash' : 'active'),
+  get: () => (filter.deleted ? 'trash' : filter.archived ? 'archived' : 'active'),
   set: (value: string | number) => {
     filter.deleted = value === 'trash'
+    filter.archived = value === 'archived'
     // Status doesn't apply in the trash (nothing there is live either way).
     if (filter.deleted) filter.enabled = undefined
     sort.value = { column: filter.deleted ? 'deletedAt' : 'createdAt', direction: 'desc' }
@@ -313,6 +323,7 @@ function listFilter() {
   return {
     search: search.value.trim() || undefined,
     deleted: filter.deleted,
+    archived: filter.archived,
     enabled: filter.enabled,
     language: filter.language,
     categoryId: filter.categoryId,
@@ -426,6 +437,10 @@ function rowActions(row: Video): RowAction[] {
     row.enabled
       ? { label: 'Disable', icon: 'i-lucide-eye-off', color: 'warning', onClick: () => (confirmDisable.value = row) }
       : { label: 'Enable', icon: 'i-lucide-eye', color: 'success', onClick: () => setStatus(row, true) },
+    { label: 'Duplicate', icon: 'i-lucide-copy', loading: duplicating.value === row.id, onClick: () => onDuplicate(row) },
+    row.archived
+      ? { label: 'Unarchive', icon: 'i-lucide-archive-restore', onClick: () => onArchiveToggle(row, false) }
+      : { label: 'Archive', icon: 'i-lucide-archive', onClick: () => onArchiveToggle(row, true) },
     { label: 'Statistics', icon: 'i-lucide-chart-column', onClick: () => navigateTo(`/videos/${row.id}?tab=statistics`) },
     { label: 'Delete', icon: 'i-lucide-trash-2', color: 'error', onClick: () => (confirmDelete.value = row) }
   ]
@@ -462,6 +477,25 @@ async function onDelete(row: Video) {
 
 function onRestore(row: Video) {
   run(() => restore(row.id), 'Video restored', 'Could not restore video')
+}
+
+function onArchiveToggle(row: Video, archived: boolean) {
+  run(() => (archived ? archive(row.id) : unarchive(row.id)), archived ? 'Video archived' : 'Video unarchived',
+    `Could not ${archived ? 'archive' : 'unarchive'} video`)
+}
+
+const duplicating = ref<number | null>(null)
+async function onDuplicate(row: Video) {
+  duplicating.value = row.id
+  try {
+    const copy = await duplicate(row.id)
+    toast.add({ title: `Duplicated as “${copy.title}”`, color: 'success' })
+    await load()
+  } catch (err) {
+    toast.add({ title: 'Could not duplicate video', description: apiErrorMessage(err), color: 'error' })
+  } finally {
+    duplicating.value = null
+  }
 }
 
 // ── Edit ───────────────────────────────────────────────────────────────────

@@ -12,6 +12,7 @@
         >
           Shuffle
         </UButton>
+        <UButton color="neutral" variant="soft" icon="i-lucide-bar-chart-3" @click="openAnalytics">Analytics</UButton>
         <UButton color="neutral" variant="soft" icon="i-lucide-plus" @click="openAdd">Add videos</UButton>
         <UButton color="neutral" variant="soft" icon="i-lucide-pencil" @click="showForm = true">Edit</UButton>
         <UButton color="error" variant="soft" icon="i-lucide-trash-2" @click="confirmDelete = true">Delete</UButton>
@@ -63,9 +64,17 @@
       <!-- View Collection Videos -->
       <UCard class="xl:col-span-2" :ui="{ body: 'p-0 sm:p-0' }">
         <template #header>
-          <div class="flex items-center gap-2">
+          <div class="flex flex-wrap items-center gap-2">
             <h2 class="font-semibold text-gray-900 dark:text-white">Videos</h2>
             <UBadge color="neutral" variant="subtle" size="sm">{{ collection.videoCount }}</UBadge>
+            <UInput
+              v-if="items.length > 8"
+              v-model="itemSearch"
+              size="sm"
+              icon="i-lucide-search"
+              placeholder="Search this collection's videos"
+              class="w-56"
+            />
             <UButton
               v-if="collection.videoCount > 1"
               size="xs"
@@ -82,66 +91,78 @@
         <div v-if="videosLoading && !items.length" class="p-4 space-y-3">
           <USkeleton v-for="i in 3" :key="i" class="h-14" />
         </div>
-        <ol v-else-if="items.length" class="divide-y divide-gray-100 dark:divide-gray-800">
-          <li v-for="item in items" :key="item.videoId" class="flex items-center gap-3 px-4 py-3" :class="item.deleted ? 'opacity-60' : ''">
-            <span class="w-6 text-right text-sm font-semibold text-gray-400 tabular-nums">{{ item.position + 1 }}</span>
-            <NuxtLink :to="`/videos/${item.videoId}`" class="relative w-24 aspect-video shrink-0 rounded overflow-hidden bg-gray-100 dark:bg-gray-800">
-              <img
-                v-if="item.thumbnailUrl && !brokenThumbs.has(item.videoId)"
-                :src="item.thumbnailUrl"
-                alt=""
-                class="w-full h-full object-cover"
-                loading="lazy"
-                @error="brokenThumbs.add(item.videoId)"
-              />
-              <UIcon v-else name="i-lucide-clapperboard" class="absolute inset-0 m-auto w-4 h-4 text-gray-400" />
-              <span
-                v-if="item.durationSeconds !== null"
-                class="absolute bottom-0.5 right-0.5 rounded bg-black/75 px-1 text-[10px] font-semibold text-white tabular-nums"
-              >
-                {{ formatDuration(item.durationSeconds) }}
-              </span>
-            </NuxtLink>
-            <div class="min-w-0 flex-1">
-              <NuxtLink :to="`/videos/${item.videoId}`" class="block font-semibold text-sm text-gray-900 dark:text-white truncate hover:underline">
-                {{ item.title ?? `Video #${item.videoId}` }}
-              </NuxtLink>
-              <p class="text-xs text-gray-500 truncate">
-                {{ languageLabel(item.language) }} · added {{ formatRelativeTime(item.addedAt) }}{{ item.addedBy ? ` by ${item.addedBy}` : '' }}
-              </p>
+        <div v-else-if="filteredItems.length" class="max-h-[70vh] overflow-y-auto">
+          <template v-for="group in groupedItems" :key="group.label ?? '__none__'">
+            <div v-if="group.label" class="sticky top-0 z-10 bg-gray-50 dark:bg-gray-900/90 backdrop-blur px-4 py-1.5 text-xs font-semibold text-gray-500 dark:text-gray-400 border-y border-gray-100 dark:border-gray-800">
+              {{ group.label }}
             </div>
-            <UBadge v-if="item.deleted" color="error" variant="subtle" size="sm" icon="i-lucide-trash-2">In trash</UBadge>
-            <UBadge v-else-if="!item.enabled" color="warning" variant="subtle" size="sm" icon="i-lucide-eye-off">Disabled</UBadge>
-            <UTooltip v-if="!item.deleted" text="Play from here">
-              <UButton
-                size="xs"
-                color="primary"
-                variant="ghost"
-                icon="i-lucide-play"
-                :aria-label="`Play the collection from ${item.title ?? 'this video'}`"
-                :to="`/collections/${collection?.id}/play?v=${item.videoId}`"
-              />
-            </UTooltip>
-            <UTooltip text="Remove from collection">
-              <UButton
-                size="xs"
-                color="error"
-                variant="ghost"
-                icon="i-lucide-x"
-                :aria-label="`Remove ${item.title ?? 'video'} from collection`"
-                @click="confirmRemove = item"
-              />
-            </UTooltip>
-          </li>
-        </ol>
+            <ol class="divide-y divide-gray-100 dark:divide-gray-800">
+              <li v-for="item in group.items" :key="item.videoId" class="flex items-center gap-3 px-4 py-3" :class="item.deleted ? 'opacity-60' : ''">
+                <span class="w-6 text-right text-sm font-semibold text-gray-400 tabular-nums">{{ item.position + 1 }}</span>
+                <NuxtLink :to="`/videos/${item.videoId}`" class="relative w-24 aspect-video shrink-0 rounded overflow-hidden bg-gray-100 dark:bg-gray-800">
+                  <img
+                    v-if="item.thumbnailUrl && !brokenThumbs.has(item.videoId)"
+                    :src="item.thumbnailUrl"
+                    alt=""
+                    class="w-full h-full object-cover"
+                    loading="lazy"
+                    @error="brokenThumbs.add(item.videoId)"
+                  />
+                  <UIcon v-else name="i-lucide-clapperboard" class="absolute inset-0 m-auto w-4 h-4 text-gray-400" />
+                  <span
+                    v-if="item.durationSeconds !== null"
+                    class="absolute bottom-0.5 right-0.5 rounded bg-black/75 px-1 text-[10px] font-semibold text-white tabular-nums"
+                  >
+                    {{ formatDuration(item.durationSeconds) }}
+                  </span>
+                </NuxtLink>
+                <div class="min-w-0 flex-1">
+                  <NuxtLink :to="`/videos/${item.videoId}`" class="block font-semibold text-sm text-gray-900 dark:text-white truncate hover:underline">
+                    {{ item.title ?? `Video #${item.videoId}` }}
+                  </NuxtLink>
+                  <p class="text-xs text-gray-500 truncate">
+                    {{ languageLabel(item.language) }} · added {{ formatRelativeTime(item.addedAt) }}{{ item.addedBy ? ` by ${item.addedBy}` : '' }}
+                  </p>
+                </div>
+                <UBadge v-if="item.deleted" color="error" variant="subtle" size="sm" icon="i-lucide-trash-2">In trash</UBadge>
+                <UBadge v-else-if="!item.enabled" color="warning" variant="subtle" size="sm" icon="i-lucide-eye-off">Disabled</UBadge>
+                <CollectionSectionEditor :section="item.section" @save="(section) => onSetSection(item, section)" />
+                <UTooltip v-if="!item.deleted" text="Play from here">
+                  <UButton
+                    size="xs"
+                    color="primary"
+                    variant="ghost"
+                    icon="i-lucide-play"
+                    :aria-label="`Play the collection from ${item.title ?? 'this video'}`"
+                    :to="`/collections/${collection?.id}/play?v=${item.videoId}`"
+                  />
+                </UTooltip>
+                <UTooltip text="Remove from collection">
+                  <UButton
+                    size="xs"
+                    color="error"
+                    variant="ghost"
+                    icon="i-lucide-x"
+                    :aria-label="`Remove ${item.title ?? 'video'} from collection`"
+                    @click="confirmRemove = item"
+                  />
+                </UTooltip>
+              </li>
+            </ol>
+          </template>
+        </div>
+        <EmptyState
+          v-else-if="itemSearch"
+          icon="i-lucide-search-x"
+          title="No videos match your search"
+          description="Try a different title."
+          class="py-10"
+        />
         <EmptyState v-else icon="i-lucide-list-video" title="No videos in this collection" description="Add videos to start building it." class="py-10">
           <template #action>
             <UButton icon="i-lucide-plus" @click="openAdd">Add videos</UButton>
           </template>
         </EmptyState>
-        <div v-if="itemsTotal > itemsPageSize" class="px-4 py-3 border-t border-gray-100 dark:border-gray-800">
-          <DataPagination v-model:page="itemsPage" v-model:page-size="itemsPageSize" :total="itemsTotal" />
-        </div>
       </UCard>
     </div>
 
@@ -194,17 +215,61 @@
       @confirm="onDelete"
     />
     <CollectionReorderModal v-model:open="showReorder" :collection-id="id" @saved="loadItems" />
+
+    <UModal v-model:open="showAnalytics" title="Completion analytics" :ui="{ content: 'sm:max-w-2xl' }">
+      <template #body>
+        <div v-if="analyticsLoading" class="space-y-3">
+          <USkeleton v-for="i in 4" :key="i" class="h-10" />
+        </div>
+        <div v-else-if="analytics" class="space-y-4">
+          <div class="grid grid-cols-2 gap-3">
+            <UCard :ui="{ body: 'p-3' }">
+              <p class="text-xs text-gray-500">Unique learners</p>
+              <p class="text-2xl font-bold text-gray-900 dark:text-white tabular-nums">{{ analytics.uniqueLearners }}</p>
+            </UCard>
+            <UCard :ui="{ body: 'p-3' }">
+              <p class="text-xs text-gray-500">Finished the whole course</p>
+              <p class="text-2xl font-bold text-gray-900 dark:text-white tabular-nums">{{ analytics.finishedCourse }}</p>
+            </UCard>
+          </div>
+          <div v-if="analytics.videos.length" class="rounded-lg border border-gray-200 dark:border-gray-800 max-h-96 overflow-y-auto">
+            <table class="w-full text-sm">
+              <thead class="sticky top-0 bg-gray-50 dark:bg-gray-900 text-left text-xs text-gray-500">
+                <tr>
+                  <th class="px-3 py-2 font-medium">Video</th>
+                  <th class="px-3 py-2 font-medium text-right">Started</th>
+                  <th class="px-3 py-2 font-medium text-right">Completed</th>
+                  <th class="px-3 py-2 font-medium text-right">Avg. progress</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+                <tr v-for="v in analytics.videos" :key="v.videoId">
+                  <td class="px-3 py-2 truncate max-w-64" :title="v.title ?? undefined">{{ v.title ?? `Video #${v.videoId}` }}</td>
+                  <td class="px-3 py-2 text-right tabular-nums">{{ v.started }}</td>
+                  <td class="px-3 py-2 text-right tabular-nums">{{ v.completed }}</td>
+                  <td class="px-3 py-2 text-right tabular-nums">{{ v.avgPercent === null ? '—' : `${v.avgPercent}%` }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <EmptyState v-else icon="i-lucide-bar-chart-3" title="No videos to report on" class="py-6" />
+        </div>
+        <div class="flex justify-end pt-2">
+          <UButton color="neutral" variant="ghost" @click="showAnalytics = false">Close</UButton>
+        </div>
+      </template>
+    </UModal>
   </div>
 </template>
 
 <script setup lang="ts">
-import { COLLECTION_VISIBILITIES, type Collection, type CollectionVideo } from '~/composables/useCollections'
+import { COLLECTION_VISIBILITIES, type Collection, type CollectionAnalytics, type CollectionVideo } from '~/composables/useCollections'
 
 definePageMeta({ middleware: 'admin' })
 
 const route = useRoute()
 const toast = useToast()
-const { get, remove, videos: listItems, addVideos, removeVideo } = useCollections()
+const { get, remove, videos: listItems, addVideos, removeVideo, updateSections, analytics: getAnalytics } = useCollections()
 const { list: listVideos } = useVideos()
 
 const id = computed(() => Number(route.params.id))
@@ -253,28 +318,71 @@ const unwatchableText = computed(() => {
 })
 
 // ── Items ──────────────────────────────────────────────────────────────────
+// Loaded all at once (collections cap at 500 videos — the reorder and "add
+// videos" modals already assume this) so search and section grouping can
+// work over the whole list, not just one server page.
 const items = ref<CollectionVideo[]>([])
-const itemsTotal = ref(0)
-const itemsPage = ref(1)
-const itemsPageSize = ref(50)
 const videosLoading = ref(false)
 const brokenThumbs = reactive(new Set<number>())
+const itemSearch = ref('')
 
 async function loadItems() {
   videosLoading.value = true
   try {
-    const res = await listItems(id.value, itemsPage.value, itemsPageSize.value)
+    const res = await listItems(id.value, 1, 500)
     items.value = res.data
-    itemsTotal.value = res.metadata.totalCount
   } catch (err) {
     toast.add({ title: 'Could not load videos', description: apiErrorMessage(err), color: 'error' })
   } finally {
     videosLoading.value = false
   }
 }
-watch([itemsPage, itemsPageSize], loadItems)
+
+const filteredItems = computed(() => {
+  const q = itemSearch.value.trim().toLowerCase()
+  if (!q) return items.value
+  return items.value.filter((i) => (i.title ?? `video #${i.videoId}`).toLowerCase().includes(q))
+})
+
+// Groups consecutive videos sharing a section under one heading; ungrouped
+// videos (section null) get a group with no label, so they render plainly.
+const groupedItems = computed(() => {
+  const groups: { label: string | null; items: CollectionVideo[] }[] = []
+  for (const item of filteredItems.value) {
+    const last = groups[groups.length - 1]
+    if (last && last.label === item.section) last.items.push(item)
+    else groups.push({ label: item.section, items: [item] })
+  }
+  return groups
+})
+
+async function onSetSection(item: CollectionVideo, section: string | null) {
+  try {
+    await updateSections(id.value, { [item.videoId]: section })
+    item.section = section
+  } catch (err) {
+    toast.add({ title: 'Could not save the section', description: apiErrorMessage(err), color: 'error' })
+  }
+}
 
 const showReorder = ref(false)
+
+// ── Analytics ────────────────────────────────────────────────────────────────
+const showAnalytics = ref(false)
+const analytics = ref<CollectionAnalytics | null>(null)
+const analyticsLoading = ref(false)
+async function openAnalytics() {
+  showAnalytics.value = true
+  analyticsLoading.value = true
+  try {
+    analytics.value = await getAnalytics(id.value)
+  } catch (err) {
+    toast.add({ title: 'Could not load analytics', description: apiErrorMessage(err), color: 'error' })
+    showAnalytics.value = false
+  } finally {
+    analyticsLoading.value = false
+  }
+}
 
 // ── Remove video ───────────────────────────────────────────────────────────
 const confirmRemove = ref<CollectionVideo | null>(null)

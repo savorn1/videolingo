@@ -25,6 +25,8 @@ export interface Collection {
 
 export interface CollectionVideo {
   position: number
+  /** Grouping label ("Week 1"); null if this video isn't in a section. */
+  section: string | null
   videoId: number
   title: string | null
   thumbnailUrl: string | null
@@ -34,6 +36,21 @@ export interface CollectionVideo {
   deleted: boolean
   addedBy: string | null
   addedAt: string | null
+}
+
+export interface CollectionVideoStat {
+  videoId: number
+  title: string | null
+  started: number
+  completed: number
+  /** Average of each learner's percent watched; null if nobody's started it. */
+  avgPercent: number | null
+}
+
+export interface CollectionAnalytics {
+  uniqueLearners: number
+  finishedCourse: number
+  videos: CollectionVideoStat[]
 }
 
 export interface CollectionPayload {
@@ -115,5 +132,20 @@ export function useCollections() {
     await api(`${base}/${id}/videos/order`, { method: 'PUT', body: { videoIds } })
   }
 
-  return { list, get, create, update, remove, videos, addVideos, removeVideo, reorder }
+  /** Sets (or clears, with a blank value) each listed video's section label. */
+  async function updateSections(id: number, sections: Record<number, string | null>) {
+    await api(`${base}/${id}/videos/sections`, { method: 'PUT', body: { sections } })
+  }
+
+  /** Per-video started/completed/average-progress, and how many learners finished the whole course. */
+  async function analytics(id: number) {
+    return (await api<ApiEnvelope<CollectionAnalytics>>(`${base}/${id}/analytics`)).data
+  }
+
+  /** A full copy — same videos, sections and visibility — owned by the acting admin. */
+  async function duplicate(id: number) {
+    return (await api<ApiEnvelope<Collection>>(`${base}/${id}/duplicate`, { method: 'POST' })).data
+  }
+
+  return { list, get, create, update, remove, videos, addVideos, removeVideo, reorder, updateSections, analytics, duplicate }
 }

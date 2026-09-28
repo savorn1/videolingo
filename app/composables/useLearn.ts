@@ -5,6 +5,7 @@
 import type { ApiEnvelope, PageEnvelope } from '#shared/types'
 import type { Collection, CollectionVideo } from './useCollections'
 import type { Video, VideoFilter } from './useVideos'
+import type { GlossaryTermRule } from '#shared/utils/glossary'
 
 export interface LearnTrack {
   id: number
@@ -99,7 +100,8 @@ export function useLearn() {
     return (await api<ApiEnvelope<LearnCue[]>>(`${base}/subtitles/${subtitleId}/cues`)).data
   }
 
-  function collections(params: { search?: string; page?: number; size?: number } = {}) {
+  /** Public courses; `videoId` = only those containing that video. */
+  function collections(params: { search?: string; videoId?: number; page?: number; size?: number } = {}) {
     return api<PageEnvelope<Collection>>(`${base}/collections`, { query: params })
   }
 
@@ -115,5 +117,15 @@ export function useLearn() {
     return (await api<ApiEnvelope<WordLookupResult>>(`${base}/lookup`, { query: params })).data
   }
 
-  return { videos, watch, study, cues, collections, collection, submitQuiz, lookup }
+  /** Glossary terms to underline in captions written in `source`, translated into `target`. */
+  async function glossary(source: string, target: string) {
+    return (await api<ApiEnvelope<GlossaryTermRule[]>>(`${base}/glossary`, { query: { source, target } })).data
+  }
+
+  /** "Report a subtitle problem" — filed as a review comment on the track, admins notified. */
+  async function reportProblem(subtitleId: number, report: { kind: 'TIMING' | 'TEXT' | 'MISSING' | 'OTHER'; note?: string; atMs?: number; offsetMs?: number }) {
+    await api(`${base}/subtitles/${subtitleId}/report`, { method: 'POST', body: report })
+  }
+
+  return { videos, watch, study, cues, collections, collection, submitQuiz, lookup, glossary, reportProblem }
 }

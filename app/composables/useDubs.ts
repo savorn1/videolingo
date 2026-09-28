@@ -25,6 +25,8 @@ export interface VideoDub {
   sizeBytes: number
   jobId: number | null
   transcriptId: number | null
+  /** Blocks delete/replace — a safety toggle in the timeline editor. */
+  locked: boolean
   createdBy: string | null
   createdAt: string | null
   updatedAt: string | null
@@ -61,5 +63,9 @@ export function useDubs() {
     await api(`${base(videoId)}/${dubId}`, { method: 'DELETE' })
   }
 
-  return { overview, create, remove }
+  async function setLocked(videoId: number, dubId: number, locked: boolean) {
+    return (await api<ApiEnvelope<VideoDub>>(`${base(videoId)}/${dubId}/lock`, { method: 'PUT', body: { locked } })).data
+  }
+
+  return { overview, create, remove, setLocked }
 }

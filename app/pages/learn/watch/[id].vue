@@ -1,23 +1,18 @@
 <template>
   <div>
-    <PageHeader
-      :title="page?.video.title ?? 'Video'"
-      :description="description"
-      :crumbs="[{ label: 'Learn', to: '/learn' }, { label: page?.video.title ?? '…' }]"
-    >
-      <template v-if="page" #actions>
-        <UButton
-          :color="tracker.progress.value?.completed ? 'success' : 'neutral'"
-          variant="soft"
-          :icon="tracker.progress.value?.completed ? 'i-lucide-circle-check' : 'i-lucide-circle'"
-          :loading="marking"
-          @click="toggleWatched"
-        >
-          {{ tracker.progress.value?.completed ? 'Watched' : 'Mark as watched' }}
-        </UButton>
-        <UButton v-if="can('videos', 'READ')" color="neutral" variant="ghost" icon="i-lucide-settings-2" :to="`/videos/${page.video.id}`">Manage</UButton>
-      </template>
-    </PageHeader>
+    <WatchHeader
+      v-if="page"
+      :page="page"
+      :progress="tracker.progress.value"
+      :current-ms="currentMs"
+      :study-items="studyItems"
+      :marking="marking"
+      :course="course"
+      :prev-item="prevItem"
+      :next-item="nextItem"
+      :link-to="linkTo"
+      @toggle-watched="toggleWatched"
+    />
 
     <UAlert v-if="error" color="error" variant="subtle" class="mb-4" :title="error" icon="i-lucide-triangle-alert">
       <template #actions>
@@ -25,7 +20,33 @@
       </template>
     </UAlert>
 
-    <DetailSkeleton v-if="loading" :fields="3" />
+    <!-- Shaped like the real layout, so nothing jumps around once the data arrives. -->
+    <div v-if="loading" class="space-y-4">
+      <div class="space-y-2">
+        <USkeleton class="h-7 w-2/3" />
+        <div class="flex flex-wrap gap-1.5">
+          <USkeleton class="h-5 w-16 rounded-full" />
+          <USkeleton class="h-5 w-14 rounded-full" />
+          <USkeleton class="h-5 w-20 rounded-full" />
+        </div>
+        <USkeleton class="h-4 w-48" />
+      </div>
+      <div class="grid grid-cols-1 xl:grid-cols-3 gap-4 items-start">
+        <div class="xl:col-span-2 space-y-4">
+          <div class="rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden">
+            <USkeleton class="w-full aspect-video rounded-none" />
+            <div class="flex items-center gap-2 px-3 py-2.5 border-t border-gray-100 dark:border-gray-800">
+              <USkeleton v-for="n in 6" :key="n" class="h-8 w-8 rounded-md" />
+            </div>
+          </div>
+          <USkeleton class="h-56 w-full rounded-lg" />
+        </div>
+        <div class="space-y-2">
+          <USkeleton class="h-6 w-28" />
+          <USkeleton v-for="n in 5" :key="n" class="h-14 w-full rounded-lg" />
+        </div>
+      </div>
+    </div>
 
     <div v-else-if="page" class="grid grid-cols-1 xl:grid-cols-3 gap-4 items-start">
       <div class="xl:col-span-2 space-y-4">
@@ -34,6 +55,9 @@
           ref="stage"
           class="overflow-hidden"
           :class="isFullscreen ? 'dark flex flex-col h-full bg-black' : 'rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900'"
+          @mousemove="wakeControls"
+          @touchstart="wakeControls"
+          @click="wakeControls"
         >
           <div :class="isFullscreen ? 'flex-1 min-h-0' : ''">
             <VideoPlayer
@@ -47,23 +71,85 @@
               :resume-key="page.video.id"
               :start-at="tracker.startAt.value"
               :dub-url="voiceOver || null"
-              :caption="showCaptions ? primaryLine : null"
-              :caption-secondary="showCaptions ? secondaryLine : null"
               :fill="isFullscreen"
               own-fullscreen
               :track-cues="primaryCues"
               :track-secondary="secondaryCues"
               :track-language="primaryTrack?.language"
               @time="onTime"
-              @ended="tracker.onEnded"
-            />
+              @ended="onEnded"
+            >
+              <template #overlay="{ fill }">
+                <CaptionOverlay
+                  v-if="showCaptions"
+                  :primary-cues="primaryCues"
+                  :secondary-cues="secondaryCues"
+                  :current-ms="currentMs"
+                  :language="primaryTrack?.language"
+                  :caption-style="prefs.captionStyle"
+                  :practice="prefs.practice"
+                  :word-highlight="prefs.wordHighlight"
+                  :glossary-terms="glossaryTerms"
+                  :fill="fill"
+                  @hover="onCaptionHover"
+                  @lookup="openLookup"
+                />
+
+                <!-- The video ended: what to do next, instead of just sitting there. -->
+                <div v-if="finished" class="absolute inset-0 z-20 flex items-center justify-center bg-black/85 p-6">
+                  <div class="text-center text-white space-y-4 max-w-sm">
+                    <UIcon name="i-lucide-party-popper" class="w-9 h-9 mx-auto text-success-400" />
+                    <template v-if="nextItem">
+                      <div>
+                        <p class="text-sm text-white/70">Next in {{ course?.collection.title }}</p>
+                        <p class="font-semibold line-clamp-2">{{ nextItem.title ?? `Video #${nextItem.videoId}` }}</p>
+                      </div>
+                      <div class="flex flex-wrap justify-center gap-2">
+                        <UButton color="neutral" variant="soft" icon="i-lucide-rotate-ccw" @click="watchAgain">Watch again</UButton>
+                        <UButton icon="i-lucide-skip-forward" :to="linkTo(nextItem.videoId)">Play next</UButton>
+                      </div>
+                    </template>
+                    <template v-else-if="courseFinished">
+                      <UIcon name="i-lucide-trophy" class="w-9 h-9 mx-auto text-warning-400 -mt-1" />
+                      <div>
+                        <p class="font-semibold">Course complete!</p>
+                        <p class="text-sm text-white/70">You've finished every video in {{ course?.collection.title }}.</p>
+                      </div>
+                      <div class="flex flex-wrap justify-center gap-2">
+                        <UButton color="neutral" variant="soft" icon="i-lucide-rotate-ccw" @click="watchAgain">Watch again</UButton>
+                        <UButton icon="i-lucide-list-video" :to="`/learn/collections/${course?.collection.id}`" @click="finished = false">
+                          Back to course
+                        </UButton>
+                      </div>
+                    </template>
+                    <template v-else>
+                      <p class="font-semibold">Nice work — you've finished this video.</p>
+                      <div class="flex flex-wrap justify-center gap-2">
+                        <UButton color="neutral" variant="soft" icon="i-lucide-rotate-ccw" @click="watchAgain">Watch again</UButton>
+                        <UButton v-if="hasQuiz" icon="i-lucide-circle-help" @click="goToQuiz">Take the quiz</UButton>
+                        <UButton v-else color="primary" variant="soft" icon="i-lucide-compass" to="/learn" @click="finished = false">
+                          Browse more videos
+                        </UButton>
+                      </div>
+                    </template>
+                  </div>
+                </div>
+              </template>
+            </VideoPlayer>
             <div v-else class="w-full aspect-video bg-black rounded-lg" />
           </div>
 
-          <!-- Sentence controls -->
+          <!-- One control bar: line-by-line playback, subtitles, speed and full
+               screen. Fades out in full screen after a moment of no movement,
+               like any video player — hover or move to bring it back. -->
           <div
-            class="flex flex-wrap items-center gap-1 px-3 py-2 border-t"
-            :class="isFullscreen ? 'border-white/10 bg-black/80' : 'border-gray-100 dark:border-gray-800'"
+            class="flex flex-wrap items-center gap-1 px-3 py-2 border-t transition-opacity duration-300"
+            :class="[
+              isFullscreen ? 'border-white/10 bg-black/80' : 'border-gray-100 dark:border-gray-800',
+              controlsHidden ? 'opacity-0 pointer-events-none' : 'opacity-100'
+            ]"
+            @mouseenter="pauseAutoHide"
+            @mouseleave="scheduleHide"
           >
             <UTooltip text="Previous line (A)">
               <UButton color="neutral" variant="ghost" icon="i-lucide-skip-back" aria-label="Previous line" :disabled="!canStep" @click="previousLine" />
@@ -84,7 +170,9 @@
             <UTooltip text="Next line (D)">
               <UButton color="neutral" variant="ghost" icon="i-lucide-skip-forward" aria-label="Next line" :disabled="!canStep" @click="nextLine" />
             </UTooltip>
+
             <span class="mx-1 h-5 w-px" :class="isFullscreen ? 'bg-white/20' : 'bg-gray-200 dark:bg-gray-700'" />
+
             <UTooltip text="Keep repeating the current line (L)">
               <UButton
                 :color="loopLine ? 'primary' : 'neutral'"
@@ -93,7 +181,7 @@
                 :disabled="!canStep"
                 @click="toggleLoop"
               >
-                <span class="hidden sm:inline">Loop line</span>
+                <span class="hidden lg:inline">Loop</span>
               </UButton>
             </UTooltip>
             <UTooltip text="Pause at the end of every line, to repeat it out loud (P)">
@@ -104,9 +192,41 @@
                 :disabled="!canStep"
                 @click="togglePauseAfter"
               >
-                <span class="hidden sm:inline">Pause after lines</span>
+                <span class="hidden lg:inline">Pause after</span>
               </UButton>
             </UTooltip>
+
+            <span class="mx-1 h-5 w-px hidden sm:block" :class="isFullscreen ? 'bg-white/20' : 'bg-gray-200 dark:bg-gray-700'" />
+
+            <SubtitleToolbar
+              v-model:track-id="trackId"
+              v-model:second-id="secondId"
+              :track-options="trackOptions"
+              :second-options="secondOptions"
+              :offset-ms="offsetMs"
+              :step="OFFSET_STEP"
+              :current-ms="currentMs"
+              :primary-label="primaryTrack?.label"
+              @nudge="nudge"
+              @reset-offset="resetOffset"
+            >
+              <template #extra>
+                <template v-if="page.voiceOvers.length">
+                  <USeparator label="Sound" />
+                  <UFormField label="Sound">
+                    <USelect v-model="voiceOver" :items="voiceOptions" size="sm" class="w-full" />
+                  </UFormField>
+                </template>
+                <USeparator label="Keyboard shortcuts" />
+                <dl class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
+                  <template v-for="k in SHORTCUT_HELP" :key="k.keys">
+                    <dt><UKbd :value="k.keys" /></dt>
+                    <dd class="text-gray-600 dark:text-gray-300">{{ k.label }}</dd>
+                  </template>
+                </dl>
+              </template>
+            </SubtitleToolbar>
+
             <div class="ml-auto flex items-center gap-1">
               <USelect v-model="speed" :items="SPEEDS" size="sm" class="w-20" aria-label="Speed ([ and ])" :disabled="!canControl" />
               <UTooltip :text="showCaptions ? 'Hide captions (C)' : 'Show captions (C)'">
@@ -129,29 +249,14 @@
               </UTooltip>
             </div>
           </div>
-
-          <div v-if="!isFullscreen" class="flex flex-wrap items-center gap-2 px-4 py-3 border-t border-gray-100 dark:border-gray-800">
-            <USelect v-model="trackId" :items="trackOptions" size="sm" class="w-48" aria-label="Subtitles" :disabled="!page.tracks.length" />
-            <USelect v-model="secondId" :items="secondOptions" size="sm" class="w-48" aria-label="Second language" :disabled="page.tracks.length < 2" />
-            <USelect v-if="page.voiceOvers.length" v-model="voiceOver" :items="voiceOptions" size="sm" class="w-48" aria-label="Sound" />
-            <UPopover>
-              <UButton size="sm" color="neutral" variant="ghost" icon="i-lucide-keyboard" class="ml-auto">Shortcuts</UButton>
-              <template #content>
-                <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 p-3 text-sm">
-                  <template v-for="k in SHORTCUT_HELP" :key="k.keys">
-                    <dt><UKbd :value="k.keys" /></dt>
-                    <dd class="text-gray-600 dark:text-gray-300">{{ k.label }}</dd>
-                  </template>
-                </dl>
-              </template>
-            </UPopover>
-          </div>
         </div>
 
-        <StudyPanel :video-id="page.video.id" :items="studyItems" :preferred-language="secondTrack?.language ?? primaryTrack?.language" @seek="seek" />
-        <UCard v-if="!studyItems.length">
-          <p class="text-sm text-gray-500">No summary or quiz for this video yet.</p>
-        </UCard>
+        <div ref="studyPanelEl">
+          <StudyPanel :video-id="page.video.id" :items="studyItems" :preferred-language="secondTrack?.language ?? primaryTrack?.language" @seek="seek" />
+          <UCard v-if="!studyItems.length">
+            <p class="text-sm text-gray-500">No summary or quiz for this video yet.</p>
+          </UCard>
+        </div>
       </div>
 
       <UCard :ui="{ body: 'p-0 sm:p-0' }" class="xl:sticky xl:top-4">
@@ -189,13 +294,12 @@
 // Watching as a learner: subtitles on the video (optionally two languages),
 // a clickable transcript that follows along, word lookup into flashcards,
 // voice-overs, AI study material, and progress saved to the account.
-import type { LearnCue, StudyItem, WatchPage } from '~/composables/useLearn'
+import type { StudyItem, WatchPage } from '~/composables/useLearn'
 import type VideoPlayer from '~/components/VideoPlayer.vue'
 
 const route = useRoute()
 const { watch: getWatchPage, cues: getCues, study } = useLearn()
-const { setCompleted } = useWatchProgress()
-const { can } = useAuth()
+const { setCompleted, forVideos } = useWatchProgress()
 const toast = useToast()
 const tracker = useProgressTracker()
 
@@ -204,14 +308,10 @@ const page = ref<WatchPage | null>(null)
 const studyItems = ref<StudyItem[]>([])
 const loading = ref(true)
 const error = ref('')
+const hasQuiz = computed(() => studyItems.value.some((i) => i.type === 'QUIZ'))
 
-const description = computed(() => {
-  const v = page.value?.video
-  if (!v) return undefined
-  return [languageLabel(v.language), v.durationSeconds ? formatDuration(v.durationSeconds) : '', v.sourceAuthor ? `by ${v.sourceAuthor}` : '']
-    .filter(Boolean)
-    .join(' · ')
-})
+// ── Course context (breadcrumb, prev/next, and what "ended" offers next) ───
+const { course, prevItem, nextItem, linkTo } = useVideoCourse(computed(() => page.value?.video.id ?? null))
 
 // ── Player ─────────────────────────────────────────────────────────────────
 // Typed explicitly: the template reads values derived from it, which would otherwise make its type circular.
@@ -228,8 +328,45 @@ function seek(ms: number, play = true) {
   // Follow the line we land on — not the one we left, whose end we may be sitting on.
   pausedLine = null
   followed = lineAt(primaryCues.value, ms)
+  finished.value = false
   player.value?.seek(ms, play)
   currentMs.value = ms
+}
+
+// ── Ended: what to do next, instead of leaving the learner sitting there ───
+const finished = ref(false)
+function onEnded() {
+  finished.value = true
+  tracker.onEnded()
+  checkCourseFinished()
+}
+
+// Whether ending this video (the last unwatched one) finishes the whole
+// course — checked against every other video's saved progress, since this
+// page only tracks the one currently playing.
+const courseFinished = ref(false)
+async function checkCourseFinished() {
+  courseFinished.value = false
+  if (!course.value || nextItem.value) return
+  const others = course.value.videos.filter((v) => v.videoId !== page.value?.video.id)
+  if (!others.length) {
+    courseFinished.value = true
+    return
+  }
+  try {
+    const map = await forVideos(others.map((v) => v.videoId))
+    courseFinished.value = others.every((v) => map.get(v.videoId)?.completed)
+  } catch {
+    courseFinished.value = false
+  }
+}
+function watchAgain() {
+  seek(0)
+}
+const studyPanelEl = ref<HTMLElement | null>(null)
+function goToQuiz() {
+  finished.value = false
+  nextTick(() => studyPanelEl.value?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
 }
 
 // ── Sentence controls ──────────────────────────────────────────────────────
@@ -326,6 +463,37 @@ function onFullscreenChange() {
 onMounted(() => document.addEventListener('fullscreenchange', onFullscreenChange))
 onBeforeUnmount(() => document.removeEventListener('fullscreenchange', onFullscreenChange))
 
+// ── Auto-hide controls in full screen ───────────────────────────────────────
+// Outside full screen the bar always stays put — it's not competing with
+// anything else for space. In full screen it behaves like any video player:
+// fades out after a moment of no movement while playing, and comes back on
+// the slightest hint someone's still there.
+const AUTO_HIDE_MS = 2500
+const controlsHidden = ref(false)
+let hideTimer: ReturnType<typeof setTimeout> | undefined
+function scheduleHide() {
+  clearTimeout(hideTimer)
+  if (!isFullscreen.value) return
+  hideTimer = setTimeout(() => {
+    if (isFullscreen.value && isPlaying.value) controlsHidden.value = true
+  }, AUTO_HIDE_MS)
+}
+function pauseAutoHide() {
+  clearTimeout(hideTimer)
+}
+function wakeControls() {
+  controlsHidden.value = false
+  scheduleHide()
+}
+watch(isFullscreen, (fs) => {
+  if (fs) wakeControls()
+  else {
+    controlsHidden.value = false
+    clearTimeout(hideTimer)
+  }
+})
+watch(isPlaying, () => wakeControls())
+
 // ── Keyboard ───────────────────────────────────────────────────────────────
 const SHORTCUT_HELP = [
   { keys: 'space', label: 'Play / pause' },
@@ -336,6 +504,8 @@ const SHORTCUT_HELP = [
   { keys: 'P', label: 'Pause after each line' },
   { keys: '[ ]', label: 'Slower / faster' },
   { keys: 'C', label: 'Captions on / off' },
+  { keys: 'S', label: 'Next subtitle track' },
+  { keys: 'T', label: 'Second language on / off' },
   { keys: 'F', label: 'Full screen' }
 ]
 // When the <video> itself has focus, the browser already handles space and arrows.
@@ -350,47 +520,64 @@ defineShortcuts({
   l: () => canStep.value && toggleLoop(),
   p: () => canStep.value && togglePauseAfter(),
   c: () => (showCaptions.value = !showCaptions.value),
+  s: () => cycleTrack(),
+  t: () => toggleSecond(),
   f: () => toggleFullscreen(),
   '[': () => stepSpeed(-1),
   ']': () => stepSpeed(1)
 })
 
 // ── Subtitles ──────────────────────────────────────────────────────────────
-const NONE = 0
-const trackId = ref<number>(NONE)
-const secondId = ref<number>(NONE)
+// Tracks follow the learner's remembered languages; cues carry their timing
+// correction for this video (see useCaptions).
+const {
+  prefs,
+  trackId,
+  secondId,
+  primaryTrack,
+  secondTrack,
+  trackOptions,
+  secondOptions,
+  primaryCues,
+  secondaryCues,
+  offsetMs,
+  OFFSET_STEP,
+  nudge,
+  resetOffset,
+  cycleTrack,
+  toggleSecond,
+  glossaryTerms
+} = useCaptions({
+  videoId: computed(() => page.value?.video.id ?? null),
+  videoLanguage: computed(() => page.value?.video.language ?? null),
+  tracks: computed(() => page.value?.tracks ?? [])
+})
 const showCaptions = ref(true)
-const cueCache = new Map<number, LearnCue[]>()
-const primaryCues = ref<LearnCue[]>([])
-const secondaryCues = ref<LearnCue[]>([])
-const primaryTrack = computed(() => page.value?.tracks.find((t) => t.id === trackId.value) ?? null)
-const secondTrack = computed(() => page.value?.tracks.find((t) => t.id === secondId.value) ?? null)
-const trackOptions = computed(() => [
-  { label: page.value?.tracks.length ? 'No subtitles' : 'No subtitles yet', value: NONE },
-  ...(page.value?.tracks ?? []).map((t) => ({ label: t.label, value: t.id }))
-])
-const secondOptions = computed(() => [
-  { label: 'No second language', value: NONE },
-  ...(page.value?.tracks ?? []).filter((t) => t.id !== trackId.value).map((t) => ({ label: `Also: ${t.label}`, value: t.id }))
-])
+// Declared here: the hover-pause watcher below reads it straight away.
+const lookupOpen = ref(false)
 
-async function cuesOf(id: number) {
-  if (!cueCache.has(id)) cueCache.set(id, await getCues(id))
-  return cueCache.get(id)!
+// Pointing at the captions pauses (if the learner wants that), so a word can
+// be clicked calmly; moving away resumes — unless a lookup is open.
+let pausedByHover = false
+function onCaptionHover(inside: boolean) {
+  if (!prefs.value.hoverPause) return
+  if (inside && isPlaying.value) {
+    pausedByHover = true
+    player.value?.pause()
+  } else if (!inside && pausedByHover && !lookupOpen.value) {
+    pausedByHover = false
+    player.value?.play()
+  }
 }
-watch(trackId, async (tid) => {
-  if (secondId.value === tid) secondId.value = NONE
-  primaryCues.value = tid === NONE ? [] : await cuesOf(tid).catch(() => [])
-})
-watch(secondId, async (sid) => {
-  secondaryCues.value = sid === NONE ? [] : await cuesOf(sid).catch(() => [])
-})
-const textAt = (cues: LearnCue[]) => {
-  const i = activeCueIndex(cues, currentMs.value)
-  return i >= 0 ? cues[i]!.text : null
-}
-const primaryLine = computed(() => textAt(primaryCues.value))
-const secondaryLine = computed(() => textAt(secondaryCues.value))
+watch(
+  () => lookupOpen.value,
+  (open) => {
+    if (!open && pausedByHover) {
+      pausedByHover = false
+      player.value?.play()
+    }
+  }
+)
 
 // ── Voice-over ─────────────────────────────────────────────────────────────
 // '' = the original sound.
@@ -401,7 +588,6 @@ const voiceOptions = computed(() => [
 ])
 
 // ── Word lookup ────────────────────────────────────────────────────────────
-const lookupOpen = ref(false)
 const lookupWord = reactive({ word: '', context: '', atMs: 0 })
 function openLookup(e: { word: string; context: string; atMs: number }) {
   Object.assign(lookupWord, e)
@@ -426,14 +612,12 @@ async function toggleWatched() {
 async function load() {
   loading.value = true
   error.value = ''
+  finished.value = false
+  courseFinished.value = false
   try {
     page.value = await getWatchPage(id.value)
     const t = Number(route.query.t)
     tracker.start(page.value.video.id, page.value.video.durationSeconds, Number.isFinite(t) && t > 0 ? t / 1000 : null)
-    // The default track, else one in the video's own language, else the first.
-    const tracks = page.value.tracks
-    const first = tracks.find((t) => t.isDefault) ?? tracks.find((t) => t.language === page.value!.video.language) ?? tracks[0]
-    trackId.value = first?.id ?? NONE
     study(id.value)
       .then((s) => (studyItems.value = s))
       .catch(() => (studyItems.value = []))

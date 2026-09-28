@@ -23,23 +23,33 @@ export interface GlossaryHit {
 const SPACED = /[\p{Script=Latin}\p{Script=Cyrillic}\p{Script=Greek}\p{Nd}]/u
 const WORD_CHAR = /[\p{L}\p{N}]/u
 
-export function containsGlossaryTerm(text: string, term: string, caseSensitive: boolean): boolean {
+/**
+ * Where `term` occurs in `text` as a whole word, as [start, end) character
+ * ranges. Word boundaries only count at an end of the term written in a
+ * spaced script — see the backend's GlossaryPrompt.contains.
+ */
+export function findGlossaryTerm(text: string, term: string, caseSensitive: boolean): [number, number][] {
   const needleRaw = term.trim()
-  if (!needleRaw || !text) return false
+  if (!needleRaw || !text) return []
   const hay = caseSensitive ? text : text.toLowerCase()
   const needle = caseSensitive ? needleRaw : needleRaw.toLowerCase()
   const chars = [...needle]
   const checkStart = SPACED.test(chars[0]!)
   const checkEnd = SPACED.test(chars[chars.length - 1]!)
+  const found: [number, number][] = []
   for (let from = hay.indexOf(needle); from >= 0; from = hay.indexOf(needle, from + 1)) {
     const end = from + needle.length
     const before = from > 0 ? String.fromCodePoint(hay.codePointAt(from - 1)!) : ''
     const after = end < hay.length ? String.fromCodePoint(hay.codePointAt(end)!) : ''
     const startOk = !checkStart || !before || !WORD_CHAR.test(before)
     const endOk = !checkEnd || !after || !WORD_CHAR.test(after)
-    if (startOk && endOk) return true
+    if (startOk && endOk) found.push([from, end])
   }
-  return false
+  return found
+}
+
+export function containsGlossaryTerm(text: string, term: string, caseSensitive: boolean): boolean {
+  return findGlossaryTerm(text, term, caseSensitive).length > 0
 }
 
 /**

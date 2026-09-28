@@ -33,6 +33,7 @@
           <div class="relative">
             <VideoPlayer
               v-if="video && tracker.ready.value"
+              ref="player"
               :key="`${video.id}-${replay}`"
               :embed-url="video.embedUrl"
               :video-url="video.videoUrl"
@@ -42,9 +43,29 @@
               :resume-key="video.id"
               :start-at="replay ? null : tracker.startAt.value"
               :autoplay="started"
-              @time="tracker.onTime"
+              :track-cues="primaryCues"
+              :track-secondary="secondaryCues"
+              :track-language="primaryTrack?.language"
+              @time="onTime"
               @ended="onEnded"
-            />
+            >
+              <template #overlay="{ fill }">
+                <CaptionOverlay
+                  v-if="showCaptions"
+                  :primary-cues="primaryCues"
+                  :secondary-cues="secondaryCues"
+                  :current-ms="currentMs"
+                  :language="primaryTrack?.language"
+                  :caption-style="prefs.captionStyle"
+                  :practice="prefs.practice"
+                  :word-highlight="prefs.wordHighlight"
+                  :glossary-terms="glossaryTerms"
+                  :fill="fill"
+                  @hover="onCaptionHover"
+                  @lookup="openLookup"
+                />
+              </template>
+            </VideoPlayer>
             <div v-else class="w-full aspect-video bg-black rounded-lg flex items-center justify-center text-white/60 text-sm">
               {{ videoError || 'Loading…' }}
             </div>
@@ -69,8 +90,9 @@
             </div>
           </div>
 
-          <!-- Controls -->
-          <div class="flex flex-wrap items-center gap-2 px-4 py-3 border-t border-gray-100 dark:border-gray-800">
+          <!-- One row: queue navigation, then subtitles (the chosen languages
+               carry on from video to video), then where you are in the queue. -->
+          <div class="flex flex-wrap items-center gap-1 px-3 py-2 border-t border-gray-100 dark:border-gray-800">
             <UTooltip text="Previous (Shift+P)">
               <UButton
                 color="neutral"
@@ -109,7 +131,23 @@
                 @click="cycleRepeat"
               />
             </UTooltip>
-            <USwitch v-model="autoAdvance" size="sm" label="Autoplay next" class="ml-1" />
+            <USwitch v-model="autoAdvance" size="sm" label="Autoplay" class="ml-1" />
+
+            <span class="mx-1 h-5 w-px bg-gray-200 dark:bg-gray-700" />
+
+            <SubtitleToolbar
+              v-model:track-id="trackId"
+              v-model:second-id="secondId"
+              :track-options="trackOptions"
+              :second-options="secondOptions"
+              :offset-ms="offsetMs"
+              :step="OFFSET_STEP"
+              :current-ms="currentMs"
+              :primary-label="primaryTrack?.label"
+              @nudge="nudge"
+              @reset-offset="resetOffset"
+            />
+
             <span class="ml-auto text-sm text-gray-500 tabular-nums">
               {{ positionInOrder + 1 }} / {{ order.length }}<template v-if="remainingSeconds"> · {{ formatDuration(remainingSeconds) }} left</template>
             </span>
@@ -148,7 +186,11 @@
           </div>
         </template>
         <ol ref="queueEl" class="max-h-[70vh] overflow-y-auto divide-y divide-gray-100 dark:divide-gray-800">
-          <li v-for="(i, n) in queueRows" :key="items[i]!.videoId">
+          <template v-for="(i, n) in queueRows" :key="items[i]!.videoId">
+            <li v-if="sectionLabel(n)" class="px-3 py-1.5 text-xs font-semibold text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-900/60">
+              {{ sectionLabel(n) }}
+            </li>
+            <li>
             <button
               type="button"
               class="w-full flex items-center gap-3 px-3 py-2 text-left transition-colors"
@@ -201,10 +243,22 @@
                 </span>
               </span>
             </button>
-          </li>
+            </li>
+          </template>
         </ol>
       </UCard>
     </div>
+
+    <WordLookupModal
+      v-if="video"
+      v-model:open="lookupOpen"
+      :word="lookupWord.word"
+      :language="primaryTrack?.language ?? video.language ?? 'en'"
+      :context="lookupWord.context"
+      :video-id="video.id"
+      :at-ms="lookupWord.atMs"
+      :suggested-target="secondTrack?.language"
+    />
   </div>
 </template>
 
@@ -214,6 +268,8 @@
 // starts from that video; the URL follows along so a refresh resumes there.
 import type { Collection, CollectionVideo } from '~/composables/useCollections'
 import type { Video } from '~/composables/useVideos'
+import type { LearnTrack, WatchPage } from '~/composables/useLearn'
+import type VideoPlayer from '~/components/VideoPlayer.vue'
 import type { WatchProgress } from '~/composables/useWatchProgress'
 import type { RepeatMode } from '#shared/utils/playlist'
 
@@ -280,6 +336,16 @@ const upNext = computed(() => {
   return i === null ? null : items.value[i]!
 })
 
+// A heading above the first row of each section — only in collection order;
+// shuffle scrambles sections apart, so a label there wouldn't mean anything.
+function sectionLabel(n: number): string | null {
+  if (shuffle.value) return null
+  const item = items.value[queueRows.value[n]!]
+  if (!item?.section) return null
+  const prev = n > 0 ? items.value[queueRows.value[n - 1]!] : null
+  return prev?.section === item.section ? null : item.section
+}
+
 const totalSeconds = computed(() => order.value.reduce((sum, i) => sum + (items.value[i]!.durationSeconds ?? 0), 0))
 const remainingSeconds = computed(() => order.value.slice(positionInOrder.value).reduce((sum, i) => sum + (items.value[i]!.durationSeconds ?? 0), 0))
 
@@ -307,8 +373,9 @@ watch(tracker.progress, (p) => {
 
 // ── Playing ───────────────────────────────────────────────────────────────
 const video = ref<Video | null>(null)
+const tracks = ref<LearnTrack[]>([])
 const videoError = ref('')
-const cache = new Map<number, Video>()
+const cache = new Map<number, WatchPage>()
 /** Autoplay only after the first choice — browsers block sound nobody asked for. */
 const started = ref(false)
 /** Bumped to restart the same video (repeat-one, play again). */
@@ -332,12 +399,17 @@ async function playItem(i: number, autoplay = true) {
   nextTick(() => document.querySelector('[data-current]')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }))
   const seq = ++loadSeq
   videoError.value = ''
-  video.value = cache.get(item.videoId) ?? null
-  if (video.value) return
+  const cached = cache.get(item.videoId)
+  video.value = cached?.video ?? null
+  tracks.value = cached?.tracks ?? []
+  if (cached) return
   try {
-    const v = (await getWatchPage(item.videoId)).video
-    cache.set(v.id, v)
-    if (seq === loadSeq) video.value = v
+    const page = await getWatchPage(item.videoId)
+    cache.set(page.video.id, page)
+    if (seq === loadSeq) {
+      video.value = page.video
+      tracks.value = page.tracks
+    }
   } catch (err) {
     if (seq === loadSeq) videoError.value = apiErrorMessage(err)
   }
@@ -391,9 +463,66 @@ function onEnded() {
 }
 onBeforeUnmount(() => clearInterval(countdownTimer))
 
+// ── Subtitles (same as the watch page: remembered languages, timing, lookups) ──
+const player = useTemplateRef<InstanceType<typeof VideoPlayer>>('player')
+const currentMs = ref(0)
+function onTime(ms: number) {
+  currentMs.value = ms
+  tracker.onTime(ms)
+}
+const {
+  prefs,
+  trackId,
+  secondId,
+  primaryTrack,
+  secondTrack,
+  trackOptions,
+  secondOptions,
+  primaryCues,
+  secondaryCues,
+  offsetMs,
+  OFFSET_STEP,
+  nudge,
+  resetOffset,
+  cycleTrack,
+  toggleSecond,
+  glossaryTerms
+} = useCaptions({
+  videoId: computed(() => video.value?.id ?? null),
+  videoLanguage: computed(() => video.value?.language ?? null),
+  tracks
+})
+const showCaptions = ref(true)
+const lookupOpen = ref(false)
+const lookupWord = reactive({ word: '', context: '', atMs: 0 })
+function openLookup(e: { word: string; context: string; atMs: number }) {
+  Object.assign(lookupWord, e)
+  lookupOpen.value = true
+}
+let pausedByHover = false
+function onCaptionHover(inside: boolean) {
+  if (!prefs.value.hoverPause) return
+  if (inside && player.value?.playing) {
+    pausedByHover = true
+    player.value?.pause()
+  } else if (!inside && pausedByHover && !lookupOpen.value) {
+    pausedByHover = false
+    player.value?.play()
+  }
+}
+watch(lookupOpen, (open) => {
+  if (!open && pausedByHover) {
+    pausedByHover = false
+    player.value?.play()
+  }
+})
+
 defineShortcuts({
   shift_n: () => goNext(false),
-  shift_p: () => goPrevious()
+  shift_p: () => goPrevious(),
+  c: () => (showCaptions.value = !showCaptions.value),
+  s: () => cycleTrack(),
+  t: () => toggleSecond()
 })
 
 // ── Load ──────────────────────────────────────────────────────────────────

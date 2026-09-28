@@ -6,6 +6,7 @@
           <UButton color="neutral" variant="soft" icon="i-lucide-layers" trailing-icon="i-lucide-chevron-down">Related</UButton>
         </UDropdownMenu>
         <UButton v-if="!video.deleted" color="neutral" variant="soft" icon="i-lucide-download" @click="showDownload = true">Download</UButton>
+        <UButton v-if="!video.deleted" color="neutral" variant="soft" icon="i-lucide-scissors" @click="showClip = true">Edit video</UButton>
         <template v-if="video.deleted">
           <UButton color="success" variant="soft" icon="i-lucide-rotate-ccw" :loading="busy" @click="onRestore">Restore</UButton>
         </template>
@@ -13,6 +14,9 @@
           <UButton color="primary" variant="soft" icon="i-lucide-pencil" @click="showEdit = true">Edit</UButton>
           <UButton v-if="video.enabled" color="warning" variant="soft" icon="i-lucide-eye-off" @click="confirmDisable = true">Disable</UButton>
           <UButton v-else color="success" variant="soft" icon="i-lucide-eye" :loading="busy" @click="setStatus(true)">Enable</UButton>
+          <UDropdownMenu :items="moreItems" :content="{ align: 'end' }">
+            <UButton color="neutral" variant="ghost" icon="i-lucide-ellipsis-vertical" aria-label="More actions" />
+          </UDropdownMenu>
           <UButton color="error" variant="soft" icon="i-lucide-trash-2" @click="confirmDelete = true">Delete</UButton>
         </template>
       </template>
@@ -36,6 +40,19 @@
         title="This video is in the trash"
         :description="`Deleted ${formatDateTime(video.deletedAt)}. Restore it to edit or re-enable it.`"
       />
+      <UAlert
+        v-else-if="video.archived"
+        class="mb-4"
+        color="neutral"
+        variant="subtle"
+        icon="i-lucide-archive"
+        title="This video is archived"
+        description="Learners can't watch it while archived. Unarchive it to make it visible again."
+      >
+        <template #actions>
+          <UButton size="xs" color="neutral" variant="soft" :loading="busy" @click="onUnarchive">Unarchive</UButton>
+        </template>
+      </UAlert>
       <UAlert
         v-else-if="!video.enabled"
         class="mb-4"
@@ -72,6 +89,8 @@
               <div class="flex flex-wrap gap-2 pb-1">
                 <UBadge v-if="video.deleted" color="error" variant="subtle">In trash</UBadge>
                 <UBadge v-else :color="video.enabled ? 'success' : 'warning'" variant="subtle">{{ video.enabled ? 'Enabled' : 'Disabled' }}</UBadge>
+                <UBadge v-if="video.archived" color="neutral" variant="subtle" icon="i-lucide-archive">Archived</UBadge>
+                <UBadge :color="visibilityMeta.color" variant="subtle" :icon="visibilityMeta.icon">{{ visibilityMeta.label }}</UBadge>
                 <UBadge v-if="video.language" color="neutral" variant="subtle" icon="i-lucide-languages">{{ languageLabel(video.language) }}</UBadge>
                 <CategoryBadge v-for="c in video.categories" :key="c.id" :name="c.name" :color="c.color" :enabled="c.enabled" />
               </div>
@@ -127,6 +146,16 @@
               </div>
             </dl>
           </UCard>
+        </template>
+
+        <!-- Version history -->
+        <template #versions>
+          <VideoVersionsPanel :video-id="video.id" :can-write="canWriteVideos" @restored="(v) => (video = v)" />
+        </template>
+
+        <!-- Timeline editor -->
+        <template #timeline>
+          <VideoTimeline :video="video" :can-write="canWriteVideos" />
         </template>
 
         <!-- View Video Statistics -->
@@ -218,6 +247,9 @@
 
     <VideoEditModal v-model="showEdit" :video="video" @saved="(saved) => (video = saved)" />
     <VideoDownloadModal v-if="video" v-model="showDownload" :video="video" :can-write="canWriteVideos" @imported="load" />
+    <VideoClipModal v-if="video" v-model="showClip" :video="video" :can-write="canWriteVideos" @replaced="load" @created="onClipPromotedToNewVideo" />
+    <VideoReplaceModal v-if="video" v-model="showReplace" :video="video" @replaced="(v) => (video = v)" />
+    <VideoMoveModal v-if="video" v-model="showMove" :video="video" @moved="(v) => (video = v)" />
 
     <ConfirmModal
       v-model="confirmDisable"
@@ -243,13 +275,14 @@
 <script setup lang="ts">
 import type { DropdownMenuItem, TabsItem } from '@nuxt/ui'
 import type { Video, VideoStatistics } from '~/composables/useVideos'
+import { VIDEO_VISIBILITIES } from '~/composables/useVideos'
 
 definePageMeta({ middleware: 'admin' })
 
 const route = useRoute()
 const router = useRouter()
 const toast = useToast()
-const { get, statistics, updateStatus, remove, restore } = useVideos()
+const { get, statistics, updateStatus, remove, restore, archive, unarchive, duplicate } = useVideos()
 
 const { can } = useAuth()
 
@@ -303,10 +336,26 @@ const relatedItems = computed<DropdownMenuItem[][]>(() => {
   ]
 })
 
+const visibilityMeta = computed(() => VIDEO_VISIBILITIES.find((v) => v.value === video.value?.visibility) ?? VIDEO_VISIBILITIES[0]!)
+
+// Less-common actions, tucked behind "More" so the header stays short.
+const moreItems = computed<DropdownMenuItem[][]>(() => [
+  [
+    { label: 'Replace file…', icon: 'i-lucide-replace', onSelect: () => (showReplace.value = true) },
+    { label: 'Move…', icon: 'i-lucide-move', onSelect: () => (showMove.value = true) },
+    { label: 'Duplicate', icon: 'i-lucide-copy', onSelect: onDuplicate },
+    video.value?.archived
+      ? { label: 'Unarchive', icon: 'i-lucide-archive-restore', onSelect: onUnarchive }
+      : { label: 'Archive', icon: 'i-lucide-archive', onSelect: onArchive }
+  ]
+])
+
 // ── Tabs (the active one is kept in ?tab= so it can be linked to) ──────────
 const tabItems: TabsItem[] = [
   { label: 'Details', value: 'details', slot: 'details', icon: 'i-lucide-file-text' },
   { label: 'Metadata', value: 'metadata', slot: 'metadata', icon: 'i-lucide-info' },
+  { label: 'Versions', value: 'versions', slot: 'versions', icon: 'i-lucide-history' },
+  { label: 'Timeline', value: 'timeline', slot: 'timeline', icon: 'i-lucide-gantt-chart' },
   { label: 'Statistics', value: 'statistics', slot: 'statistics', icon: 'i-lucide-chart-column' }
 ]
 const tab = computed({
@@ -403,6 +452,7 @@ onMounted(() => {
 // ── Actions ────────────────────────────────────────────────────────────────
 const showEdit = ref(false)
 const showDownload = ref(false)
+const showClip = ref(false)
 const busy = ref(false)
 const confirmDisable = ref(false)
 const confirmDelete = ref(false)
@@ -438,6 +488,11 @@ async function onDelete() {
   }
 }
 
+function onClipPromotedToNewVideo(newVideoId: number) {
+  toast.add({ title: 'New video created', description: "It's disabled until you review it — opening it now.", color: 'success' })
+  navigateTo(`/videos/${newVideoId}`)
+}
+
 async function onRestore() {
   if (!video.value) return
   busy.value = true
@@ -448,6 +503,47 @@ async function onRestore() {
     toast.add({ title: 'Could not restore video', description: apiErrorMessage(err), color: 'error' })
   } finally {
     busy.value = false
+  }
+}
+
+// ── Replace / Move / Archive / Duplicate ────────────────────────────────────
+const showReplace = ref(false)
+const showMove = ref(false)
+
+async function onArchive() {
+  if (!video.value) return
+  busy.value = true
+  try {
+    video.value = await archive(video.value.id)
+    toast.add({ title: 'Video archived', color: 'success' })
+  } catch (err) {
+    toast.add({ title: 'Could not archive video', description: apiErrorMessage(err), color: 'error' })
+  } finally {
+    busy.value = false
+  }
+}
+
+async function onUnarchive() {
+  if (!video.value) return
+  busy.value = true
+  try {
+    video.value = await unarchive(video.value.id)
+    toast.add({ title: 'Video unarchived', color: 'success' })
+  } catch (err) {
+    toast.add({ title: 'Could not unarchive video', description: apiErrorMessage(err), color: 'error' })
+  } finally {
+    busy.value = false
+  }
+}
+
+async function onDuplicate() {
+  if (!video.value) return
+  try {
+    const copy = await duplicate(video.value.id)
+    toast.add({ title: `Duplicated as “${copy.title}”`, color: 'success' })
+    await navigateTo(`/videos/${copy.id}`)
+  } catch (err) {
+    toast.add({ title: 'Could not duplicate video', description: apiErrorMessage(err), color: 'error' })
   }
 }
 </script>
