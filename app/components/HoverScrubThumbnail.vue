@@ -1,13 +1,6 @@
 <template>
   <div class="relative w-full h-full" @pointerenter="onEnter" @pointerleave="onLeave">
-    <img
-      v-if="thumbnailUrl && !broken"
-      :src="thumbnailUrl"
-      :alt="alt ?? ''"
-      loading="lazy"
-      class="w-full h-full object-cover"
-      @error="broken = true"
-    />
+    <img v-if="thumbnailUrl && !broken" :src="thumbnailUrl" :alt="alt ?? ''" loading="lazy" class="w-full h-full object-cover" @error="broken = true" />
     <UIcon v-else name="i-lucide-clapperboard" class="absolute inset-0 m-auto w-5 h-5 text-gray-400" />
 
     <!-- Mounted only on hover: no cost for the dozens of thumbnails not being looked at. -->
@@ -24,10 +17,7 @@
       @seeked="frameReady = true"
     />
 
-    <span
-      v-if="durationSeconds != null"
-      class="absolute bottom-1 right-1 rounded bg-black/75 px-1 text-[10px] font-semibold text-white tabular-nums"
-    >
+    <span v-if="durationSeconds != null" class="absolute bottom-1 right-1 rounded bg-black/75 px-1 text-[10px] font-semibold text-white tabular-nums">
       {{ formatDuration(durationSeconds) }}
     </span>
   </div>

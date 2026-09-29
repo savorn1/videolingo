@@ -8,6 +8,7 @@
         icon="i-lucide-users"
         :value="formatCount(data?.totalUsers)"
         :sublabel="data ? `${data.enabledUsers} enabled · ${data.disabledUsers} disabled · ${data.admins} admins` : ''"
+        color="primary"
         :loading="!data"
       />
       <KpiTile
@@ -17,6 +18,7 @@
         :delta="data && describeDelta(data.newUsers.current, data.newUsers.previous)"
         :compared-to="comparedTo"
         :previous-text="data ? formatCount(data.newUsers.previous) : ''"
+        color="success"
         :loading="!data"
       />
       <KpiTile
@@ -27,6 +29,7 @@
         :compared-to="comparedTo"
         :previous-text="data ? formatCount(data.activeViewers.previous) : ''"
         sublabel="Signed-in accounts that watched something"
+        color="info"
         :loading="!data"
       />
       <KpiTile
@@ -34,6 +37,7 @@
         icon="i-lucide-log-in"
         :value="formatCount(data?.signedInDuringPeriod)"
         :sublabel="data ? `Last sign-in in this period · ${data.neverSignedIn} never signed in` : ''"
+        color="neutral"
         :loading="!data"
       />
     </div>

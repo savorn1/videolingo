@@ -78,7 +78,7 @@
               type="button"
               class="p-0.5 rounded opacity-0 group-hover:opacity-100 hover:bg-error-50 dark:hover:bg-error-950"
               :aria-label="`Delete template ${t.name}`"
-              @click.stop="templates.remove(t.id)"
+              @click.stop="confirmDeleteTemplate = t"
             >
               <UIcon name="i-lucide-x" class="w-3.5 h-3.5 text-gray-400" />
             </button>
@@ -173,15 +173,30 @@
               aria-label="Text colour"
               class="h-7 w-10 cursor-pointer rounded border border-gray-200 dark:border-gray-700"
             />
+            <UInput
+              :model-value="layer.color ?? undefined"
+              size="xs"
+              class="w-20 font-mono"
+              aria-label="Text colour (hex)"
+              @change="(e: Event) => setHex('color', (e.target as HTMLInputElement).value)"
+            />
           </label>
           <USwitch :model-value="!!layer.background" label="Background" @update:model-value="(v) => layer && (layer.background = v ? '#000000' : null)" />
-          <input
-            v-if="layer.background"
-            v-model="layer.background"
-            type="color"
-            aria-label="Background colour"
-            class="h-7 w-10 cursor-pointer rounded border border-gray-200 dark:border-gray-700"
-          />
+          <template v-if="layer.background">
+            <input
+              v-model="layer.background"
+              type="color"
+              aria-label="Background colour"
+              class="h-7 w-10 cursor-pointer rounded border border-gray-200 dark:border-gray-700"
+            />
+            <UInput
+              :model-value="layer.background ?? undefined"
+              size="xs"
+              class="w-20 font-mono"
+              aria-label="Background colour (hex)"
+              @change="(e: Event) => setHex('background', (e.target as HTMLInputElement).value)"
+            />
+          </template>
         </div>
         <div v-if="layer.background" class="flex items-center gap-3">
           <span class="w-16 text-xs text-gray-500">Box</span>
@@ -238,6 +253,7 @@
                   ? 'bg-primary-500 border-primary-500'
                   : 'border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800'
               "
+              :title="`Place at ${SPOT_NAMES[i]}`"
               :aria-label="`Place at ${SPOT_NAMES[i]}`"
               @click="Object.assign(layer, spot)"
             />
@@ -350,9 +366,21 @@
         >
           Render layers
         </UButton>
-        <UButton color="neutral" variant="ghost" icon="i-lucide-rotate-ccw" :disabled="!s.layers.length" @click="edit.reset()">Clear</UButton>
+        <UTooltip text="Undoable — Ctrl/⌘+Z brings the layers back">
+          <UButton class="ml-2" color="neutral" variant="ghost" icon="i-lucide-rotate-ccw" :disabled="!s.layers.length" @click="edit.reset()">Clear</UButton>
+        </UTooltip>
       </div>
     </section>
+
+    <ConfirmModal
+      :model-value="confirmDeleteTemplate !== null"
+      title="Delete template"
+      :description="`Delete the saved template “${confirmDeleteTemplate?.name ?? ''}”? Templates aren't part of the editor's undo history, so this can't be undone.`"
+      confirm-label="Delete"
+      color="error"
+      @update:model-value="(v: boolean) => !v && (confirmDeleteTemplate = null)"
+      @confirm="onDeleteTemplateConfirm"
+    />
   </div>
 </template>
 
@@ -364,7 +392,7 @@
 import { LAYER_ANIMATIONS, LAYER_SPOTS, LAYER_WEIGHTS, type OverlayEdit } from '~/composables/useOverlayEdit'
 import { uploadToStorage } from '~/composables/useVideos'
 import { formatTimecode } from '#shared/utils/transport'
-import { useOverlayTemplates } from '~/composables/useOverlayTemplates'
+import { useOverlayTemplates, type OverlayTemplate } from '~/composables/useOverlayTemplates'
 
 const props = defineProps<{ edit: OverlayEdit; videoId: number; durationMs: number; currentMs: number; canWrite: boolean; busy: boolean }>()
 const emit = defineEmits<{ queued: [] }>()
@@ -384,6 +412,15 @@ const { requestUpload } = useVideos()
 const s = props.edit.state
 const layer = computed(() => props.edit.selected.value)
 
+// Applies a typed hex value on blur/Enter only — leaves the field alone
+// while mid-edit rather than reverting on every keystroke that isn't a
+// complete hex colour yet.
+function setHex(field: 'color' | 'background', value: string) {
+  if (!layer.value) return
+  const hex = value.trim().replace(/^#?/, '#')
+  if (/^#[0-9a-fA-F]{6}$/.test(hex)) layer.value[field] = hex
+}
+
 // ── Templates ────────────────────────────────────────────────────────────────
 const templates = useOverlayTemplates()
 const savingTemplate = ref(false)
@@ -393,6 +430,13 @@ function onSaveTemplate() {
   templates.save(templateName.value, s.layers)
   templateName.value = ''
   savingTemplate.value = false
+}
+
+const confirmDeleteTemplate = ref<OverlayTemplate | null>(null)
+function onDeleteTemplateConfirm() {
+  if (!confirmDeleteTemplate.value) return
+  templates.remove(confirmDeleteTemplate.value.id)
+  confirmDeleteTemplate.value = null
 }
 
 const importInput = useTemplateRef<HTMLInputElement>('importInput')

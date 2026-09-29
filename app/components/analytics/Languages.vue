@@ -3,13 +3,14 @@
     <UAlert v-if="error" color="error" variant="subtle" class="mb-4" :title="error" icon="i-lucide-triangle-alert" />
 
     <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-4">
-      <KpiTile label="In the catalog" icon="i-lucide-book-open" :value="formatCount(data?.catalogLanguages)" :loading="!data" />
-      <KpiTile label="Enabled" icon="i-lucide-toggle-right" :value="formatCount(data?.enabledLanguages)" :loading="!data" />
+      <KpiTile label="In the catalog" icon="i-lucide-book-open" :value="formatCount(data?.catalogLanguages)" color="primary" :loading="!data" />
+      <KpiTile label="Enabled" icon="i-lucide-toggle-right" :value="formatCount(data?.enabledLanguages)" color="success" :loading="!data" />
       <KpiTile
         label="In use"
         icon="i-lucide-check-circle"
         :value="formatCount(data?.languagesInUse)"
         sublabel="With videos, transcripts or subtitles"
+        color="info"
         :loading="!data"
       />
       <KpiTile
@@ -17,6 +18,7 @@
         icon="i-lucide-circle-help"
         :value="formatCount(data?.unknownCodes)"
         sublabel="Codes used by content but not listed under Languages"
+        color="warning"
         :loading="!data"
       />
     </div>

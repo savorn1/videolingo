@@ -1,12 +1,32 @@
 <template>
   <div class="flex flex-wrap items-center gap-2">
-    <UButton v-if="setEnabled" size="xs" color="neutral" variant="soft" icon="i-lucide-check" :loading="busy === 'enable'" :disabled="!!busy" @click="run('enable')">
+    <UButton
+      v-if="setEnabled"
+      size="xs"
+      color="neutral"
+      variant="soft"
+      icon="i-lucide-check"
+      :loading="busy === 'enable'"
+      :disabled="!!busy"
+      @click="run('enable')"
+    >
       Enable selected
     </UButton>
-    <UButton v-if="setEnabled" size="xs" color="neutral" variant="soft" icon="i-lucide-ban" :loading="busy === 'disable'" :disabled="!!busy" @click="run('disable')">
+    <UButton
+      v-if="setEnabled"
+      size="xs"
+      color="neutral"
+      variant="soft"
+      icon="i-lucide-ban"
+      :loading="busy === 'disable'"
+      :disabled="!!busy"
+      @click="run('disable')"
+    >
       Disable selected
     </UButton>
-    <UButton v-if="remove" size="xs" color="error" variant="soft" icon="i-lucide-trash-2" :disabled="!!busy" @click="confirming = true">Delete selected</UButton>
+    <UButton v-if="remove" size="xs" color="error" variant="soft" icon="i-lucide-trash-2" :disabled="!!busy" @click="confirming = true"
+      >Delete selected</UButton
+    >
 
     <ConfirmModal
       :model-value="confirming"

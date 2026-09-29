@@ -8,6 +8,7 @@
         icon="i-lucide-hard-drive"
         :value="data ? formatFileSize(data.storedBytes) : '—'"
         :sublabel="data ? `${data.storedVideos} files in the bucket · ${data.externalVideos} linked externally` : ''"
+        color="primary"
         :loading="!data"
       />
       <KpiTile
@@ -18,6 +19,7 @@
         :compared-to="comparedTo"
         :previous-text="data ? formatFileSize(data.uploadedBytes.previous) : ''"
         sentiment="neutral"
+        color="info"
         :loading="!data"
       />
       <KpiTile
@@ -25,6 +27,7 @@
         icon="i-lucide-trash-2"
         :value="data ? formatFileSize(data.trashedBytes) : '—'"
         :sublabel="data ? `${data.trashedVideos} video(s) — still in the bucket until purged` : ''"
+        color="warning"
         :loading="!data"
       />
       <KpiTile
@@ -32,6 +35,7 @@
         icon="i-lucide-file-video"
         :value="data ? formatFileSize(data.averageFileBytes) : '—'"
         :sublabel="data?.unknownSizeVideos ? `${data.unknownSizeVideos} file(s) with unknown size aren't counted` : ''"
+        color="neutral"
         :loading="!data"
       />
     </div>

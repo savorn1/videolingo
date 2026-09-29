@@ -9,6 +9,8 @@
       </template>
     </PageHeader>
 
+    <SummaryTiles :tiles="summaryTiles" @select="onSelectTile" />
+
     <UCard class="mb-4">
       <div class="flex flex-wrap gap-3">
         <UInput v-model="search" placeholder="Search name, slug or description" icon="i-lucide-search" class="w-72" />
@@ -40,7 +42,7 @@
             :label="(c: Category) => c.name"
             :remove="remove"
             :set-enabled="setEnabled"
-            @done="clear(), load()"
+            @done="(clear(), load(), loadTileCounts())"
           />
         </template>
         <template #name-data="{ row }">
@@ -119,6 +121,7 @@
 <script setup lang="ts">
 import type { ColumnDef, RowAction } from '#shared/types'
 import type { Category } from '~/composables/useCategories'
+import type { SummaryTile } from '~/components/SummaryTiles.vue'
 
 definePageMeta({ middleware: 'admin' })
 
@@ -198,6 +201,32 @@ function clearFilters() {
 }
 
 onMounted(load)
+onMounted(loadTileCounts)
+
+// ── Summary tiles ────────────────────────────────────────────────────────────
+// Global counts (ignoring the other filters), same as Processing Jobs' tiles.
+const tileCounts = ref<{ total: number | null; enabled: number | null; disabled: number | null }>({ total: null, enabled: null, disabled: null })
+async function loadTileCounts() {
+  tileCounts.value = { total: null, enabled: null, disabled: null }
+  const count = async (enabled?: boolean) => {
+    try {
+      return (await list({ enabled, page: 1, size: 1 })).metadata.totalCount
+    } catch {
+      return null
+    }
+  }
+  const [total, enabled, disabled] = await Promise.all([count(), count(true), count(false)])
+  tileCounts.value = { total, enabled, disabled }
+}
+const summaryTiles = computed<SummaryTile[]>(() => [
+  { key: 'all', label: 'Categories', count: tileCounts.value.total, icon: 'i-lucide-folder-tree', active: filter.enabled === undefined, color: 'primary' },
+  { key: 'enabled', label: 'Enabled', count: tileCounts.value.enabled, icon: 'i-lucide-eye', active: filter.enabled === true, color: 'success' },
+  { key: 'disabled', label: 'Disabled', count: tileCounts.value.disabled, icon: 'i-lucide-eye-off', active: filter.enabled === false, color: 'neutral' }
+])
+function onSelectTile(key: string) {
+  const next = key === 'enabled' ? true : key === 'disabled' ? false : undefined
+  filter.enabled = filter.enabled === next ? undefined : next
+}
 
 // ── Actions ────────────────────────────────────────────────────────────────
 const showForm = ref(false)
@@ -238,6 +267,7 @@ async function toggle(row: Category, enabled: boolean) {
       color: 'success'
     })
     await load()
+    loadTileCounts()
   } catch (err) {
     toast.add({ title: `Could not ${enabled ? 'enable' : 'disable'} category`, description: apiErrorMessage(err), color: 'error' })
   }
@@ -250,6 +280,7 @@ async function onDelete(row: Category) {
     toast.add({ title: `${row.name} deleted`, description: detached ? `Removed from ${detached} video(s).` : undefined, color: 'success' })
     confirmDelete.value = null
     await load()
+    loadTileCounts()
   } catch (err) {
     toast.add({ title: 'Could not delete category', description: apiErrorMessage(err), color: 'error' })
   } finally {

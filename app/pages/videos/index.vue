@@ -2,11 +2,16 @@
   <div>
     <PageHeader title="Videos" description="Learning videos — uploaded, linked from YouTube, Vimeo or Facebook, or hosted elsewhere.">
       <template #actions>
+        <UButton v-if="filter.deleted" color="error" variant="soft" icon="i-lucide-trash-2" :loading="clearingTrash" @click="onClearTrashClick">
+          Clear trash
+        </UButton>
         <UButton icon="i-lucide-plus" to="/videos/new">Add video</UButton>
       </template>
     </PageHeader>
 
     <UTabs v-model="view" :items="viewItems" :content="false" class="mb-4 w-full sm:w-80" />
+
+    <SummaryTiles v-if="summaryTiles.length" :tiles="summaryTiles" @select="onSelectTile" />
 
     <UCard class="mb-4">
       <div class="flex flex-wrap gap-3">
@@ -63,7 +68,7 @@
         :rows="rows"
         :columns="columns"
         :loading="loading"
-        :selectable="!filter.deleted"
+        selectable
         :total-count="total"
         @select-all-matching="selectAllMatching"
         refreshable
@@ -75,10 +80,12 @@
         <template #bulk-actions="{ selected: picked, clear }">
           <VideoBulkActions
             :videos="picked"
+            :trash="filter.deleted"
             @done="
               () => {
                 clear()
                 load()
+                loadTileCounts()
               }
             "
           />
@@ -178,6 +185,16 @@
       @confirm="confirmDelete && onDelete(confirmDelete)"
     />
     <ConfirmModal
+      :model-value="confirmPurge !== null"
+      title="Delete permanently"
+      :description="`Permanently delete '${confirmPurge?.title ?? ''}' and free its storage? This cannot be undone — restoring won't be possible afterwards.`"
+      confirm-label="Delete permanently"
+      color="error"
+      :loading="busy"
+      @update:model-value="(v: boolean) => !v && (confirmPurge = null)"
+      @confirm="confirmPurge && onPurge(confirmPurge)"
+    />
+    <ConfirmModal
       :model-value="confirmDisable !== null"
       title="Disable video"
       :description="`Disable '${confirmDisable?.title ?? ''}'? Learners can no longer watch it until it's enabled again.`"
@@ -187,16 +204,27 @@
       @update:model-value="(v: boolean) => !v && (confirmDisable = null)"
       @confirm="confirmDisable && setStatus(confirmDisable, false)"
     />
+    <ConfirmModal
+      :model-value="confirmClearTrash"
+      title="Clear trash"
+      :description="`Permanently delete ${trashCount ?? 0} video(s) and free their storage? This cannot be undone — restoring won't be possible afterwards.`"
+      confirm-label="Clear trash"
+      color="error"
+      :loading="clearingTrash"
+      @update:model-value="(v: boolean) => !v && !clearingTrash && (confirmClearTrash = false)"
+      @confirm="onClearTrashConfirm"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import type { ColumnDef, RowAction } from '#shared/types'
 import type { Video } from '~/composables/useVideos'
+import type { SummaryTile } from '~/components/SummaryTiles.vue'
 
 definePageMeta({ middleware: 'admin' })
 
-const { list, updateStatus, remove, restore, archive, unarchive, duplicate } = useVideos()
+const { list, updateStatus, remove, restore, archive, unarchive, duplicate, purge, purgeTrash } = useVideos()
 // Rows ticked for bulk actions (VideoBulkActions).
 const selected = ref<Video[]>([])
 const { list: listUsers } = useUsers()
@@ -411,11 +439,53 @@ function clearFilters() {
   filter.createdTo = undefined
 }
 
+// ── Summary tiles ────────────────────────────────────────────────────────────
+// Only the active-videos view has a status split worth showing (archived/trash
+// don't have an "enabled" concept the way live videos do); global counts, not
+// scoped to the other filters — a quick "how's the library doing" glance,
+// same spirit as Processing Jobs' status tiles.
+const tileCounts = ref<{ total: number | null; enabled: number | null; disabled: number | null }>({ total: null, enabled: null, disabled: null })
+async function loadTileCounts() {
+  tileCounts.value = { total: null, enabled: null, disabled: null }
+  const count = async (enabled?: boolean) => {
+    try {
+      return (await list({ deleted: false, archived: false, enabled, page: 1, size: 1 })).metadata.totalCount
+    } catch {
+      return null
+    }
+  }
+  const [total, enabled, disabled] = await Promise.all([count(), count(true), count(false)])
+  tileCounts.value = { total, enabled, disabled }
+}
+const summaryTiles = computed<SummaryTile[]>(() =>
+  view.value !== 'active'
+    ? []
+    : [
+        {
+          key: 'all',
+          label: 'Live videos',
+          count: tileCounts.value.total,
+          icon: 'i-lucide-clapperboard',
+          active: filter.enabled === undefined,
+          color: 'primary'
+        },
+        { key: 'enabled', label: 'Enabled', count: tileCounts.value.enabled, icon: 'i-lucide-eye', active: filter.enabled === true, color: 'success' },
+        { key: 'disabled', label: 'Disabled', count: tileCounts.value.disabled, icon: 'i-lucide-eye-off', active: filter.enabled === false, color: 'neutral' }
+      ]
+)
+function onSelectTile(key: string) {
+  const next = key === 'enabled' ? true : key === 'disabled' ? false : undefined
+  // Clicking the tile that's already the active filter clears it back to "all".
+  filter.enabled = filter.enabled === next ? undefined : next
+}
+
 onMounted(() => {
   loadOwners()
   loadTags()
   load()
+  loadTileCounts()
 })
+watch(view, loadTileCounts)
 
 // ── Row actions ────────────────────────────────────────────────────────────
 function rowActions(row: Video): RowAction[] {
@@ -424,7 +494,12 @@ function rowActions(row: Video): RowAction[] {
   const view: RowAction = { label: 'View', icon: 'i-lucide-play', onClick: () => navigateTo(`/videos/${row.id}`) }
   const peek: RowAction = { label: 'Quick view', icon: 'i-lucide-eye', onClick: () => (peeking.value = row) }
   if (row.deleted) {
-    return [{ label: 'Restore', icon: 'i-lucide-rotate-ccw', color: 'success', loading: busy.value, onClick: () => onRestore(row) }, peek, view]
+    return [
+      { label: 'Restore', icon: 'i-lucide-rotate-ccw', color: 'success', loading: busy.value, onClick: () => onRestore(row) },
+      peek,
+      view,
+      { label: 'Delete permanently', icon: 'i-lucide-trash-2', color: 'error', onClick: () => (confirmPurge.value = row) }
+    ]
   }
   return [
     peek,
@@ -445,6 +520,7 @@ function rowActions(row: Video): RowAction[] {
 const busy = ref(false)
 const confirmDisable = ref<Video | null>(null)
 const confirmDelete = ref<Video | null>(null)
+const confirmPurge = ref<Video | null>(null)
 const peeking = ref<Video | null>(null)
 
 async function run(action: () => Promise<unknown>, success: string, failure: string) {
@@ -453,6 +529,7 @@ async function run(action: () => Promise<unknown>, success: string, failure: str
     await action()
     toast.add({ title: success, color: 'success' })
     await load()
+    loadTileCounts()
     return true
   } catch (err) {
     toast.add({ title: failure, description: apiErrorMessage(err), color: 'error' })
@@ -474,6 +551,41 @@ async function onDelete(row: Video) {
 
 function onRestore(row: Video) {
   run(() => restore(row.id), 'Video restored', 'Could not restore video')
+}
+
+async function onPurge(row: Video) {
+  if (await run(() => purge(row.id), 'Video permanently deleted', 'Could not permanently delete video')) confirmPurge.value = null
+}
+
+// ── Clear trash ────────────────────────────────────────────────────────────
+// The count shown in the confirm dialog is fetched fresh (ignoring search/
+// category filters) since the purge always empties the whole trash, not just
+// what's currently visible in the filtered list.
+const confirmClearTrash = ref(false)
+const clearingTrash = ref(false)
+const trashCount = ref<number | null>(null)
+async function onClearTrashClick() {
+  trashCount.value = null
+  confirmClearTrash.value = true
+  try {
+    trashCount.value = (await list({ deleted: true, page: 1, size: 1 })).metadata.totalCount
+  } catch {
+    trashCount.value = total.value
+  }
+}
+async function onClearTrashConfirm() {
+  clearingTrash.value = true
+  try {
+    await purgeTrash()
+    toast.add({ title: 'Trash cleared', color: 'success' })
+    confirmClearTrash.value = false
+    selected.value = []
+    await load()
+  } catch (err) {
+    toast.add({ title: 'Could not clear the trash', description: apiErrorMessage(err), color: 'error' })
+  } finally {
+    clearingTrash.value = false
+  }
 }
 
 function onArchiveToggle(row: Video, archived: boolean) {

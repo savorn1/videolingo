@@ -6,6 +6,8 @@
       </template>
     </PageHeader>
 
+    <SummaryTiles :tiles="summaryTiles" @select="onSelectTile" />
+
     <UCard class="mb-4">
       <div class="flex flex-wrap gap-3">
         <UInput v-model="search" placeholder="Search tags" icon="i-lucide-search" class="w-64" />
@@ -30,7 +32,7 @@
         @refresh="load"
       >
         <template #bulk-actions="{ selected: picked, clear }">
-          <GenericBulkActions :items="picked" entity-label="tag" :label="(t: Tag) => t.name" :remove="remove" @done="clear(), load()" />
+          <GenericBulkActions :items="picked" entity-label="tag" :label="(t: Tag) => t.name" :remove="remove" @done="onBulkDone(clear)" />
         </template>
         <template #name-data="{ row }">
           <div class="min-w-0 max-w-sm">
@@ -130,6 +132,7 @@
 <script setup lang="ts">
 import type { ColumnDef, RowAction } from '#shared/types'
 import type { Tag } from '~/composables/useTags'
+import type { SummaryTile } from '~/components/SummaryTiles.vue'
 
 definePageMeta({ middleware: 'admin' })
 
@@ -207,7 +210,40 @@ function clearFilters() {
   filter.unused = undefined
 }
 
+// ── Summary tiles ────────────────────────────────────────────────────────────
+// Global counts (ignoring the other filters), same as Processing Jobs' tiles —
+// a quick sense of how many tags are actually in use, at a glance.
+const tileCounts = ref<{ total: number | null; used: number | null; unused: number | null }>({ total: null, used: null, unused: null })
+async function loadTileCounts() {
+  tileCounts.value = { total: null, used: null, unused: null }
+  const count = async (unused?: boolean) => {
+    try {
+      return (await list({ unused, page: 1, size: 1 })).metadata.totalCount
+    } catch {
+      return null
+    }
+  }
+  const [total, unused, used] = await Promise.all([count(), count(true), count(false)])
+  tileCounts.value = { total, used, unused }
+}
+const summaryTiles = computed<SummaryTile[]>(() => [
+  { key: 'all', label: 'Tags', count: tileCounts.value.total, icon: 'i-lucide-hash', active: filter.unused === undefined, color: 'primary' },
+  { key: 'used', label: 'In use', count: tileCounts.value.used, icon: 'i-lucide-check', active: filter.unused === false, color: 'success' },
+  { key: 'unused', label: 'Unused', count: tileCounts.value.unused, icon: 'i-lucide-circle-slash', active: filter.unused === true, color: 'neutral' }
+])
+function onSelectTile(key: string) {
+  const next = key === 'unused' ? true : key === 'used' ? false : undefined
+  filter.unused = filter.unused === next ? undefined : next
+}
+
 onMounted(load)
+onMounted(loadTileCounts)
+
+function onBulkDone(clear: () => void) {
+  clear()
+  load()
+  loadTileCounts()
+}
 
 function rowActions(row: Tag): RowAction[] {
   return [

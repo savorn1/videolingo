@@ -11,6 +11,7 @@
         :compared-to="comparedTo"
         :previous-text="data ? formatCount(data.requests.previous) : ''"
         :sublabel="data?.successRate != null ? `${formatPercent(data.successRate)} succeeded · ${data.videosWithAi} videos` : ''"
+        color="primary"
         :loading="!data"
       />
       <KpiTile
@@ -21,6 +22,7 @@
         :compared-to="comparedTo"
         :previous-text="data ? formatUsd(data.costUsd.previous) : ''"
         sentiment="up-bad"
+        color="warning"
         :loading="!data"
       />
       <KpiTile
@@ -31,6 +33,7 @@
         :compared-to="comparedTo"
         :previous-text="data ? formatCount(data.generations.previous) : ''"
         sublabel="Summaries, chapters, key points, questions, quizzes"
+        color="info"
         :loading="!data"
       />
       <KpiTile
@@ -41,6 +44,7 @@
         :compared-to="comparedTo"
         :previous-text="data ? formatCount(data.chats.previous) : ''"
         :sublabel="data ? `${formatCount(data.chatMessages)} messages · ${data.averageMessagesPerChat.toFixed(1)} per chat` : ''"
+        color="success"
         :loading="!data"
       />
     </div>

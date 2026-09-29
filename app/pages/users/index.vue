@@ -6,6 +6,8 @@
       </template>
     </PageHeader>
 
+    <SummaryTiles :tiles="summaryTiles" @select="onSelectTile" />
+
     <UCard class="mb-4">
       <div class="flex flex-wrap gap-3">
         <UInput v-model="search" placeholder="Search username or email" icon="i-lucide-search" class="w-64" />
@@ -40,7 +42,7 @@
 
         <template #username-data="{ row }">
           <div class="flex items-center gap-2">
-            <UAvatar :alt="row.username" size="xs" />
+            <UserAvatar :name="row.username" size="xs" />
             <span class="font-semibold">{{ row.username }}</span>
             <UBadge v-if="row.username === myUsername" size="sm" color="neutral" variant="subtle">You</UBadge>
           </div>
@@ -162,6 +164,7 @@
 
 <script setup lang="ts">
 import type { ColumnDef, FieldDef, RowAction } from '#shared/types'
+import type { SummaryTile } from '~/components/SummaryTiles.vue'
 import { USER_ROLE_OPTIONS, type AdminUser, type CreateUserPayload, type Role, type UserEditPayload } from '~/composables/useUsers'
 
 definePageMeta({ middleware: 'admin' })
@@ -280,7 +283,50 @@ function clearFilters() {
 onMounted(() => {
   loadCustomRoles()
   load()
+  loadTileCounts()
 })
+
+// ── Summary tiles ────────────────────────────────────────────────────────────
+// Global counts (ignoring the other filters), same as Processing Jobs' tiles.
+const tileCounts = ref<{ total: number | null; enabled: number | null; disabled: number | null; admins: number | null }>({
+  total: null,
+  enabled: null,
+  disabled: null,
+  admins: null
+})
+async function loadTileCounts() {
+  tileCounts.value = { total: null, enabled: null, disabled: null, admins: null }
+  const count = async (params: { enabled?: boolean; role?: Role }) => {
+    try {
+      return (await list({ ...params, page: 1, size: 1 })).metadata.totalCount
+    } catch {
+      return null
+    }
+  }
+  const [total, enabled, disabled, admins] = await Promise.all([count({}), count({ enabled: true }), count({ enabled: false }), count({ role: 'ADMIN' })])
+  tileCounts.value = { total, enabled, disabled, admins }
+}
+const summaryTiles = computed<SummaryTile[]>(() => [
+  {
+    key: 'all',
+    label: 'Users',
+    count: tileCounts.value.total,
+    icon: 'i-lucide-users',
+    active: filter.enabled === undefined && filter.role === undefined,
+    color: 'primary'
+  },
+  { key: 'enabled', label: 'Enabled', count: tileCounts.value.enabled, icon: 'i-lucide-user-check', active: filter.enabled === true, color: 'success' },
+  { key: 'disabled', label: 'Disabled', count: tileCounts.value.disabled, icon: 'i-lucide-user-x', active: filter.enabled === false, color: 'neutral' },
+  { key: 'admins', label: 'Admins', count: tileCounts.value.admins, icon: 'i-lucide-shield', active: filter.role === 'ADMIN', color: 'info' }
+])
+function onSelectTile(key: string) {
+  if (key === 'admins') {
+    filter.role = filter.role === 'ADMIN' ? undefined : 'ADMIN'
+    return
+  }
+  const next = key === 'enabled' ? true : key === 'disabled' ? false : undefined
+  filter.enabled = filter.enabled === next ? undefined : next
+}
 
 // ── Row actions ────────────────────────────────────────────────────────────
 function rowActions(row: AdminUser): RowAction[] {
@@ -309,6 +355,7 @@ async function setStatus(row: AdminUser, enabled: boolean) {
     toast.add({ title: `${row.username} ${enabled ? 'enabled' : 'disabled'}`, color: 'success' })
     confirmDisable.value = null
     await load()
+    loadTileCounts()
   } catch (err) {
     toast.add({ title: `Could not ${enabled ? 'enable' : 'disable'} user`, description: apiErrorMessage(err), color: 'error' })
   } finally {

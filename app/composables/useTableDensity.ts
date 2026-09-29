@@ -14,9 +14,7 @@ export function useTableDensity() {
     density.value = next
   }
 
-  const densityUi = computed(() =>
-    density.value === 'compact' ? { td: 'py-1.5', th: 'py-1.5' } : {}
-  )
+  const densityUi = computed(() => (density.value === 'compact' ? { td: 'py-1.5', th: 'py-1.5' } : {}))
 
   return { density, setDensity, densityUi }
 }

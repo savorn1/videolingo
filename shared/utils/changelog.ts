@@ -40,7 +40,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     id: '2026-09-27-practice-panel',
     date: '2026-09-27',
     title: 'Shadowing and dictation practice',
-    description: "The watch page now has a Practice panel: record yourself repeating a line, or type what you hear, and see a word-by-word check.",
+    description: 'The watch page now has a Practice panel: record yourself repeating a line, or type what you hear, and see a word-by-word check.',
     area: 'Learning'
   },
   {

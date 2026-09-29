@@ -12,7 +12,7 @@
     >
       <template #actions>
         <UButton size="xs" color="info" @click="onRestoreDraft">Restore</UButton>
-        <UButton size="xs" color="neutral" variant="ghost" @click="onDiscardDraft">Discard</UButton>
+        <UButton size="xs" color="neutral" variant="ghost" @click="confirmDiscardDraft = true">Discard</UButton>
       </template>
     </UAlert>
 
@@ -122,39 +122,46 @@
           @seek="(ms: number) => preview?.seek(ms, false)"
         />
         <p v-if="!stageFullscreen" class="text-xs text-gray-500 dark:text-gray-400">
-          Drag on the video to crop · scroll over it to zoom · hold <UKbd value="space" /> and drag to move around when zoomed · <UKbd value="space" /> /
-          <UKbd value="K" /> play · <UKbd value="←" /> <UKbd value="→" /> one frame · <UKbd value="J" /> <UKbd value="L" /> ±5 s · <UKbd value="F" /> full
-          screen
+          Drag on the video to crop · scroll over it to zoom · more shortcuts under
+          <UIcon name="i-lucide-keyboard" class="w-3 h-3 inline align-text-top" /> above, or press <UKbd value="?" />
         </p>
       </div>
 
       <!-- Controls -->
       <UCard>
-        <div class="flex items-center justify-end gap-1 -mt-1 mb-1">
-          <UButton
-            size="xs"
-            color="neutral"
-            variant="ghost"
-            icon="i-lucide-undo-2"
-            :disabled="!history.undoable.value"
-            title="Undo (Ctrl/⌘+Z)"
-            @click="history.undo()"
-          >
-            Undo
-          </UButton>
-          <UButton
-            size="xs"
-            color="neutral"
-            variant="ghost"
-            icon="i-lucide-redo-2"
-            :disabled="!history.redoable.value"
-            title="Redo (Ctrl/⌘+Shift+Z)"
-            @click="history.redo()"
-          >
-            Redo
-          </UButton>
-          <ShortcutsHelp :items="EDITOR_SHORTCUTS" button-class="ml-1" />
-        </div>
+        <template #header>
+          <div class="flex items-center justify-between gap-2">
+            <h2 class="font-semibold text-gray-900 dark:text-white flex items-center gap-1.5">
+              <UIcon name="i-lucide-sliders-horizontal" class="w-4 h-4 text-gray-400" />
+              Edit
+            </h2>
+            <div class="flex items-center gap-1">
+              <UButton
+                size="xs"
+                color="neutral"
+                variant="ghost"
+                icon="i-lucide-undo-2"
+                :disabled="!history.undoable.value"
+                title="Undo (Ctrl/⌘+Z)"
+                @click="history.undo()"
+              >
+                Undo
+              </UButton>
+              <UButton
+                size="xs"
+                color="neutral"
+                variant="ghost"
+                icon="i-lucide-redo-2"
+                :disabled="!history.redoable.value"
+                title="Redo (Ctrl/⌘+Shift+Z)"
+                @click="history.redo()"
+              >
+                Redo
+              </UButton>
+              <ShortcutsHelp :items="EDITOR_SHORTCUTS" />
+            </div>
+          </div>
+        </template>
         <UTabs v-model="mode" :items="tabItems" variant="link" :ui="{ list: 'mb-3' }">
           <!-- ── Trim & crop ───────────────────────────────────────────── -->
           <template #trim>
@@ -238,6 +245,17 @@
           <!-- ── Split into segments ──────────────────────────────────────── -->
           <template #split>
             <div class="space-y-3">
+              <div v-if="durationMs" class="relative h-6 rounded-md bg-gray-100 dark:bg-gray-800 overflow-hidden">
+                <div
+                  v-for="(bar, i) in segmentBars"
+                  :key="i"
+                  class="absolute inset-y-0 flex items-center justify-center text-[10px] font-medium text-white border-r border-white dark:border-gray-900 last:border-r-0"
+                  :class="bar.valid ? bar.color : 'bg-error-500'"
+                  :style="{ left: bar.leftPct + '%', width: bar.widthPct + '%' }"
+                >
+                  {{ i + 1 }}
+                </div>
+              </div>
               <div v-for="(seg, i) in segments" :key="i" class="flex items-center gap-2">
                 <span class="w-5 text-xs text-gray-400 tabular-nums">{{ i + 1 }}</span>
                 <UInput v-model.number="seg.startMsSeconds" type="number" size="sm" :min="0" class="w-24" />
@@ -279,7 +297,7 @@
               :current-ms="currentMs"
               :can-write="canWrite"
               :busy="busy"
-              @queued="load"
+              @queued="onQueued"
             />
           </template>
 
@@ -291,7 +309,7 @@
               :current-ms="currentMs"
               :can-write="canWrite"
               :busy="busy"
-              @queued="load"
+              @queued="onQueued"
             />
           </template>
         </UTabs>
@@ -299,7 +317,7 @@
     </div>
 
     <!-- Results: jobs in progress (or the latest failure), then clips awaiting a decision -->
-    <UCard :ui="{ body: 'space-y-3' }">
+    <UCard ref="resultsCard" :ui="{ body: 'space-y-3' }">
       <template #header>
         <div class="flex items-center gap-2">
           <h2 class="font-semibold text-gray-900 dark:text-white">Results</h2>
@@ -330,7 +348,11 @@
 
       <ul v-if="data?.clips.length" class="divide-y divide-gray-100 dark:divide-gray-800 rounded-lg border border-gray-200 dark:border-gray-800">
         <li v-for="clip in data.clips" :key="clip.id" class="flex items-center gap-3 px-3 py-2">
-          <UIcon :name="CLIP_ICONS[clip.operation]" class="w-5 h-5 text-primary-500 shrink-0" />
+          <span
+            class="flex items-center justify-center w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300 shrink-0"
+          >
+            <UIcon :name="CLIP_ICONS[clip.operation]" class="w-4 h-4" />
+          </span>
           <div class="min-w-0 flex-1">
             <p class="text-sm font-medium text-gray-900 dark:text-white truncate">{{ clipTitle(clip) }}</p>
             <p class="text-xs text-gray-500 dark:text-gray-400">
@@ -370,6 +392,16 @@
       @update:model-value="(v: boolean) => !v && !promoting && (confirmPromote = null)"
       @confirm="onPromote"
     />
+
+    <ConfirmModal
+      :model-value="confirmDiscardDraft"
+      title="Discard unrendered edits"
+      description="These were only kept in this browser and haven't been rendered yet. Discarding them can't be undone."
+      confirm-label="Discard"
+      color="error"
+      @update:model-value="(v: boolean) => (confirmDiscardDraft = v)"
+      @confirm="onDiscardDraft"
+    />
   </div>
 </template>
 
@@ -407,13 +439,19 @@ async function load() {
   }
 }
 
+// The Results card sits below a tall preview + controls grid — easy to miss
+// that anything happened after clicking "Start trim" etc, especially once
+// the layout stacks to a single column below the `xl` breakpoint.
+const resultsCard = useTemplateRef<{ $el: HTMLElement }>('resultsCard')
+function scrollToResults() {
+  resultsCard.value?.$el?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+}
+function onQueued() {
+  load()
+  scrollToResults()
+}
+
 const mode = ref<'trim' | 'split' | 'audio' | 'overlay'>('trim')
-const tabItems = [
-  { label: 'Trim & crop', value: 'trim', slot: 'trim' as const, icon: 'i-lucide-scissors' },
-  { label: 'Split', value: 'split', slot: 'split' as const, icon: 'i-lucide-split' },
-  { label: 'Audio', value: 'audio', slot: 'audio' as const, icon: 'i-lucide-audio-lines' },
-  { label: 'Text & overlay', value: 'overlay', slot: 'overlay' as const, icon: 'i-lucide-type' }
-]
 
 const EDITOR_SHORTCUTS = [
   { keys: 'space', label: 'Play / pause' },
@@ -650,6 +688,7 @@ function applyPreset(preset: (typeof EXPORT_PRESETS)[number]) {
   setAspect(preset.aspect)
   scaleOn.value = true
   Object.assign(scale, { w: preset.w, h: preset.h })
+  toast.add({ title: `Crop and resize set for ${preset.label}`, color: 'info' })
 }
 
 // "Auto-center": a crop box centred on wherever the video moves the most,
@@ -710,6 +749,7 @@ async function onStartTrim() {
     })
     toast.add({ title: `Trim queued — job #${job.id}`, color: 'success' })
     await load()
+    scrollToResults()
   } catch (err) {
     toast.add({ title: 'Could not start the trim', description: apiErrorMessage(err), color: 'error' })
   } finally {
@@ -723,6 +763,21 @@ interface SegmentInput {
   endMsSeconds: number | null
 }
 const segments = ref<SegmentInput[]>([{ startMsSeconds: 0, endMsSeconds: null }])
+
+// A quick-glance strip above the raw-seconds inputs — numbers alone make it
+// easy to miss a gap or an overlap between segments.
+const SEGMENT_COLORS = ['bg-primary-500', 'bg-info-500', 'bg-success-500', 'bg-warning-500', 'bg-violet-500', 'bg-rose-500']
+const segmentBars = computed(() => {
+  if (!durationMs.value) return []
+  return segments.value.map((s, i) => {
+    const startMs = Math.max(0, s.startMsSeconds * 1000)
+    const endMs = s.endMsSeconds != null ? s.endMsSeconds * 1000 : durationMs.value
+    const leftPct = Math.min(100, (startMs / durationMs.value) * 100)
+    const widthPct = Math.max(0, Math.min(100 - leftPct, ((endMs - startMs) / durationMs.value) * 100))
+    return { leftPct, widthPct, valid: endMs > startMs, color: SEGMENT_COLORS[i % SEGMENT_COLORS.length] }
+  })
+})
+
 function splitEvenly(n: number) {
   if (!durationMs.value) return
   const stepSeconds = durationMs.value / 1000 / n
@@ -747,6 +802,7 @@ async function onStartSplit() {
     )
     toast.add({ title: `Split queued — job #${job.id}`, color: 'success' })
     await load()
+    scrollToResults()
   } catch (err) {
     toast.add({ title: 'Could not start the split', description: apiErrorMessage(err), color: 'error' })
   } finally {
@@ -827,6 +883,25 @@ watchEffect(() => {
 // must exist before this: useEditorHistory reads the current state right
 // away to seed history, and takeState() below touches audioEdit.state.
 const overlayEdit = useOverlayEdit(durationMs)
+
+// A dot on a tab means it has pending settings — easy to miss otherwise,
+// since switching tabs doesn't reset or hide what's already set there.
+const trimDirty = computed(() => cropOn.value || scaleOn.value || range.value[0] !== 0 || range.value[1] !== durationMs.value)
+const splitDirty = computed(() => segments.value.length > 1 || segments.value[0]?.startMsSeconds !== 0 || segments.value[0]?.endMsSeconds != null)
+const DIRTY_BADGE = { color: 'warning' as const, size: 'xs' as const }
+const tabItems = computed(() => [
+  { label: 'Trim & crop', value: 'trim', slot: 'trim' as const, icon: 'i-lucide-scissors', badge: trimDirty.value ? DIRTY_BADGE : undefined },
+  { label: 'Split', value: 'split', slot: 'split' as const, icon: 'i-lucide-split', badge: splitDirty.value ? DIRTY_BADGE : undefined },
+  { label: 'Audio', value: 'audio', slot: 'audio' as const, icon: 'i-lucide-audio-lines', badge: audioEdit.changed.value ? DIRTY_BADGE : undefined },
+  {
+    label: 'Text & overlay',
+    value: 'overlay',
+    slot: 'overlay' as const,
+    icon: 'i-lucide-type',
+    badge: overlayEdit.state.layers.length ? DIRTY_BADGE : undefined
+  }
+])
+
 function takeState() {
   const { selectedId: _a, ...audio } = audioEdit.state
   return {
@@ -879,9 +954,11 @@ async function onRestoreDraft() {
   await history.restoreDraft(draft.value)
   draft.value = null
 }
+const confirmDiscardDraft = ref(false)
 function onDiscardDraft() {
   history.discardDraft()
   draft.value = null
+  confirmDiscardDraft.value = false
 }
 
 // ── Promote / discard ────────────────────────────────────────────────────────

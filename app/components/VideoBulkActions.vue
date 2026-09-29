@@ -1,17 +1,27 @@
 <template>
   <div class="flex flex-wrap items-center gap-2">
-    <UButton v-if="can('videos', 'WRITE')" size="xs" color="primary" variant="soft" icon="i-lucide-hash" @click="openAction('tags')">Add tags</UButton>
-    <UButton v-if="can('collections', 'WRITE')" size="xs" color="primary" variant="soft" icon="i-lucide-library" @click="openAction('collection')">
-      Add to collection
-    </UButton>
-    <UButton v-if="can('transcripts', 'WRITE')" size="xs" color="primary" variant="soft" icon="i-lucide-languages" @click="openAction('translate')">
-      Translate…
-    </UButton>
-    <UButton v-if="can('videos', 'WRITE')" size="xs" color="neutral" variant="soft" icon="i-lucide-copy" @click="openAction('duplicate')">Duplicate</UButton>
-    <UButton v-if="can('videos', 'WRITE')" size="xs" color="neutral" variant="soft" icon="i-lucide-archive" @click="openAction('archive')">Archive</UButton>
-    <UButton v-if="can('videos', 'WRITE')" size="xs" color="neutral" variant="soft" icon="i-lucide-archive-restore" @click="openAction('unarchive')">
-      Unarchive
-    </UButton>
+    <template v-if="trash">
+      <UButton v-if="can('videos', 'WRITE')" size="xs" color="success" variant="soft" icon="i-lucide-rotate-ccw" @click="openAction('restore')">
+        Restore
+      </UButton>
+      <UButton v-if="can('videos', 'WRITE')" size="xs" color="error" variant="soft" icon="i-lucide-trash-2" @click="openAction('purge')">
+        Delete permanently
+      </UButton>
+    </template>
+    <template v-else>
+      <UButton v-if="can('videos', 'WRITE')" size="xs" color="primary" variant="soft" icon="i-lucide-hash" @click="openAction('tags')">Add tags</UButton>
+      <UButton v-if="can('collections', 'WRITE')" size="xs" color="primary" variant="soft" icon="i-lucide-library" @click="openAction('collection')">
+        Add to collection
+      </UButton>
+      <UButton v-if="can('transcripts', 'WRITE')" size="xs" color="primary" variant="soft" icon="i-lucide-languages" @click="openAction('translate')">
+        Translate…
+      </UButton>
+      <UButton v-if="can('videos', 'WRITE')" size="xs" color="neutral" variant="soft" icon="i-lucide-copy" @click="openAction('duplicate')">Duplicate</UButton>
+      <UButton v-if="can('videos', 'WRITE')" size="xs" color="neutral" variant="soft" icon="i-lucide-archive" @click="openAction('archive')">Archive</UButton>
+      <UButton v-if="can('videos', 'WRITE')" size="xs" color="neutral" variant="soft" icon="i-lucide-archive-restore" @click="openAction('unarchive')">
+        Unarchive
+      </UButton>
+    </template>
 
     <UModal
       v-model:open="show"
@@ -71,6 +81,10 @@
             Puts each aside, out of the active library. Learners can't watch them either way.
           </p>
           <p v-else-if="action === 'unarchive'" class="text-sm text-gray-600 dark:text-gray-300">Brings each back into the active library.</p>
+          <p v-else-if="action === 'restore'" class="text-sm text-gray-600 dark:text-gray-300">Takes each out of the trash, back into the active library.</p>
+          <p v-else-if="action === 'purge'" class="text-sm text-gray-600 dark:text-gray-300">
+            Permanently deletes each and frees its storage. <span class="font-medium text-error-600 dark:text-error-400">This cannot be undone.</span>
+          </p>
 
           <!-- Results -->
           <div
@@ -91,7 +105,16 @@
 
           <div class="flex justify-end gap-2">
             <UButton color="neutral" variant="ghost" @click="show = false">{{ results.length ? 'Close' : 'Cancel' }}</UButton>
-            <UButton v-if="!results.length" :icon="icon" :loading="running" :disabled="!ready" @click="run">{{ title }}</UButton>
+            <UButton
+              v-if="!results.length"
+              :color="action === 'purge' ? 'error' : 'primary'"
+              :icon="icon"
+              :loading="running"
+              :disabled="!ready"
+              @click="run"
+            >
+              {{ title }}
+            </UButton>
           </div>
         </div>
       </template>
@@ -101,22 +124,23 @@
 
 <script setup lang="ts">
 // Bulk actions for the selected rows of the videos list: add tags, add to a
-// collection, or queue translations. Each runs per video (the API is
-// per-video) and reports every outcome, so a partial failure is visible.
+// collection, queue translations, or (for `trash`) restore or permanently
+// delete. Each runs per video (the API is per-video) and reports every
+// outcome, so a partial failure is visible.
 import type { Video } from '~/composables/useVideos'
 
-const props = defineProps<{ videos: Video[] }>()
+const props = defineProps<{ videos: Video[]; trash?: boolean }>()
 const emit = defineEmits<{ done: [] }>()
 
 const { can } = useAuth()
 const { list: listTags, assignToVideo } = useTags()
 const { list: listCollections, addVideos } = useCollections()
 const { list: listTranscripts, create: createTranscript, regenerate } = useTranscripts()
-const { duplicate, archive, unarchive } = useVideos()
+const { duplicate, archive, unarchive, restore, purge } = useVideos()
 const { settings: clientSettings } = useClientSettings()
 const toast = useToast()
 
-type Action = 'tags' | 'collection' | 'translate' | 'duplicate' | 'archive' | 'unarchive'
+type Action = 'tags' | 'collection' | 'translate' | 'duplicate' | 'archive' | 'unarchive' | 'restore' | 'purge'
 const action = ref<Action>('tags')
 const show = ref(false)
 const running = ref(false)
@@ -131,7 +155,9 @@ const title = computed(
       translate: 'Queue translations',
       duplicate: 'Duplicate videos',
       archive: 'Archive videos',
-      unarchive: 'Unarchive videos'
+      unarchive: 'Unarchive videos',
+      restore: 'Restore videos',
+      purge: 'Delete permanently'
     })[action.value]
 )
 const icon = computed(
@@ -142,7 +168,9 @@ const icon = computed(
       translate: 'i-lucide-languages',
       duplicate: 'i-lucide-copy',
       archive: 'i-lucide-archive',
-      unarchive: 'i-lucide-archive-restore'
+      unarchive: 'i-lucide-archive-restore',
+      restore: 'i-lucide-rotate-ccw',
+      purge: 'i-lucide-trash-2'
     })[action.value]
 )
 
@@ -232,6 +260,16 @@ async function run() {
           if (action.value === 'archive') await archive(v.id)
           else await unarchive(v.id)
           push(v.title, 'ok', action.value === 'archive' ? 'archived' : 'unarchived')
+        } catch (err) {
+          push(v.title, 'failed', apiErrorMessage(err))
+        }
+      }
+    } else if (action.value === 'restore' || action.value === 'purge') {
+      for (const v of props.videos) {
+        try {
+          if (action.value === 'restore') await restore(v.id)
+          else await purge(v.id)
+          push(v.title, 'ok', action.value === 'restore' ? 'restored' : 'permanently deleted')
         } catch (err) {
           push(v.title, 'failed', apiErrorMessage(err))
         }

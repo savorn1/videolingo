@@ -8,6 +8,7 @@
         icon="i-lucide-video"
         :value="formatCount(data?.totalVideos)"
         :sublabel="data ? `${data.enabledVideos} enabled · ${data.disabledVideos} disabled · ${data.trashedVideos} in trash` : ''"
+        color="primary"
         :loading="!data"
       />
       <KpiTile
@@ -17,6 +18,7 @@
         :delta="data && describeDelta(data.uploads.current, data.uploads.previous)"
         :compared-to="comparedTo"
         :previous-text="data ? formatCount(data.uploads.previous) : ''"
+        color="info"
         :loading="!data"
       />
       <KpiTile
@@ -24,6 +26,7 @@
         icon="i-lucide-clock"
         :value="formatWatchTime(data?.totalDurationSeconds)"
         :sublabel="data ? `Average ${formatDuration(data.averageDurationSeconds)} per video` : ''"
+        color="neutral"
         :loading="!data"
       />
       <KpiTile
@@ -31,6 +34,7 @@
         icon="i-lucide-eye-off"
         :value="formatCount(data?.neverWatched)"
         sublabel="Live videos with no views at all"
+        color="warning"
         :loading="!data"
       />
     </div>

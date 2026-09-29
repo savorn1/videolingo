@@ -27,7 +27,7 @@
     <div v-else-if="user" class="grid grid-cols-1 lg:grid-cols-3 gap-4">
       <UCard class="lg:col-span-1">
         <div class="flex flex-col items-center text-center">
-          <UAvatar :alt="user.username" size="3xl" class="mb-3" />
+          <UserAvatar :name="user.username" size="3xl" class="mb-3" />
           <p class="text-lg font-bold text-gray-900 dark:text-white">{{ user.username }}</p>
           <p class="text-sm text-gray-500 dark:text-gray-400">{{ user.email ?? 'No email on file' }}</p>
           <div class="flex flex-wrap justify-center gap-2 mt-3">

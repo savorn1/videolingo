@@ -305,7 +305,11 @@
         >
           Render audio
         </UButton>
-        <UButton color="neutral" variant="ghost" icon="i-lucide-rotate-ccw" :disabled="!edit.changed.value" @click="edit.reset()">Reset</UButton>
+        <UTooltip text="Undoable — Ctrl/⌘+Z brings the settings back">
+          <UButton class="ml-2" color="neutral" variant="ghost" icon="i-lucide-rotate-ccw" :disabled="!edit.changed.value" @click="edit.reset()">
+            Reset
+          </UButton>
+        </UTooltip>
       </div>
     </section>
   </div>

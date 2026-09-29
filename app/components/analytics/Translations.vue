@@ -8,6 +8,7 @@
         icon="i-lucide-languages"
         :value="formatCount(data?.translations)"
         :sublabel="data ? `${formatCount(data.translatedWords)} words · ${data.translatedSubtitleTracks} subtitle tracks` : ''"
+        color="primary"
         :loading="!data"
       />
       <KpiTile
@@ -17,6 +18,7 @@
         :delta="data && describeDelta(data.newTranslations.current, data.newTranslations.previous)"
         :compared-to="comparedTo"
         :previous-text="data ? formatCount(data.newTranslations.previous) : ''"
+        color="success"
         :loading="!data"
       />
       <KpiTile
@@ -28,6 +30,7 @@
             ? `${formatPercent(data.liveVideos ? data.videosTranslated / data.liveVideos : 0)} of live videos · ${data.averageTranslationsPerVideo.toFixed(1)} per video`
             : ''
         "
+        color="info"
         :loading="!data"
       />
       <KpiTile
@@ -35,6 +38,7 @@
         icon="i-lucide-cpu"
         :value="data?.jobSuccessRate != null ? formatPercent(data.jobSuccessRate) : '—'"
         :sublabel="data ? (data.averageJobSeconds != null ? `Average run ${formatDuration(data.averageJobSeconds)}` : 'No finished jobs in this period') : ''"
+        color="success"
         :loading="!data"
       />
     </div>

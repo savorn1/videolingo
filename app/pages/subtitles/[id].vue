@@ -25,6 +25,7 @@
         </UDropdownMenu>
       </template>
       <template v-else-if="subtitle && editing" #actions>
+        <ShortcutsHelp :items="EDITOR_SHORTCUTS" />
         <UButton color="neutral" variant="ghost" :disabled="saving" @click="cancelEditing">Cancel</UButton>
         <UButton icon="i-lucide-save" :loading="saving" :disabled="!isDirty || invalidCount > 0 || rulesInvalid" @click="save">Save</UButton>
       </template>
@@ -162,12 +163,18 @@
               <div class="flex items-center gap-2">
                 <h2 class="font-semibold text-gray-900 dark:text-white">Cues</h2>
                 <UBadge color="neutral" variant="subtle" size="sm">{{ (editing ? draft.length : cues.length).toLocaleString() }}</UBadge>
-                <UBadge v-if="editing && invalidCount" color="error" variant="subtle" size="sm">{{ invalidCount }} to fix</UBadge>
-                <UBadge v-if="liveIssues.length" color="warning" variant="subtle" size="sm" icon="i-lucide-triangle-alert"
-                  >{{ liveIssues.length }} warning{{ liveIssues.length === 1 ? '' : 's' }}</UBadge
-                >
+                <button v-if="editing && invalidCount" type="button" @click="onlyIssues = true">
+                  <UBadge color="error" variant="subtle" size="sm" class="cursor-pointer">{{ invalidCount }} to fix</UBadge>
+                </button>
+                <button v-if="liveIssues.length" type="button" @click="onlyIssues = true">
+                  <UBadge color="warning" variant="subtle" size="sm" icon="i-lucide-triangle-alert" class="cursor-pointer"
+                    >{{ liveIssues.length }} warning{{ liveIssues.length === 1 ? '' : 's' }}</UBadge
+                  >
+                </button>
                 <UTooltip v-if="glossaryHits.length" :text="`Terms left untranslated — glossaries into ${languageLabel(subtitle.language)}`">
-                  <UBadge color="info" variant="subtle" size="sm" icon="i-lucide-book-a">{{ glossaryHits.length }} glossary</UBadge>
+                  <button type="button" @click="onlyIssues = true">
+                    <UBadge color="info" variant="subtle" size="sm" icon="i-lucide-book-a" class="cursor-pointer">{{ glossaryHits.length }} glossary</UBadge>
+                  </button>
                 </UTooltip>
               </div>
               <USwitch v-if="liveIssues.length || glossaryHits.length" v-model="onlyIssues" size="sm" label="Only with warnings" />
@@ -277,7 +284,16 @@
                       <UButton size="xs" color="error" variant="ghost" icon="i-lucide-trash-2" aria-label="Remove cue" @click="draft.splice(i, 1)" />
                     </div>
                   </div>
-                  <UTextarea v-model="draft[i]!.text" :rows="2" autoresize :maxrows="5" class="w-full" aria-label="Cue text (Enter for a new line)" />
+                  <UTextarea
+                    v-model="draft[i]!.text"
+                    :rows="2"
+                    autoresize
+                    :maxrows="5"
+                    class="w-full"
+                    aria-label="Cue text (Enter for a new line, Ctrl/⌘+Enter to insert a cue below)"
+                    @keydown.ctrl.enter.exact.prevent="insertAfter(i)"
+                    @keydown.meta.enter.exact.prevent="insertAfter(i)"
+                  />
                   <p v-if="rowErrors[i]" class="text-xs text-error-600 dark:text-error-400">{{ rowErrors[i] }}</p>
                   <div v-else-if="issuesByCue.get(i)?.length || glossaryByCue.get(i)?.length" class="flex flex-wrap gap-1.5">
                     <UBadge v-for="issue in issuesByCue.get(i) ?? []" :key="issue.type" size="sm" color="warning" variant="subtle">{{ issue.message }}</UBadge>
@@ -301,12 +317,11 @@
       <template #body>
         <div class="space-y-4">
           <UAlert
-            v-if="subtitle?.source === 'MANUAL' || subtitle?.source === 'UPLOADED'"
             color="warning"
             variant="subtle"
             icon="i-lucide-triangle-alert"
             :title="`This replaces all ${subtitle?.cueCount ?? 0} current cues`"
-            description="Hand edits and uploaded timing are lost. Download a copy first if you might want them back."
+            description="Any hand edits or uploaded timing are lost, regardless of how this track was made. Download a copy first if you might want them back."
           />
           <UFormField label="Transcript" required>
             <USelect v-model="regenTranscriptId" :items="regenTranscriptOptions" placeholder="Choose a transcript" class="w-full" />
@@ -518,9 +533,11 @@ const primaryCueText = computed(() => {
   return i >= 0 ? list[i]!.text : ''
 })
 
-// Keep the spoken cue in view while playing (view mode only).
+// Keep the spoken cue in view while playing — including while editing, since
+// timing a cue against playback (the "set start/end to player time" buttons)
+// needs the row on screen just as much as reading along does.
 watch(activeIndex, (i) => {
-  if (i < 0 || editing.value || !player.value || player.value.paused) return
+  if (i < 0 || !player.value || player.value.paused) return
   nextTick(() => document.getElementById(`cue-${i}`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }))
 })
 
@@ -648,6 +665,20 @@ useUnsavedChangesGuard(isDirty)
 const rowErrors = computed(() => draft.value.map((r) => segmentError({ startMs: parseTimestamp(r.start), endMs: parseTimestamp(r.end), text: r.text })))
 const invalidCount = computed(() => rowErrors.value.filter(Boolean).length)
 const rulesInvalid = computed(() => draftMeta.rules.maxDurationMs <= draftMeta.rules.minDurationMs || !draftMeta.label.trim())
+
+const EDITOR_SHORTCUTS = [
+  { keys: 'ctrl/⌘ S', label: 'Save' },
+  { keys: 'ctrl/⌘ enter', label: 'Insert a cue below (from its text box)' }
+]
+// A safe, modifier-only shortcut — unlike a bare key, it can't fire while
+// typing a cue's text, so no isTyping() guard is needed.
+function onKeyDown(e: KeyboardEvent) {
+  if (!(e.ctrlKey || e.metaKey) || e.key !== 's' || !editing.value) return
+  e.preventDefault()
+  if (!saving.value && isDirty.value && !invalidCount.value && !rulesInvalid.value) save()
+}
+onMounted(() => window.addEventListener('keydown', onKeyDown))
+onBeforeUnmount(() => window.removeEventListener('keydown', onKeyDown))
 
 function insertAfter(index: number) {
   const prevEnd = index >= 0 ? parseTimestamp(draft.value[index]!.end) : null

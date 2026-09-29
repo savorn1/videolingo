@@ -8,7 +8,7 @@
           <p v-else class="text-2xl font-semibold text-gray-900 dark:text-white mt-1 truncate">{{ value }}</p>
           <p v-if="sublabel && !loading" class="text-xs text-gray-400 dark:text-gray-500 mt-1">{{ sublabel }}</p>
         </div>
-        <div class="shrink-0 rounded-xl p-2.5 text-white shadow-sm" :class="colorClasses">
+        <div class="shrink-0 rounded-xl p-2.5 text-white" :class="[colorClasses, shadowClasses]">
           <UIcon :name="icon" class="w-5 h-5" />
         </div>
       </div>
@@ -17,7 +17,8 @@
 </template>
 
 <script setup lang="ts">
-type StatColor = 'primary' | 'success' | 'warning' | 'error' | 'info' | 'neutral'
+import type { StatColor } from '#shared/utils/statColor'
+import { STAT_GRADIENT_CLASSES, STAT_SHADOW_CLASSES } from '#shared/utils/statColor'
 
 const props = withDefaults(
   defineProps<{
@@ -34,22 +35,8 @@ const props = withDefaults(
   { color: 'primary' }
 )
 
-// A solid gradient block with a white icon reads as more "alive" than a
-// flat tinted tile — each semantic color gets its own two-stop gradient
-// rather than a single flat shade, still drawn from the same design-token
-// scale (primary/success/warning/error/info/neutral) so it stays consistent
-// with the rest of the app's Blueprint palette instead of introducing new
-// arbitrary hues.
-const COLOR_CLASSES: Record<StatColor, string> = {
-  primary: 'bg-gradient-to-br from-primary-400 to-primary-600',
-  success: 'bg-gradient-to-br from-success-400 to-success-600',
-  warning: 'bg-gradient-to-br from-warning-400 to-warning-600',
-  error: 'bg-gradient-to-br from-error-400 to-error-600',
-  info: 'bg-gradient-to-br from-info-400 to-info-600',
-  neutral: 'bg-gradient-to-br from-gray-400 to-gray-600'
-}
-
-const colorClasses = computed(() => COLOR_CLASSES[props.color])
+const colorClasses = computed(() => STAT_GRADIENT_CLASSES[props.color])
+const shadowClasses = computed(() => STAT_SHADOW_CLASSES[props.color])
 
 // A string tag name in a dynamic `:is` only resolves for native HTML elements
 // — Nuxt's globally-registered components (like NuxtLink) need an explicit

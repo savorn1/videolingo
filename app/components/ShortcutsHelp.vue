@@ -1,14 +1,6 @@
 <template>
   <UTooltip text="Keyboard shortcuts (?)">
-    <UButton
-      size="xs"
-      color="neutral"
-      variant="ghost"
-      icon="i-lucide-keyboard"
-      aria-label="Keyboard shortcuts"
-      :class="buttonClass"
-      @click="open = true"
-    />
+    <UButton size="xs" color="neutral" variant="ghost" icon="i-lucide-keyboard" aria-label="Keyboard shortcuts" :class="buttonClass" @click="open = true" />
   </UTooltip>
 
   <UModal v-model:open="open" title="Keyboard shortcuts" :ui="{ content: 'sm:max-w-sm' }">

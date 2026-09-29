@@ -32,6 +32,7 @@
             :value="formatCount(watchStats?.views.current)"
             :delta="watchStats && describeDelta(watchStats.views.current, watchStats.views.previous)"
             compared-to="vs previous 30 days"
+            color="primary"
             :loading="!watchStats && !analyticsError"
           />
           <KpiTile
@@ -40,6 +41,7 @@
             :value="formatWatchTime(watchStats?.watchSeconds.current)"
             :delta="watchStats && describeDelta(watchStats.watchSeconds.current, watchStats.watchSeconds.previous)"
             compared-to="vs previous 30 days"
+            color="info"
             :loading="!watchStats && !analyticsError"
           />
           <KpiTile
@@ -49,6 +51,7 @@
             :delta="users && describeDelta(users.activeViewers.current, users.activeViewers.previous)"
             compared-to="vs previous 30 days"
             :sublabel="users ? `${formatCount(users.newUsers.current)} new accounts` : ''"
+            color="success"
             :loading="!users && !analyticsError"
           />
           <KpiTile
@@ -58,6 +61,7 @@
             :delta="videos && describeDelta(videos.uploads.current, videos.uploads.previous)"
             compared-to="vs previous 30 days"
             :sublabel="videos ? `${formatCount(videos.totalVideos)} in the library` : ''"
+            color="primary"
             :loading="!videos && !analyticsError"
           />
         </div>

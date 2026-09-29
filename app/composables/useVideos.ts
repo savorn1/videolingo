@@ -141,6 +141,16 @@ export function useVideos() {
     return (await api<ApiEnvelope<Video>>(`/api/admin/videos/${id}/restore`, { method: 'POST' })).data
   }
 
+  /** Permanently deletes one trashed video and frees its storage. Must already be in the trash. Cannot be undone. */
+  async function purge(id: number) {
+    await api(`/api/admin/videos/${id}/permanent`, { method: 'DELETE' })
+  }
+
+  /** Permanently deletes every trashed video and frees its storage. Cannot be undone. */
+  async function purgeTrash() {
+    await api('/api/admin/videos/trash', { method: 'DELETE' })
+  }
+
   async function archive(id: number) {
     return (await api<ApiEnvelope<Video>>(`/api/admin/videos/${id}/archive`, { method: 'POST' })).data
   }
@@ -197,6 +207,8 @@ export function useVideos() {
     updateStatus,
     remove,
     restore,
+    purge,
+    purgeTrash,
     archive,
     unarchive,
     moveOwner,

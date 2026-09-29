@@ -1,7 +1,7 @@
 <template>
   <div class="max-w-xl space-y-6">
     <div class="flex items-center gap-4">
-      <UAvatar :text="avatarInitial" size="xl" />
+      <UserAvatar :name="profile?.username" size="xl" />
       <div>
         <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
           {{ profile?.username ?? 'Profile' }}
@@ -61,7 +61,6 @@ const { theme, setTheme } = useTableTheme()
 const toast = useToast()
 
 const profile = ref<Profile | null>(null)
-const avatarInitial = computed(() => profile.value?.username.charAt(0).toUpperCase() ?? '')
 
 const tableStyleItems: { label: string; value: TableTheme; icon: string }[] = [
   { label: 'Plain', value: 'plain', icon: 'i-lucide-square' },

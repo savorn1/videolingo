@@ -25,7 +25,7 @@
     <div class="flex-1 flex items-center justify-center px-6 py-12">
       <div class="w-full max-w-sm">
         <div class="lg:hidden flex flex-col items-center text-center mb-8">
-          <span class="flex items-center justify-center w-11 h-11 rounded-xl bg-primary-500 text-white mb-3 shadow-sm">
+          <span class="flex items-center justify-center w-11 h-11 rounded-xl bg-primary-500 text-white mb-3 shadow-md shadow-primary-500/25">
             <UIcon name="i-lucide-languages" class="w-6 h-6" />
           </span>
           <h1 class="text-xl font-bold text-gray-900 dark:text-white">VideoLingo</h1>

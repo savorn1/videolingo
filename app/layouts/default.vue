@@ -48,7 +48,7 @@
             <UColorModeButton />
             <UDropdownMenu :items="profileItems" :content="{ align: 'end' }" :ui="{ content: 'w-56' }">
               <UButton size="sm" color="neutral" variant="ghost" trailing-icon="i-lucide-chevron-down">
-                <UAvatar :alt="username ?? '?'" size="2xs" />
+                <UserAvatar :name="username" size="2xs" />
                 {{ username }}
               </UButton>
             </UDropdownMenu>

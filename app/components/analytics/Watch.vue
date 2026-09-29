@@ -11,6 +11,7 @@
         :compared-to="comparedTo"
         :previous-text="data ? formatCount(data.views.previous) : ''"
         :sublabel="data ? `${formatCount(data.anonymousViews)} by visitors not signed in` : ''"
+        color="primary"
         :loading="!data"
       />
       <KpiTile
@@ -21,6 +22,7 @@
         :compared-to="comparedTo"
         :previous-text="data ? formatWatchTime(data.watchSeconds.previous) : ''"
         :sublabel="data ? `${formatDuration(data.averageWatchSeconds)} per view on average` : ''"
+        color="info"
         :loading="!data"
       />
       <KpiTile
@@ -31,6 +33,7 @@
         :compared-to="comparedTo"
         :previous-text="data ? formatCount(data.uniqueViewers.previous) : ''"
         sublabel="Signed-in accounts"
+        color="success"
         :loading="!data"
       />
       <KpiTile
@@ -41,6 +44,7 @@
         :compared-to="comparedTo"
         :previous-text="data ? formatPercent(data.completionRate.previous) : ''"
         :sublabel="data?.averagePercentWatched != null ? `Viewers watch ${formatPercent(data.averagePercentWatched)} of a video on average` : ''"
+        color="success"
         :loading="!data"
       />
     </div>

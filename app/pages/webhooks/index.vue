@@ -9,12 +9,14 @@
       </template>
     </PageHeader>
 
+    <SummaryTiles :tiles="summaryTiles" @select="onSelectTile" />
+
     <UAlert v-if="error" color="error" variant="subtle" class="mb-4" :title="error" icon="i-lucide-triangle-alert" />
 
     <UCard>
-      <DataTable v-model:selected="selected" :rows="rows" :columns="columns" :loading="loading" :selectable="canWrite" refreshable @refresh="load">
+      <DataTable v-model:selected="selected" :rows="displayedRows" :columns="columns" :loading="loading" :selectable="canWrite" refreshable @refresh="load">
         <template v-if="canWrite" #bulk-actions="{ selected: picked, clear }">
-          <GenericBulkActions :items="picked" entity-label="webhook" :label="(w: Webhook) => w.name" :remove="remove" @done="clear(), load()" />
+          <GenericBulkActions :items="picked" entity-label="webhook" :label="(w: Webhook) => w.name" :remove="remove" @done="(clear(), load())" />
         </template>
         <template #name-data="{ row }">
           <div class="min-w-0 max-w-md">
@@ -188,6 +190,7 @@
 
 <script setup lang="ts">
 import type { ColumnDef, RowAction } from '#shared/types'
+import type { SummaryTile } from '~/components/SummaryTiles.vue'
 import { WEBHOOK_EVENTS, type Webhook, type WebhookDelivery } from '~/composables/useWebhooks'
 
 definePageMeta({ middleware: 'admin' })
@@ -199,6 +202,30 @@ const canWrite = computed(() => can('webhooks', 'WRITE'))
 
 const rows = ref<Webhook[]>([])
 const selected = ref<Webhook[]>([])
+
+// ── Summary tiles ────────────────────────────────────────────────────────────
+// Every webhook is already loaded (no server-side paging here), so counting
+// and filtering both happen against the in-memory list — no extra requests.
+function health(row: Webhook): 'off' | 'failing' | 'ok' {
+  return !row.enabled ? 'off' : row.consecutiveFailures ? 'failing' : 'ok'
+}
+const statusFilter = ref<'ok' | 'failing' | 'off' | null>(null)
+const displayedRows = computed(() => (statusFilter.value ? rows.value.filter((r) => health(r) === statusFilter.value) : rows.value))
+const summaryTiles = computed<SummaryTile[]>(() => {
+  const ok = rows.value.filter((r) => health(r) === 'ok').length
+  const failing = rows.value.filter((r) => health(r) === 'failing').length
+  const off = rows.value.filter((r) => health(r) === 'off').length
+  return [
+    { key: 'all', label: 'Webhooks', count: rows.value.length, icon: 'i-lucide-webhook', active: statusFilter.value === null, color: 'primary' },
+    { key: 'ok', label: 'OK', count: ok, icon: 'i-lucide-check-circle', active: statusFilter.value === 'ok', color: 'success' },
+    { key: 'failing', label: 'Failing', count: failing, icon: 'i-lucide-triangle-alert', active: statusFilter.value === 'failing', color: 'error' },
+    { key: 'off', label: 'Off', count: off, icon: 'i-lucide-power-off', active: statusFilter.value === 'off', color: 'neutral' }
+  ]
+})
+function onSelectTile(key: string) {
+  const next = key === 'all' ? null : (key as 'ok' | 'failing' | 'off')
+  statusFilter.value = statusFilter.value === next ? null : next
+}
 const loading = ref(false)
 const error = ref('')
 const saving = ref(false)

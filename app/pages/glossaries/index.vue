@@ -9,6 +9,8 @@
       </template>
     </PageHeader>
 
+    <SummaryTiles :tiles="summaryTiles" @select="onSelectTile" />
+
     <UCard class="mb-4">
       <div class="flex flex-wrap gap-3">
         <UInput v-model="search" placeholder="Search glossaries" icon="i-lucide-search" class="w-64" />
@@ -32,7 +34,13 @@
         @refresh="load"
       >
         <template v-if="canWrite" #bulk-actions="{ selected: picked, clear }">
-          <GenericBulkActions :items="picked" entity-label="glossary" :label="(g: Glossary) => g.name" :remove="remove" @done="clear(), load()" />
+          <GenericBulkActions
+            :items="picked"
+            entity-label="glossary"
+            :label="(g: Glossary) => g.name"
+            :remove="remove"
+            @done="(clear(), load(), loadTileCounts())"
+          />
         </template>
         <template #name-data="{ row }">
           <div class="min-w-0 max-w-sm">
@@ -103,6 +111,7 @@
 <script setup lang="ts">
 import type { ColumnDef, RowAction } from '#shared/types'
 import type { Glossary } from '~/composables/useGlossaries'
+import type { SummaryTile } from '~/components/SummaryTiles.vue'
 
 definePageMeta({ middleware: 'admin' })
 
@@ -187,6 +196,32 @@ function clearFilters() {
 }
 
 onMounted(load)
+onMounted(loadTileCounts)
+
+// ── Summary tiles ────────────────────────────────────────────────────────────
+// Global counts (ignoring the other filters), same as Processing Jobs' tiles.
+const tileCounts = ref<{ total: number | null; enabled: number | null; off: number | null }>({ total: null, enabled: null, off: null })
+async function loadTileCounts() {
+  tileCounts.value = { total: null, enabled: null, off: null }
+  const count = async (enabled?: boolean) => {
+    try {
+      return (await list({ enabled, page: 1, size: 1 })).metadata.totalCount
+    } catch {
+      return null
+    }
+  }
+  const [total, enabled, off] = await Promise.all([count(), count(true), count(false)])
+  tileCounts.value = { total, enabled, off }
+}
+const summaryTiles = computed<SummaryTile[]>(() => [
+  { key: 'all', label: 'Glossaries', count: tileCounts.value.total, icon: 'i-lucide-book-a', active: filter.enabled === undefined, color: 'primary' },
+  { key: 'enabled', label: 'Enabled', count: tileCounts.value.enabled, icon: 'i-lucide-power', active: filter.enabled === true, color: 'success' },
+  { key: 'off', label: 'Off', count: tileCounts.value.off, icon: 'i-lucide-power-off', active: filter.enabled === false, color: 'neutral' }
+])
+function onSelectTile(key: string) {
+  const next = key === 'enabled' ? true : key === 'off' ? false : undefined
+  filter.enabled = filter.enabled === next ? undefined : next
+}
 
 function rowActions(row: Glossary): RowAction[] {
   return [
@@ -214,6 +249,7 @@ async function toggle(row: Glossary) {
     })
     toast.add({ title: full.enabled ? `“${full.name}” turned off` : `“${full.name}” turned on`, color: 'success' })
     await load()
+    loadTileCounts()
   } catch (err) {
     toast.add({ title: 'Could not change the glossary', description: apiErrorMessage(err), color: 'error' })
   }
@@ -227,6 +263,7 @@ async function onDelete(row: Glossary) {
     toast.add({ title: `“${row.name}” deleted`, color: 'success' })
     confirmDelete.value = null
     await load()
+    loadTileCounts()
   } catch (err) {
     toast.add({ title: 'Could not delete glossary', description: apiErrorMessage(err), color: 'error' })
   } finally {

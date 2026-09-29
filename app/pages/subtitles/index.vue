@@ -9,6 +9,8 @@
       </template>
     </PageHeader>
 
+    <SummaryTiles :tiles="summaryTiles" @select="onSelectTile" />
+
     <UCard class="mb-4">
       <div class="flex flex-wrap gap-3">
         <UInput v-model="search" placeholder="Search video or label" icon="i-lucide-search" class="w-64" />
@@ -50,7 +52,13 @@
         @select="(row: Subtitle) => navigateTo(`/subtitles/${row.id}`)"
       >
         <template #bulk-actions="{ selected: picked, clear }">
-          <GenericBulkActions :items="picked" entity-label="subtitle track" :label="(s: Subtitle) => s.label" :remove="remove" @done="clear(), load()" />
+          <GenericBulkActions
+            :items="picked"
+            entity-label="subtitle track"
+            :label="(s: Subtitle) => s.label"
+            :remove="remove"
+            @done="(clear(), load(), loadTileCounts())"
+          />
         </template>
         <template #label-data="{ row }">
           <div class="min-w-0 max-w-xs">
@@ -141,6 +149,7 @@
 <script setup lang="ts">
 import type { ColumnDef, RowAction } from '#shared/types'
 import { REVIEW_STATUSES, SUBTITLE_SOURCES, type ReviewStatus, type Subtitle, type SubtitleFormat, type SubtitleSource } from '~/composables/useSubtitles'
+import type { SummaryTile } from '~/components/SummaryTiles.vue'
 
 definePageMeta({ middleware: 'admin' })
 
@@ -256,6 +265,68 @@ function clearFilters() {
 }
 
 onMounted(load)
+onMounted(loadTileCounts)
+
+// ── Summary tiles ────────────────────────────────────────────────────────────
+// Global counts (ignoring the other filters), same as Processing Jobs' tiles.
+const tileCounts = ref<{ total: number | null; published: number | null; unpublished: number | null; inReview: number | null }>({
+  total: null,
+  published: null,
+  unpublished: null,
+  inReview: null
+})
+async function loadTileCounts() {
+  tileCounts.value = { total: null, published: null, unpublished: null, inReview: null }
+  const count = async (params: { published?: boolean; reviewStatus?: ReviewStatus }) => {
+    try {
+      return (await list({ ...params, page: 1, size: 1 })).metadata.totalCount
+    } catch {
+      return null
+    }
+  }
+  const [total, published, unpublished, inReview] = await Promise.all([
+    count({}),
+    count({ published: true }),
+    count({ published: false }),
+    count({ reviewStatus: 'IN_REVIEW' })
+  ])
+  tileCounts.value = { total, published, unpublished, inReview }
+}
+const summaryTiles = computed<SummaryTile[]>(() => [
+  {
+    key: 'all',
+    label: 'Tracks',
+    count: tileCounts.value.total,
+    icon: 'i-lucide-subtitles',
+    active: filter.published === undefined && filter.reviewStatus === undefined,
+    color: 'primary'
+  },
+  { key: 'published', label: 'Published', count: tileCounts.value.published, icon: 'i-lucide-eye', active: filter.published === true, color: 'success' },
+  {
+    key: 'unpublished',
+    label: 'Unpublished',
+    count: tileCounts.value.unpublished,
+    icon: 'i-lucide-eye-off',
+    active: filter.published === false,
+    color: 'neutral'
+  },
+  {
+    key: 'inReview',
+    label: 'In review',
+    count: tileCounts.value.inReview,
+    icon: 'i-lucide-clipboard-check',
+    active: filter.reviewStatus === 'IN_REVIEW',
+    color: 'warning'
+  }
+])
+function onSelectTile(key: string) {
+  if (key === 'inReview') {
+    filter.reviewStatus = filter.reviewStatus === 'IN_REVIEW' ? undefined : 'IN_REVIEW'
+    return
+  }
+  const next = key === 'published' ? true : key === 'unpublished' ? false : undefined
+  filter.published = filter.published === next ? undefined : next
+}
 
 function onCreated(created: Subtitle) {
   if (created.warnings?.length) {
@@ -296,6 +367,7 @@ async function run(action: () => Promise<unknown>, success: string, failure: str
     await action()
     toast.add({ title: success, color: 'success' })
     await load()
+    loadTileCounts()
     return true
   } catch (err) {
     toast.add({ title: failure, description: apiErrorMessage(err), color: 'error' })
