@@ -21,14 +21,29 @@
     </div>
 
     <div class="flex flex-wrap items-center gap-0.5">
-      <UButton v-bind="btn" :icon="playing ? 'i-lucide-pause' : 'i-lucide-play'" :aria-label="playing ? 'Pause' : 'Play'" title="Play / pause (Space, K)" @click="togglePlay" />
-      <UButton v-bind="btn" icon="i-lucide-square" aria-label="Stop" :title="loopOn && selection ? 'Stop — back to the selection start (Home)' : 'Stop — back to the start (Home)'" @click="stop" />
+      <UButton
+        v-bind="btn"
+        :icon="playing ? 'i-lucide-pause' : 'i-lucide-play'"
+        :aria-label="playing ? 'Pause' : 'Play'"
+        title="Play / pause (Space, K)"
+        @click="togglePlay"
+      />
+      <UButton
+        v-bind="btn"
+        icon="i-lucide-square"
+        aria-label="Stop"
+        :title="loopOn && selection ? 'Stop — back to the selection start (Home)' : 'Stop — back to the start (Home)'"
+        @click="stop"
+      />
       <UButton v-bind="btn" icon="i-lucide-step-back" aria-label="Previous frame" title="Previous frame (←) · Shift+← 1 s back" @click="step(-1)" />
       <UButton v-bind="btn" icon="i-lucide-step-forward" aria-label="Next frame" title="Next frame (→) · Shift+→ 1 s ahead" @click="step(1)" />
 
       <span class="ml-2 text-xs tabular-nums text-gray-900 dark:text-white" data-testid="transport-time">{{ formatTimecode(timeMs) }}</span>
       <span class="text-xs tabular-nums text-gray-400">/ {{ formatTimecode(durationMs) }}</span>
-      <span class="ml-2 hidden sm:inline text-xs tabular-nums text-gray-400" :title="fpsMeasured ? 'Measured from the video' : 'Assumed until the video has played for a moment'">
+      <span
+        class="ml-2 hidden sm:inline text-xs tabular-nums text-gray-400"
+        :title="fpsMeasured ? 'Measured from the video' : 'Assumed until the video has played for a moment'"
+      >
         frame {{ frameNo }} · {{ fpsMeasured ? '' : '~' }}{{ fps }} fps
       </span>
 
@@ -56,8 +71,22 @@
           :disabled="!el"
           @update:model-value="(v) => player?.setRate(Number(v))"
         />
-        <UButton v-if="pipSupported" v-bind="btn" icon="i-lucide-picture-in-picture-2" :aria-label="inPip ? 'Exit picture-in-picture' : 'Picture-in-picture'" :title="inPip ? 'Exit picture-in-picture' : 'Picture-in-picture'" @click="togglePip" />
-        <UButton v-if="fsSupported" v-bind="btn" :icon="isFullscreen ? 'i-lucide-minimize' : 'i-lucide-maximize'" :aria-label="isFullscreen ? 'Exit full screen' : 'Full screen'" title="Full screen (F)" @click="toggleFullscreen" />
+        <UButton
+          v-if="pipSupported"
+          v-bind="btn"
+          icon="i-lucide-picture-in-picture-2"
+          :aria-label="inPip ? 'Exit picture-in-picture' : 'Picture-in-picture'"
+          :title="inPip ? 'Exit picture-in-picture' : 'Picture-in-picture'"
+          @click="togglePip"
+        />
+        <UButton
+          v-if="fsSupported"
+          v-bind="btn"
+          :icon="isFullscreen ? 'i-lucide-minimize' : 'i-lucide-maximize'"
+          :aria-label="isFullscreen ? 'Exit full screen' : 'Full screen'"
+          title="Full screen (F)"
+          @click="toggleFullscreen"
+        />
       </div>
     </div>
   </div>

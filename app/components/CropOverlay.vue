@@ -189,7 +189,10 @@ function startResize(handle: HandleId, e: PointerEvent) {
   const bottom = o.y + o.h
   track((ev) => {
     const p = toVideo(ev)
-    let x1 = o.x, y1 = o.y, x2 = right, y2 = bottom
+    let x1 = o.x,
+      y1 = o.y,
+      x2 = right,
+      y2 = bottom
     if (handle.includes('w')) x1 = Math.min(p.x, right - MIN_SIZE)
     if (handle.includes('e')) x2 = Math.max(p.x, o.x + MIN_SIZE)
     if (handle.includes('n')) y1 = Math.min(p.y, bottom - MIN_SIZE)

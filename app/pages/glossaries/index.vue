@@ -21,7 +21,19 @@
     <UAlert v-if="error" color="error" variant="subtle" class="mb-4" :title="error" icon="i-lucide-triangle-alert" />
 
     <UCard>
-      <DataTable v-model:sort="sort" :rows="rows" :columns="columns" :loading="loading" refreshable @refresh="load">
+      <DataTable
+        v-model:sort="sort"
+        v-model:selected="selected"
+        :rows="rows"
+        :columns="columns"
+        :loading="loading"
+        :selectable="canWrite"
+        refreshable
+        @refresh="load"
+      >
+        <template v-if="canWrite" #bulk-actions="{ selected: picked, clear }">
+          <GenericBulkActions :items="picked" entity-label="glossary" :label="(g: Glossary) => g.name" :remove="remove" @done="clear(), load()" />
+        </template>
         <template #name-data="{ row }">
           <div class="min-w-0 max-w-sm">
             <NuxtLink :to="`/glossaries/${row.id}`" class="font-medium text-primary-600 dark:text-primary-400 hover:underline">{{ row.name }}</NuxtLink>
@@ -100,6 +112,7 @@ const toast = useToast()
 const canWrite = computed(() => can('glossaries', 'WRITE'))
 
 const rows = ref<Glossary[]>([])
+const selected = ref<Glossary[]>([])
 const total = ref(0)
 const loading = ref(false)
 const error = ref('')

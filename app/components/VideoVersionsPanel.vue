@@ -24,10 +24,13 @@
           </p>
         </div>
         <UButton size="xs" color="neutral" variant="soft" icon="i-lucide-play" :to="v.url" target="_blank">Preview</UButton>
+        <UButton v-if="currentUrl" size="xs" color="neutral" variant="soft" icon="i-lucide-columns-2" @click="comparing = v">Compare</UButton>
         <UButton v-if="canWrite" size="xs" color="primary" :loading="restoring === v.id" @click="confirmRestore = v">Restore</UButton>
         <UButton v-if="canWrite" size="xs" color="error" variant="ghost" icon="i-lucide-trash-2" aria-label="Discard version" @click="onDiscard(v)" />
       </li>
     </ul>
+
+    <VersionCompareModal :version="comparing" :current-url="currentUrl ?? ''" :current-label="currentLabel" @close="comparing = null" />
 
     <ConfirmModal
       :model-value="confirmRestore !== null"
@@ -44,7 +47,7 @@
 <script setup lang="ts">
 import type { VideoVersion } from '~/composables/useVideoVersions'
 
-const props = defineProps<{ videoId: number; canWrite: boolean }>()
+const props = defineProps<{ videoId: number; canWrite: boolean; currentUrl?: string | null; currentLabel?: string }>()
 const emit = defineEmits<{ restored: [video: import('~/composables/useVideos').Video] }>()
 
 const { list, restore, remove } = useVideoVersions()
@@ -67,6 +70,9 @@ async function load() {
 }
 onMounted(load)
 watch(() => props.videoId, load)
+
+const comparing = ref<VideoVersion | null>(null)
+const currentLabel = computed(() => props.currentLabel ?? 'now')
 
 const confirmRestore = ref<VideoVersion | null>(null)
 const restoring = ref<number | null>(null)

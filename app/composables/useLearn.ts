@@ -127,5 +127,14 @@ export function useLearn() {
     await api(`${base}/subtitles/${subtitleId}/report`, { method: 'POST', body: report })
   }
 
-  return { videos, watch, study, cues, collections, collection, submitQuiz, lookup, glossary, reportProblem }
+  /** Shadowing: what speech-to-text heard in a recording of one line. */
+  async function pronunciation(recording: Blob, language?: string | null) {
+    const form = new FormData()
+    const ext = recording.type.includes('mp4') ? 'm4a' : recording.type.includes('ogg') ? 'ogg' : 'webm'
+    form.append('file', recording, `recording.${ext}`)
+    const query = language ? `?language=${encodeURIComponent(language)}` : ''
+    return (await api<ApiEnvelope<{ text: string }>>(`/api/learn/pronunciation${query}`, { method: 'POST', body: form })).data
+  }
+
+  return { videos, watch, study, cues, collections, collection, submitQuiz, lookup, glossary, reportProblem, pronunciation }
 }

@@ -21,7 +21,12 @@
             <span class="font-medium text-gray-900 dark:text-white truncate">{{ jobLabel(job) }}</span>
             <UButton size="xs" color="neutral" variant="link" :to="`/processing-jobs/${job.id}`" :padded="false">Job #{{ job.id }}</UButton>
           </div>
-          <JobProgress :status="job.status" :progress="job.progress" :current-step="job.status === 'FAILED' ? job.errorMessage : job.currentStep" />
+          <JobProgress
+            :status="job.status"
+            :progress="job.progress"
+            :current-step="job.status === 'FAILED' ? job.errorMessage : job.currentStep"
+            :queue-position="job.queuePosition"
+          />
         </div>
 
         <!-- Platforms only allow downloading with the owner's permission. -->

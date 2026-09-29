@@ -38,15 +38,20 @@
     <UCard>
       <DataTable
         v-model:sort="sort"
+        v-model:selected="selected"
         :rows="rows"
         :columns="columns"
         :loading="loading"
+        selectable
         refreshable
         exportable
         export-filename="subtitles"
         @refresh="load"
         @select="(row: Subtitle) => navigateTo(`/subtitles/${row.id}`)"
       >
+        <template #bulk-actions="{ selected: picked, clear }">
+          <GenericBulkActions :items="picked" entity-label="subtitle track" :label="(s: Subtitle) => s.label" :remove="remove" @done="clear(), load()" />
+        </template>
         <template #label-data="{ row }">
           <div class="min-w-0 max-w-xs">
             <div class="flex items-center gap-1.5">
@@ -144,6 +149,7 @@ const toast = useToast()
 
 const showCreate = ref(false)
 const rows = ref<Subtitle[]>([])
+const selected = ref<Subtitle[]>([])
 const total = ref(0)
 const loading = ref(false)
 const error = ref('')

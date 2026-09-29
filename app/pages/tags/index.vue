@@ -17,7 +17,21 @@
     <UAlert v-if="error" color="error" variant="subtle" class="mb-4" :title="error" icon="i-lucide-triangle-alert" />
 
     <UCard>
-      <DataTable v-model:sort="sort" :rows="rows" :columns="columns" :loading="loading" refreshable exportable export-filename="tags" @refresh="load">
+      <DataTable
+        v-model:sort="sort"
+        v-model:selected="selected"
+        :rows="rows"
+        :columns="columns"
+        :loading="loading"
+        selectable
+        refreshable
+        exportable
+        export-filename="tags"
+        @refresh="load"
+      >
+        <template #bulk-actions="{ selected: picked, clear }">
+          <GenericBulkActions :items="picked" entity-label="tag" :label="(t: Tag) => t.name" :remove="remove" @done="clear(), load()" />
+        </template>
         <template #name-data="{ row }">
           <div class="min-w-0 max-w-sm">
             <TagChip :name="row.name" />
@@ -110,21 +124,6 @@
         </div>
       </template>
     </UModal>
-
-    <ConfirmModal
-      :model-value="confirmDelete !== null"
-      title="Delete tag"
-      :description="
-        confirmDelete?.videoCount
-          ? `Delete #${confirmDelete.name}? It will be removed from ${confirmDelete.videoCount} video(s) — the videos themselves are kept.`
-          : `Delete #${confirmDelete?.name ?? ''}? No videos use it.`
-      "
-      confirm-label="Delete"
-      color="error"
-      :loading="saving"
-      @update:model-value="(v: boolean) => !v && !saving && (confirmDelete = null)"
-      @confirm="confirmDelete && onDelete(confirmDelete)"
-    />
   </div>
 </template>
 
@@ -139,6 +138,7 @@ const { list: listVideos } = useVideos()
 const toast = useToast()
 
 const rows = ref<Tag[]>([])
+const selected = ref<Tag[]>([])
 const total = ref(0)
 const loading = ref(false)
 const error = ref('')
@@ -214,7 +214,7 @@ function rowActions(row: Tag): RowAction[] {
     { label: 'Edit', icon: 'i-lucide-pencil', color: 'primary', onClick: () => openForm(row) },
     { label: 'Add to videos…', icon: 'i-lucide-hash', onClick: () => openAssign(row) },
     ...(row.videoCount ? [{ label: 'View videos', icon: 'i-lucide-clapperboard', onClick: () => navigateTo(`/videos?tagId=${row.id}`) }] : []),
-    { label: 'Delete', icon: 'i-lucide-trash-2', color: 'error', onClick: () => (confirmDelete.value = row) }
+    { label: 'Delete', icon: 'i-lucide-trash-2', color: 'error', onClick: () => onDelete(row) }
   ]
 }
 
@@ -294,18 +294,16 @@ async function onAssign() {
 }
 
 // ── Delete ─────────────────────────────────────────────────────────────────
-const confirmDelete = ref<Tag | null>(null)
-async function onDelete(row: Tag) {
-  saving.value = true
-  try {
-    const detached = await remove(row.id)
-    toast.add({ title: `#${row.name} deleted`, description: detached ? `Removed from ${detached} video(s).` : undefined, color: 'success' })
-    confirmDelete.value = null
-    await load()
-  } catch (err) {
-    toast.add({ title: 'Could not delete tag', description: apiErrorMessage(err), color: 'error' })
-  } finally {
-    saving.value = false
-  }
+// Removing one tag is easy to undo (it's just relinking, not lost work), so
+// this skips the confirm step and offers "Undo" on the toast instead — the
+// row leaves the list right away, and the actual delete only happens a few
+// seconds later, unless Undo is clicked first (useUndoableDelete).
+const { del } = useUndoableDelete()
+function onDelete(row: Tag) {
+  const i = rows.value.findIndex((r) => r.id === row.id)
+  if (i === -1) return
+  rows.value.splice(i, 1)
+  total.value = Math.max(0, total.value - 1)
+  del(`#${row.name}`, { commit: () => remove(row.id), restore: load })
 }
 </script>

@@ -8,7 +8,7 @@
 import type { ApiEnvelope } from '#shared/types'
 import type { ProcessingJob } from '~/composables/useProcessingJobs'
 
-export type ClipOperation = 'TRIM' | 'SPLIT' | 'AUDIO' | 'EXTRACT'
+export type ClipOperation = 'TRIM' | 'SPLIT' | 'AUDIO' | 'EXTRACT' | 'OVERLAY'
 
 export interface CropRect {
   x: number
@@ -72,6 +72,39 @@ export interface AudioEditRequest {
   music?: { key: string; volume: number; loop: boolean; duck: boolean; startMs: number } | null
 }
 
+/** A text or image layer drawn over the video; x/y is its centre as fractions of the frame. */
+export interface OverlayLayer {
+  kind: 'TEXT' | 'IMAGE'
+  text: string | null
+  font: string | null
+  /** CSS-style, 100–900. */
+  weight: number
+  /** Font size as % of the video's height. */
+  sizePct: number
+  color: string | null
+  /** Null = no box behind the text. */
+  background: string | null
+  backgroundOpacity: number
+  align: 'LEFT' | 'CENTER' | 'RIGHT' | null
+  /** An uploaded file (kind OVERLAY). */
+  imageKey: string | null
+  /** Image width as % of the video's width. */
+  widthPct: number
+  x: number
+  y: number
+  opacity: number
+  startMs: number
+  /** Null = to the end. */
+  endMs: number | null
+  animation: 'NONE' | 'FADE' | 'SLIDE_UP' | 'SLIDE_LEFT'
+}
+
+export interface Waveform {
+  durationMs: number
+  /** Loudest level (0–1) in each equal slice of the sound. */
+  peaks: number[]
+}
+
 export interface EditOverview {
   /** Clips awaiting a decision, newest first. */
   clips: VideoClip[]
@@ -108,6 +141,27 @@ export function useVideoEdits() {
     return (await api<ApiEnvelope<ProcessingJob>>(`${base(videoId)}/extract-audio`, { method: 'POST', body: { format } })).data
   }
 
+  async function startOverlay(videoId: number, layers: OverlayLayer[]) {
+    return (await api<ApiEnvelope<ProcessingJob>>(`${base(videoId)}/overlay`, { method: 'POST', body: { layers } })).data
+  }
+
+  /** Font families the server can draw text with. */
+  async function fonts(videoId: number) {
+    return (await api<ApiEnvelope<string[]>>(`${base(videoId)}/fonts`)).data
+  }
+
+  /** A crop box (w/h = `aspect`) centred on wherever the video moves the most — for "Auto-center". */
+  async function autoCrop(videoId: number, aspect: number) {
+    return (await api<ApiEnvelope<CropRect>>(`${base(videoId)}/auto-crop?aspect=${aspect}`)).data
+  }
+
+  /** The video's sound (or an uploaded audio file's) as peaks, for drawing a waveform. */
+  async function waveform(videoId: number, options: { key?: string | null; points?: number } = {}) {
+    const query = new URLSearchParams({ points: String(options.points ?? 2000) })
+    if (options.key) query.set('key', options.key)
+    return (await api<ApiEnvelope<Waveform>>(`${base(videoId)}/waveform?${query}`)).data
+  }
+
   async function promote(videoId: number, clipId: number) {
     return (await api<ApiEnvelope<PromoteResult>>(`${base(videoId)}/${clipId}/promote`, { method: 'POST' })).data
   }
@@ -116,5 +170,5 @@ export function useVideoEdits() {
     await api(`${base(videoId)}/${clipId}`, { method: 'DELETE' })
   }
 
-  return { overview, startTrim, startSplit, startAudio, startExtract, promote, remove }
+  return { overview, startTrim, startSplit, startAudio, startExtract, startOverlay, fonts, waveform, autoCrop, promote, remove }
 }

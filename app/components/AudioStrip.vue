@@ -16,7 +16,9 @@
         :style="{ left: pct(edit.state.range[0]), width: pct(edit.state.range[1] - edit.state.range[0]) }"
       />
       <div v-for="t in ticks" :key="t" class="absolute top-0 h-full border-l border-gray-300 dark:border-gray-700" :style="{ left: pct(t) }">
-        <span v-if="t < durationMs * 0.95" class="absolute top-0 left-1 text-[10px] leading-none text-gray-400 tabular-nums">{{ formatDuration(Math.round(t / 1000)) }}</span>
+        <span v-if="t < durationMs * 0.95" class="absolute top-0 left-1 text-[10px] leading-none text-gray-400 tabular-nums">{{
+          formatDuration(Math.round(t / 1000))
+        }}</span>
       </div>
     </div>
 
@@ -46,7 +48,17 @@
         :style="{ left: pct(c.atMs), width: pct(visibleEnd(c) - c.atMs), top: `${(lanes.get(c.id) ?? 0) * LANE_PX + 3}px`, height: `${LANE_PX - 6}px` }"
         @pointerdown.stop="onClipDown(c, 'move', $event)"
       >
-        <div class="px-2 pt-1 truncate pointer-events-none">
+        <svg
+          v-if="wave"
+          class="absolute inset-0 h-full w-full pointer-events-none text-white/45"
+          :viewBox="`0 0 ${clipWave(c).length || 1} 100`"
+          preserveAspectRatio="none"
+          aria-hidden="true"
+          data-testid="clip-waveform"
+        >
+          <path :d="wavePath(clipWave(c))" stroke="currentColor" stroke-width="1" fill="none" />
+        </svg>
+        <div class="relative px-2 pt-1 truncate pointer-events-none">
           {{ formatTimecode(c.srcStartMs) }}–{{ formatTimecode(c.srcEndMs) }}
           <span v-if="c.gain !== 1" class="opacity-80">· {{ Math.round(c.gain * 100) }}%</span>
         </div>
@@ -81,7 +93,7 @@ import { assignLanes, clipEnd, clipLength, moveTo, trimEdges, type AudioClip } f
 import { formatTimecode } from '#shared/utils/transport'
 import { snapMs } from '#shared/utils/timeline'
 
-const props = defineProps<{ edit: AudioEdit; durationMs: number; currentMs: number }>()
+const props = defineProps<{ edit: AudioEdit; videoId: number; durationMs: number; currentMs: number }>()
 const emit = defineEmits<{ seek: [ms: number] }>()
 
 const LANE_PX = 36
@@ -108,6 +120,50 @@ const ticks = computed(() => {
 // A clip running past the end of the video is cut there when rendered — and drawn that way.
 function visibleEnd(c: AudioClip) {
   return Math.min(clipEnd(c), props.durationMs)
+}
+
+// ── Waveform ─────────────────────────────────────────────────────────────────
+// Peaks of the sound clips are cut from (the video's, or the replacement
+// file's), fetched from the server — which reads our own storage, so no
+// browser access to the media is needed.
+const { waveform } = useVideoEdits()
+const wave = ref<{ durationMs: number; peaks: number[] } | null>(null)
+const sourceKey = computed(() => (props.edit.state.source === 'UPLOAD' ? (props.edit.state.replacement?.key ?? null) : null))
+watch(
+  sourceKey,
+  async (key) => {
+    wave.value = null
+    try {
+      const w = await waveform(props.videoId, { key, points: 3000 })
+      if (key === sourceKey.value && w.peaks.length) wave.value = w
+    } catch {
+      // No waveform (e.g. no sound, or a link video): the clips are still usable.
+    }
+  },
+  { immediate: true }
+)
+
+/** The clip's own stretch of the peaks, at most ~600 bars. */
+function clipWave(c: AudioClip) {
+  const w = wave.value
+  if (!w || !w.durationMs) return []
+  const n = w.peaks.length
+  const a = Math.max(0, Math.floor((c.srcStartMs / w.durationMs) * n))
+  const b = Math.min(n, Math.ceil((c.srcEndMs / w.durationMs) * n))
+  const slice = w.peaks.slice(a, b)
+  const stride = Math.max(1, Math.ceil(slice.length / 600))
+  const out: number[] = []
+  for (let i = 0; i < slice.length; i += stride) out.push(Math.max(...slice.slice(i, i + stride)) * c.gain)
+  return out
+}
+
+function wavePath(peaks: number[]) {
+  return peaks
+    .map((p, i) => {
+      const h = Math.min(96, Math.max(2, p * 96))
+      return `M${i + 0.5} ${50 - h / 2}V${50 + h / 2}`
+    })
+    .join('')
 }
 
 function msPerPx() {

@@ -77,4 +77,14 @@
   body {
     font-weight: 500;
   }
+
+  /* A visible keyboard focus ring everywhere, even on custom elements (the
+     crop box's drag handles, timeline clips, overlay layers…) that don't go
+     through a Nuxt UI component and so don't get its focus styling for
+     free. `:focus-visible` only fires for keyboard/programmatic focus, not
+     a mouse click, so this never shows up as an unwanted ring on click. */
+  :focus-visible {
+    outline: 2px solid var(--ui-primary);
+    outline-offset: 2px;
+  }
 }

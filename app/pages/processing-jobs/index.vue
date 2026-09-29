@@ -25,7 +25,7 @@
             : 'border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 hover:border-gray-300 dark:hover:border-gray-700'
         "
         :aria-pressed="filter.status === s.value"
-        @click="filter.status = filter.status === s.value ? undefined : s.value"
+        @click="onFilterStatus(s.value)"
       >
         <div class="flex items-center justify-between">
           <StatusBadge :status="s.value" />
@@ -107,7 +107,12 @@
         <template #status-data="{ row }">
           <div class="w-40 space-y-1.5">
             <StatusBadge :status="row.status" />
-            <JobProgress :status="row.status" :progress="row.progress" :current-step="row.status === 'FAILED' ? row.errorMessage : row.currentStep" />
+            <JobProgress
+              :status="row.status"
+              :progress="row.progress"
+              :current-step="row.status === 'FAILED' ? row.errorMessage : row.currentStep"
+              :queue-position="row.queuePosition"
+            />
           </div>
         </template>
 
@@ -176,6 +181,15 @@ const search = ref('')
 const page = ref(1)
 const pageSize = ref(15)
 const sort = ref<{ column: string; direction: 'asc' | 'desc' } | undefined>({ column: 'id', direction: 'desc' })
+
+// Filtering to QUEUED is "show me the queue" — oldest first (job #1 at the
+// top) is what running order actually looks like, so flip the sort with it.
+function onFilterStatus(status: (typeof JOB_STATUSES)[number]['value']) {
+  const turningOn = filter.status !== status
+  filter.status = turningOn ? status : undefined
+  if (turningOn && status === 'QUEUED') sort.value = { column: 'id', direction: 'asc' }
+  else if (!turningOn && sort.value?.column === 'id' && sort.value.direction === 'asc') sort.value = { column: 'id', direction: 'desc' }
+}
 
 useListQuerySync({ filter, search, page })
 

@@ -1,6 +1,6 @@
 <template>
   <div>
-    <div v-if="refreshable || exportable || (showColumnToggle && rows.length > 0)" class="flex justify-end items-center gap-2 mb-2">
+    <div v-if="refreshable || exportable || rows.length > 0" class="flex justify-end items-center gap-2 mb-2">
       <UButton v-if="refreshable" size="xs" variant="soft" color="neutral" icon="i-lucide-refresh-cw" :loading="loading" @click="emit('refresh')">
         Refresh
       </UButton>
@@ -8,6 +8,20 @@
       <UDropdownMenu v-if="exportable && rows.length > 0" :items="exportItems">
         <UButton size="xs" variant="soft" color="neutral" icon="i-lucide-download" trailing-icon="i-lucide-chevron-down"> Export </UButton>
       </UDropdownMenu>
+
+      <!-- Only the desktop <UTable> reads density's ui.td/th — the mobile card
+           fallback below has its own fixed layout, so this has nothing to
+           do there and stays out of the way. -->
+      <UTooltip v-if="rows.length > 0" :text="density === 'compact' ? 'Comfortable rows' : 'Compact rows'" class="hidden sm:block">
+        <UButton
+          size="xs"
+          variant="soft"
+          color="neutral"
+          :icon="density === 'compact' ? 'i-lucide-rows-3' : 'i-lucide-rows-4'"
+          :aria-label="density === 'compact' ? 'Switch to comfortable rows' : 'Switch to compact rows'"
+          @click="setDensity(density === 'compact' ? 'comfortable' : 'compact')"
+        />
+      </UTooltip>
 
       <UPopover v-if="showColumnToggle && rows.length > 0">
         <UButton size="xs" variant="soft" color="neutral" icon="i-lucide-columns-3"> Columns </UButton>
@@ -348,6 +362,7 @@ const ROW_NUMBER_KEY = '__rowNumber'
 const SELECT_KEY = '__select'
 
 const { tableUi, rowEvenClass, sortButtonClass } = useTableTheme()
+const { density, setDensity, densityUi } = useTableDensity()
 
 // Zebra striping — UTable styles every row uniformly, so alternating shading
 // goes through `meta.class.tr`, which TanStack resolves per-row via `row.index`.
@@ -371,12 +386,18 @@ function rowClass(row: { index: number; original: T }) {
 // goes through the `:ui` prop, Table.vue's own class-merging (tailwind-merge)
 // resolves the conflicting `hover:bg-*` utility instead of both classes
 // fighting it out at matching specificity.
-const tableUiWithHover = computed(() => ({
-  ...tableUi.value,
-  tbody: hasSelectListener.value
-    ? 'isolate [&>tr]:data-[selectable=true]:hover:bg-success/10 [&>tr]:data-[selectable=true]:outline-primary/25 [&>tr]:data-[selectable=true]:focus-visible:outline-3 divide-y divide-default'
-    : (tableUi.value as { tbody?: string }).tbody
-}))
+const tableUiWithHover = computed(() => {
+  const theme = tableUi.value as { td?: string; th?: string; tbody?: string }
+  const density = densityUi.value as { td?: string; th?: string }
+  return {
+    ...tableUi.value,
+    td: [theme.td, density.td].filter(Boolean).join(' ') || undefined,
+    th: [theme.th, density.th].filter(Boolean).join(' ') || undefined,
+    tbody: hasSelectListener.value
+      ? 'isolate [&>tr]:data-[selectable=true]:hover:bg-success/10 [&>tr]:data-[selectable=true]:outline-primary/25 [&>tr]:data-[selectable=true]:focus-visible:outline-3 divide-y divide-default'
+      : theme.tbody
+  }
+})
 
 // Export: CSV / Excel / PDF / Copy, all client-side, all built from whatever's
 // currently loaded in `rows` (not the full server-side dataset if the caller

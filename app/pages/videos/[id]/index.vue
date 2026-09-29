@@ -153,7 +153,13 @@
 
         <!-- Version history -->
         <template #versions>
-          <VideoVersionsPanel :video-id="video.id" :can-write="canWriteVideos" @restored="(v) => (video = v)" />
+          <VideoVersionsPanel
+            :video-id="video.id"
+            :can-write="canWriteVideos"
+            :current-url="video.videoUrl"
+            :current-label="formatRelativeTime(video.updatedAt)"
+            @restored="(v) => (video = v)"
+          />
         </template>
 
         <!-- Timeline editor -->
@@ -249,7 +255,8 @@
     </template>
 
     <VideoEditModal v-model="showEdit" :video="video" @saved="(saved) => (video = saved)" />
-    <VideoDownloadModal v-if="video" v-model="showDownload" :video="video" :can-write="canWriteVideos" @imported="load" />    <VideoReplaceModal v-if="video" v-model="showReplace" :video="video" @replaced="(v) => (video = v)" />
+    <VideoDownloadModal v-if="video" v-model="showDownload" :video="video" :can-write="canWriteVideos" @imported="load" />
+    <VideoReplaceModal v-if="video" v-model="showReplace" :video="video" @replaced="(v) => (video = v)" />
     <VideoMoveModal v-if="video" v-model="showMove" :video="video" @moved="(v) => (video = v)" />
 
     <ConfirmModal

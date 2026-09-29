@@ -34,7 +34,7 @@
             </span>
           </div>
 
-          <JobProgress :status="job.status" :progress="job.progress" :current-step="job.currentStep" size="lg" />
+          <JobProgress :status="job.status" :progress="job.progress" :current-step="job.currentStep" :queue-position="job.queuePosition" size="lg" />
 
           <UAlert
             v-if="job.status === 'FAILED' && job.errorMessage"

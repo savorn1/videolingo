@@ -53,7 +53,7 @@
         </h2>
         <div class="flex flex-wrap gap-2">
           <UInput v-model="search" placeholder="Search videos" icon="i-lucide-search" size="sm" class="w-56" />
-          <USelect v-model="language" :items="languageFilterOptions" size="sm" class="w-40" placeholder="Language" />
+          <USelect v-model="filter.language" :items="languageFilterOptions" size="sm" class="w-40" placeholder="Language" />
         </div>
       </div>
 
@@ -63,8 +63,8 @@
       <EmptyState
         v-else-if="!videos.length"
         icon="i-lucide-search-x"
-        :title="search || language ? 'No videos match' : 'No videos yet'"
-        :description="search || language ? 'Try a different search.' : 'Videos will appear here once they are added.'"
+        :title="search || filter.language ? 'No videos match' : 'No videos yet'"
+        :description="search || filter.language ? 'Try a different search.' : 'Videos will appear here once they are added.'"
       />
       <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-4" :class="loading ? 'opacity-60' : ''">
         <VideoCard
@@ -73,6 +73,7 @@
           :to="`/learn/watch/${v.id}`"
           :title="v.title"
           :thumbnail-url="v.thumbnailUrl"
+          :video-url="v.videoUrl"
           :duration-seconds="v.durationSeconds"
           :progress="progress.get(v.id)"
         >
@@ -111,10 +112,11 @@ const progress = ref(new Map<number, WatchProgress>())
 const total = ref(0)
 const loading = ref(false)
 const search = ref('')
-const language = ref<string | undefined>()
+const filter = reactive<{ language: string | undefined }>({ language: undefined })
 const page = ref(1)
 const pageSize = ref(12)
-const languageFilterOptions = computed(() => [{ label: 'All languages', value: undefined }, ...languageOptions(language.value)])
+useListQuerySync({ filter, search, page })
+const languageFilterOptions = computed(() => [{ label: 'All languages', value: undefined }, ...languageOptions(filter.language)])
 
 let seq = 0
 async function loadVideos() {
@@ -123,7 +125,7 @@ async function loadVideos() {
   try {
     const res = await listVideos({
       search: search.value.trim() || undefined,
-      language: language.value,
+      language: filter.language,
       page: page.value,
       size: pageSize.value,
       sortBy: 'createdAt',
@@ -148,7 +150,7 @@ watch(search, () => {
     loadVideos()
   }, 300)
 })
-watch([language, pageSize], () => {
+watch([() => filter.language, pageSize], () => {
   page.value = 1
   loadVideos()
 })

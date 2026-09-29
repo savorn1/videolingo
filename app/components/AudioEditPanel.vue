@@ -22,10 +22,20 @@
     <section :class="SECTION">
       <h3 :class="HEADING">Sound</h3>
       <div class="flex flex-wrap gap-1">
-        <UButton size="xs" :color="s.source === 'ORIGINAL' ? 'primary' : 'neutral'" :variant="s.source === 'ORIGINAL' ? 'soft' : 'ghost'" @click="s.source = 'ORIGINAL'">
+        <UButton
+          size="xs"
+          :color="s.source === 'ORIGINAL' ? 'primary' : 'neutral'"
+          :variant="s.source === 'ORIGINAL' ? 'soft' : 'ghost'"
+          @click="s.source = 'ORIGINAL'"
+        >
           The video's own
         </UButton>
-        <UButton size="xs" :color="s.source === 'UPLOAD' ? 'primary' : 'neutral'" :variant="s.source === 'UPLOAD' ? 'soft' : 'ghost'" @click="s.source = 'UPLOAD'">
+        <UButton
+          size="xs"
+          :color="s.source === 'UPLOAD' ? 'primary' : 'neutral'"
+          :variant="s.source === 'UPLOAD' ? 'soft' : 'ghost'"
+          @click="s.source = 'UPLOAD'"
+        >
           Replace with a file
         </UButton>
       </div>
@@ -45,24 +55,52 @@
     <section :class="SECTION">
       <h3 :class="HEADING">Clips <span class="normal-case font-normal">— on the strip under the video</span></h3>
       <div class="flex flex-wrap gap-1">
-        <UButton size="xs" color="neutral" variant="soft" icon="i-lucide-scissors-line-dashed" :disabled="!splittable" @click="onSplit">Split at playhead</UButton>
-        <UButton size="xs" color="neutral" variant="soft" icon="i-lucide-copy" :disabled="!selected || s.clips.length >= MAX_AUDIO_CLIPS" @click="onDuplicate">Duplicate</UButton>
+        <UButton size="xs" color="neutral" variant="soft" icon="i-lucide-scissors-line-dashed" :disabled="!splittable" @click="onSplit"
+          >Split at playhead</UButton
+        >
+        <UButton size="xs" color="neutral" variant="soft" icon="i-lucide-copy" :disabled="!selected || s.clips.length >= MAX_AUDIO_CLIPS" @click="onDuplicate"
+          >Duplicate</UButton
+        >
         <UButton size="xs" color="neutral" variant="soft" icon="i-lucide-merge" :disabled="!hasNext" @click="onMerge">Merge with next</UButton>
         <UButton size="xs" color="error" variant="soft" icon="i-lucide-trash-2" :disabled="!selected" @click="onDeleteClip">Delete clip</UButton>
-        <UButton size="xs" color="neutral" variant="ghost" icon="i-lucide-rotate-ccw" :disabled="!edit.clipsChanged.value" @click="edit.resetClips()">Reset clips</UButton>
+        <UButton size="xs" color="neutral" variant="ghost" icon="i-lucide-rotate-ccw" :disabled="!edit.clipsChanged.value" @click="edit.resetClips()"
+          >Reset clips</UButton
+        >
       </div>
-      <div v-if="selected" class="grid grid-cols-4 gap-2" data-testid="clip-fields">
+      <div v-if="selected" class="grid grid-cols-2 sm:grid-cols-4 gap-2" data-testid="clip-fields">
         <UFormField label="Starts at (s)">
           <UInput :model-value="sec(selected.atMs)" type="number" step="0.01" min="0" size="sm" @update:model-value="(v) => patchClip({ atMs: ms(v) })" />
         </UFormField>
         <UFormField label="From (s)">
-          <UInput :model-value="sec(selected.srcStartMs)" type="number" step="0.01" min="0" size="sm" @update:model-value="(v) => patchClip({ srcStartMs: ms(v) })" />
+          <UInput
+            :model-value="sec(selected.srcStartMs)"
+            type="number"
+            step="0.01"
+            min="0"
+            size="sm"
+            @update:model-value="(v) => patchClip({ srcStartMs: ms(v) })"
+          />
         </UFormField>
         <UFormField label="To (s)">
-          <UInput :model-value="sec(selected.srcEndMs)" type="number" step="0.01" min="0" size="sm" @update:model-value="(v) => patchClip({ srcEndMs: ms(v) })" />
+          <UInput
+            :model-value="sec(selected.srcEndMs)"
+            type="number"
+            step="0.01"
+            min="0"
+            size="sm"
+            @update:model-value="(v) => patchClip({ srcEndMs: ms(v) })"
+          />
         </UFormField>
         <UFormField label="Volume %">
-          <UInput :model-value="Math.round(selected.gain * 100)" type="number" step="5" min="0" :max="400" size="sm" @update:model-value="(v) => patchClip({ gain: Number(v) / 100 })" />
+          <UInput
+            :model-value="Math.round(selected.gain * 100)"
+            type="number"
+            step="5"
+            min="0"
+            :max="400"
+            size="sm"
+            @update:model-value="(v) => patchClip({ gain: Number(v) / 100 })"
+          />
         </UFormField>
       </div>
       <p v-else class="text-xs text-gray-500 dark:text-gray-400">Select a clip on the strip to edit it.</p>
@@ -76,8 +114,12 @@
       </div>
       <USlider v-model="s.range" :min="0" :max="Math.max(durationMs, 1)" :step="10" :min-steps-between-thumbs="5" aria-label="Range" />
       <div class="flex flex-wrap gap-1">
-        <UButton size="xs" color="neutral" variant="ghost" @click="s.range = [Math.min(Math.round(currentMs), s.range[1] - 50), s.range[1]]">Start at playhead</UButton>
-        <UButton size="xs" color="neutral" variant="ghost" @click="s.range = [s.range[0], Math.max(Math.round(currentMs), s.range[0] + 50)]">End at playhead</UButton>
+        <UButton size="xs" color="neutral" variant="ghost" @click="s.range = [Math.min(Math.round(currentMs), s.range[1] - 50), s.range[1]]"
+          >Start at playhead</UButton
+        >
+        <UButton size="xs" color="neutral" variant="ghost" @click="s.range = [s.range[0], Math.max(Math.round(currentMs), s.range[0] + 50)]"
+          >End at playhead</UButton
+        >
         <UButton size="xs" color="neutral" variant="soft" icon="i-lucide-volume-x" :disabled="!rangeValid" @click="onMuteRange">Mute range</UButton>
         <UButton size="xs" color="error" variant="soft" icon="i-lucide-eraser" :disabled="!rangeValid" @click="onDeleteRange">Delete range</UButton>
       </div>
@@ -86,7 +128,9 @@
           <UBadge color="error" variant="subtle" class="gap-1">
             <UIcon name="i-lucide-volume-x" class="w-3 h-3" />
             <span class="tabular-nums">{{ formatTimecode(m.startMs) }} – {{ formatTimecode(m.endMs) }}</span>
-            <button type="button" class="ml-0.5 hover:text-error-700" :aria-label="`Unmute ${formatTimecode(m.startMs)}`" @click="s.mutes.splice(i, 1)">✕</button>
+            <button type="button" class="ml-0.5 hover:text-error-700" :aria-label="`Unmute ${formatTimecode(m.startMs)}`" @click="s.mutes.splice(i, 1)">
+              ✕
+            </button>
           </UBadge>
         </li>
       </ul>
@@ -97,7 +141,15 @@
       <h3 :class="HEADING">Level</h3>
       <div class="flex items-center gap-3">
         <span class="w-16 text-xs text-gray-500">Volume</span>
-        <USlider :model-value="Math.round(s.volume * 100)" :min="0" :max="400" :step="5" class="flex-1" aria-label="Volume" @update:model-value="(v) => (s.volume = Number(v) / 100)" />
+        <USlider
+          :model-value="Math.round(s.volume * 100)"
+          :min="0"
+          :max="400"
+          :step="5"
+          class="flex-1"
+          aria-label="Volume"
+          @update:model-value="(v) => (s.volume = Number(v) / 100)"
+        />
         <span class="w-12 text-right text-xs tabular-nums">{{ Math.round(s.volume * 100) }}%</span>
       </div>
       <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
@@ -109,7 +161,15 @@
           <UInput :model-value="sec(s.fadeInMs)" type="number" step="0.1" min="0" max="60" size="sm" @update:model-value="(v) => (s.fadeInMs = clampFade(v))" />
         </UFormField>
         <UFormField label="Fade out (s)">
-          <UInput :model-value="sec(s.fadeOutMs)" type="number" step="0.1" min="0" max="60" size="sm" @update:model-value="(v) => (s.fadeOutMs = clampFade(v))" />
+          <UInput
+            :model-value="sec(s.fadeOutMs)"
+            type="number"
+            step="0.1"
+            min="0"
+            max="60"
+            size="sm"
+            @update:model-value="(v) => (s.fadeOutMs = clampFade(v))"
+          />
         </UFormField>
       </div>
     </section>
@@ -157,13 +217,26 @@
         </div>
         <div class="flex flex-wrap items-end gap-x-4 gap-y-2">
           <UFormField label="Starts at (s)" class="w-28">
-            <UInput :model-value="sec(s.music.startMs)" type="number" step="0.1" min="0" size="sm" @update:model-value="(v) => s.music && (s.music.startMs = ms(v))" />
+            <UInput
+              :model-value="sec(s.music.startMs)"
+              type="number"
+              step="0.1"
+              min="0"
+              size="sm"
+              @update:model-value="(v) => s.music && (s.music.startMs = ms(v))"
+            />
           </UFormField>
           <USwitch v-model="s.music.loop" label="Loop" />
           <USwitch v-model="s.music.duck" label="Quieter under speech" />
         </div>
       </template>
-      <UploadButton v-else label="Add music" icon="i-lucide-music" :progress="uploading === 'music' ? uploadProgress : null" @pick="(f) => onUpload(f, 'music')" />
+      <UploadButton
+        v-else
+        label="Add music"
+        icon="i-lucide-music"
+        :progress="uploading === 'music' ? uploadProgress : null"
+        @pick="(f) => onUpload(f, 'music')"
+      />
     </section>
 
     <!-- ── Speed & pitch ───────────────────────────────────────────────── -->
@@ -218,12 +291,18 @@
     <!-- ── Render ──────────────────────────────────────────────────────── -->
     <section :class="SECTION">
       <p class="text-xs text-gray-500 dark:text-gray-400">
-        The preview plays the volume (up to 100%) and muted ranges; everything else is heard in the result, which you can check before replacing
-        the original.
+        The preview plays the volume (up to 100%) and muted ranges; everything else is heard in the result, which you can check before replacing the original.
       </p>
       <p class="text-xs text-error-500 min-h-4">{{ edit.error.value }}</p>
       <div class="flex gap-2">
-        <UButton v-if="canWrite" class="flex-1 justify-center" icon="i-lucide-audio-lines" :loading="starting" :disabled="!!edit.error.value || busy || !!uploading" @click="onRender">
+        <UButton
+          v-if="canWrite"
+          class="flex-1 justify-center"
+          icon="i-lucide-audio-lines"
+          :loading="starting"
+          :disabled="!!edit.error.value || busy || !!uploading"
+          @click="onRender"
+        >
           Render audio
         </UButton>
         <UButton color="neutral" variant="ghost" icon="i-lucide-rotate-ccw" :disabled="!edit.changed.value" @click="edit.reset()">Reset</UButton>

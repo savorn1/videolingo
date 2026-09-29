@@ -31,6 +31,8 @@ export interface ProcessingJob {
   canRetry: boolean
   canCancel: boolean
   canDelete: boolean
+  /** How many queued jobs are ahead of this one; null unless QUEUED. */
+  queuePosition: number | null
 }
 
 export interface ProcessingJobProgress {
@@ -42,6 +44,7 @@ export interface ProcessingJobProgress {
   durationSeconds: number | null
   updatedAt: string | null
   lastLogId: number | null
+  queuePosition: number | null
 }
 
 export interface ProcessingJobLog {

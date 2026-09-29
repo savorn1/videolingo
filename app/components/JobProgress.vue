@@ -3,6 +3,7 @@
     <div class="flex items-center justify-between gap-3" :class="size === 'lg' ? 'text-sm' : 'text-xs'">
       <span class="truncate text-gray-600 dark:text-gray-300" :title="caption">{{ caption }}</span>
       <span v-if="status !== 'QUEUED'" class="shrink-0 font-semibold tabular-nums text-gray-900 dark:text-white">{{ progress }}%</span>
+      <span v-else-if="queuePosition" class="shrink-0 text-gray-500 dark:text-gray-400">#{{ queuePosition }} in queue</span>
     </div>
     <UProgress
       :model-value="status === 'QUEUED' ? null : progress"
@@ -21,9 +22,11 @@ const props = withDefaults(
     status: JobStatus
     progress: number
     currentStep?: string | null
+    /** How many queued jobs are ahead of this one. */
+    queuePosition?: number | null
     size?: 'sm' | 'lg'
   }>(),
-  { currentStep: null, size: 'sm' }
+  { currentStep: null, queuePosition: null, size: 'sm' }
 )
 
 // Queued jobs show an indeterminate bar — "waiting for a worker" isn't 0%
@@ -45,7 +48,7 @@ const caption = computed(() => {
   if (props.currentStep) return props.currentStep
   switch (props.status) {
     case 'QUEUED':
-      return 'Waiting for a worker…'
+      return props.queuePosition ? `Waiting — ${props.queuePosition} job${props.queuePosition > 1 ? 's' : ''} ahead` : 'Waiting for a worker…'
     case 'RUNNING':
       return 'Running…'
     case 'SUCCEEDED':

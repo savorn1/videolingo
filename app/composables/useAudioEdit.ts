@@ -96,7 +96,9 @@ export function useAudioEdit(durationMs: Ref<number>) {
     pitchSemitones: state.pitchSemitones,
     balance: state.balance,
     channels: state.channels,
-    music: state.music ? { key: state.music.key, volume: state.music.volume, loop: state.music.loop, duck: state.music.duck, startMs: state.music.startMs } : null
+    music: state.music
+      ? { key: state.music.key, volume: state.music.volume, loop: state.music.loop, duck: state.music.duck, startMs: state.music.startMs }
+      : null
   }))
 
   const changed = computed(

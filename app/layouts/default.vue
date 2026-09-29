@@ -43,6 +43,7 @@
 
           <template #right>
             <UDashboardSearchButton />
+            <WhatsNewButton />
             <InboxBell />
             <UColorModeButton />
             <UDropdownMenu :items="profileItems" :content="{ align: 'end' }" :ui="{ content: 'w-56' }">

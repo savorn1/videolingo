@@ -22,15 +22,27 @@
     <UCard>
       <DataTable
         v-model:sort="sort"
+        v-model:selected="selected"
         :rows="rows"
         :columns="columns"
         :loading="loading"
+        selectable
         refreshable
         exportable
         export-filename="categories"
         @refresh="load"
         @select="(row: Category) => navigateTo(`/categories/${row.id}`)"
       >
+        <template #bulk-actions="{ selected: picked, clear }">
+          <GenericBulkActions
+            :items="picked"
+            entity-label="category"
+            :label="(c: Category) => c.name"
+            :remove="remove"
+            :set-enabled="setEnabled"
+            @done="clear(), load()"
+          />
+        </template>
         <template #name-data="{ row }">
           <div class="min-w-0 max-w-sm">
             <CategoryBadge :name="row.name" :color="row.color" :enabled="row.enabled" />
@@ -114,6 +126,7 @@ const { list, setEnabled, remove } = useCategories()
 const toast = useToast()
 
 const rows = ref<Category[]>([])
+const selected = ref<Category[]>([])
 const total = ref(0)
 const loading = ref(false)
 const error = ref('')

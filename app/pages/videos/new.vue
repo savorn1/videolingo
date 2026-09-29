@@ -53,7 +53,9 @@
                 v-for="s in linkSources"
                 :key="s.value"
                 class="flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors"
-                :class="inspected?.source === s.value ? `${s.activeClass} font-medium` : 'border-gray-200 dark:border-gray-800 text-gray-600 dark:text-gray-400'"
+                :class="
+                  inspected?.source === s.value ? `${s.activeClass} font-medium` : 'border-gray-200 dark:border-gray-800 text-gray-600 dark:text-gray-400'
+                "
                 :title="s.hint"
               >
                 <UIcon :name="s.icon" class="w-3.5 h-3.5" :class="s.iconClass" />
@@ -174,11 +176,11 @@
                       size="xs"
                       color="neutral"
                       variant="soft"
-                      icon="i-lucide-camera"
+                      icon="i-lucide-film"
                       :loading="thumbUploading"
-                      @click="captureFromPreview"
+                      @click="showFramePicker = !showFramePicker"
                     >
-                      Use the current frame
+                      {{ showFramePicker ? 'Hide frame picker' : 'Choose a frame…' }}
                     </UButton>
                     <UButton
                       v-if="suggestedThumbnail && form.thumbnailUrl !== suggestedThumbnail"
@@ -193,6 +195,12 @@
                   </div>
                 </div>
               </div>
+              <ThumbnailPicker
+                v-if="showFramePicker && canCaptureFrame && preview?.videoUrl"
+                :src="preview.videoUrl"
+                class="mt-3 max-w-xl"
+                @picked="(url) => (form.thumbnailUrl = url)"
+              />
             </UFormField>
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-5 items-start">
@@ -229,7 +237,6 @@
         </template>
         <VideoPlayer
           v-if="preview"
-          ref="player"
           :embed-url="preview.embedUrl"
           :video-url="preview.videoUrl"
           :poster="form.thumbnailUrl || null"
@@ -332,6 +339,7 @@ const languageItems = computed(() => [{ label: 'Not set', value: undefined }, ..
 const categoryItems = computed(() => categoryOptions(form.categoryIds).map((o) => ({ label: o.label, value: o.value, disabled: o.disabled })))
 
 function resetForm() {
+  showFramePicker.value = false
   Object.assign(form, {
     title: '',
     description: '',
@@ -571,22 +579,8 @@ async function uploadThumbnail(blob: Blob) {
   }
 }
 
-const player = ref<{ videoEl: HTMLVideoElement | null } | null>(null)
-const canCaptureFrame = computed(() => !!preview.value && !preview.value.embedUrl)
-
-async function captureFromPreview() {
-  const el = player.value?.videoEl
-  if (!el) return
-  try {
-    await uploadThumbnail(await captureFrame(el))
-  } catch {
-    toast.add({
-      title: 'Couldn’t capture this frame',
-      description: 'The site hosting the file doesn’t allow it — paste a thumbnail address instead.',
-      color: 'warning'
-    })
-  }
-}
+const canCaptureFrame = computed(() => !!preview.value && !preview.value.embedUrl && !!preview.value.videoUrl)
+const showFramePicker = ref(false)
 
 // ── preview ─────────────────────────────────────────────────────────────
 const hasSource = computed(() => (mode.value === 'link' ? !!inspected.value : !!file.value))

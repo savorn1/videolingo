@@ -1,6 +1,20 @@
 <template>
   <div class="space-y-4">
     <UAlert v-if="error" color="error" variant="subtle" :title="error" icon="i-lucide-triangle-alert" />
+    <UAlert
+      v-if="draft"
+      color="info"
+      variant="subtle"
+      icon="i-lucide-history"
+      :title="`You have unrendered edits from ${formatRelativeTime(new Date(draft.savedAt).toISOString())}`"
+      description="They were kept in this browser. Restore them, or start fresh."
+      data-testid="draft-notice"
+    >
+      <template #actions>
+        <UButton size="xs" color="info" @click="onRestoreDraft">Restore</UButton>
+        <UButton size="xs" color="neutral" variant="ghost" @click="onDiscardDraft">Discard</UButton>
+      </template>
+    </UAlert>
 
     <div class="grid grid-cols-1 xl:grid-cols-3 gap-4 items-start">
       <!-- Preview (large, stays in view while scrolling the controls) -->
@@ -35,8 +49,18 @@
               @time="onTime"
               @duration="onDuration"
             >
-              <template v-if="cropActive" #overlay>
+              <template v-if="cropActive || mode === 'overlay'" #overlay>
+                <OverlayLayers
+                  v-if="mode === 'overlay'"
+                  :edit="overlayEdit"
+                  :natural-width="naturalWidth"
+                  :natural-height="naturalHeight"
+                  :current-ms="currentMs"
+                  :duration-ms="durationMs"
+                  :zoom="zoom"
+                />
                 <CropOverlay
+                  v-else
                   ref="cropLayer"
                   :model-value="crop"
                   :natural-width="naturalWidth"
@@ -53,7 +77,13 @@
             class="absolute top-2 right-2 z-20 flex items-center gap-0.5 rounded-md bg-black/70 px-1 py-0.5 text-white transition-opacity"
             :class="zoom > 1 ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'"
           >
-            <button type="button" class="p-1 rounded hover:bg-white/15 disabled:opacity-40" aria-label="Zoom out" :disabled="zoom <= 1" @click="zoomBy(1 / 1.25)">
+            <button
+              type="button"
+              class="p-1 rounded hover:bg-white/15 disabled:opacity-40"
+              aria-label="Zoom out"
+              :disabled="zoom <= 1"
+              @click="zoomBy(1 / 1.25)"
+            >
               <UIcon name="i-lucide-zoom-out" class="w-4 h-4 block" />
             </button>
             <button
@@ -64,7 +94,13 @@
             >
               {{ Math.round(zoom * 100) }}%
             </button>
-            <button type="button" class="p-1 rounded hover:bg-white/15 disabled:opacity-40" aria-label="Zoom in" :disabled="zoom >= MAX_ZOOM" @click="zoomBy(1.25)">
+            <button
+              type="button"
+              class="p-1 rounded hover:bg-white/15 disabled:opacity-40"
+              aria-label="Zoom in"
+              :disabled="zoom >= MAX_ZOOM"
+              @click="zoomBy(1.25)"
+            >
               <UIcon name="i-lucide-zoom-in" class="w-4 h-4 block" />
             </button>
           </div>
@@ -79,20 +115,46 @@
         <AudioStrip
           v-if="mode === 'audio'"
           :edit="audioEdit"
+          :video-id="video.id"
           :duration-ms="durationMs"
           :current-ms="currentMs"
           :style="fitStyle"
           @seek="(ms: number) => preview?.seek(ms, false)"
         />
         <p v-if="!stageFullscreen" class="text-xs text-gray-500 dark:text-gray-400">
-          Drag on the video to crop · scroll over it to zoom · hold <UKbd value="space" /> and drag to move around when zoomed ·
-          <UKbd value="space" /> / <UKbd value="K" /> play · <UKbd value="←" /> <UKbd value="→" /> one frame · <UKbd value="J" />
-          <UKbd value="L" /> ±5 s · <UKbd value="F" /> full screen
+          Drag on the video to crop · scroll over it to zoom · hold <UKbd value="space" /> and drag to move around when zoomed · <UKbd value="space" /> /
+          <UKbd value="K" /> play · <UKbd value="←" /> <UKbd value="→" /> one frame · <UKbd value="J" /> <UKbd value="L" /> ±5 s · <UKbd value="F" /> full
+          screen
         </p>
       </div>
 
       <!-- Controls -->
       <UCard>
+        <div class="flex items-center justify-end gap-1 -mt-1 mb-1">
+          <UButton
+            size="xs"
+            color="neutral"
+            variant="ghost"
+            icon="i-lucide-undo-2"
+            :disabled="!history.undoable.value"
+            title="Undo (Ctrl/⌘+Z)"
+            @click="history.undo()"
+          >
+            Undo
+          </UButton>
+          <UButton
+            size="xs"
+            color="neutral"
+            variant="ghost"
+            icon="i-lucide-redo-2"
+            :disabled="!history.redoable.value"
+            title="Redo (Ctrl/⌘+Shift+Z)"
+            @click="history.redo()"
+          >
+            Redo
+          </UButton>
+          <ShortcutsHelp :items="EDITOR_SHORTCUTS" button-class="ml-1" />
+        </div>
         <UTabs v-model="mode" :items="tabItems" variant="link" :ui="{ list: 'mb-3' }">
           <!-- ── Trim & crop ───────────────────────────────────────────── -->
           <template #trim>
@@ -107,11 +169,20 @@
                 <UButton size="xs" color="neutral" variant="soft" @click="range = [range[0], Math.round(currentMs)]">Set end to current time</UButton>
               </div>
 
+              <div class="space-y-1">
+                <span class="text-xs text-gray-500 dark:text-gray-400">Export for</span>
+                <div class="flex flex-wrap gap-1">
+                  <UButton v-for="p in EXPORT_PRESETS" :key="p.label" size="xs" color="neutral" variant="soft" :icon="p.icon" @click="applyPreset(p)">
+                    {{ p.label }}
+                  </UButton>
+                </div>
+              </div>
+
               <USwitch v-model="cropOn" label="Also crop" @update:model-value="onCropToggle" />
               <template v-if="cropOn">
                 <p class="text-xs text-gray-500 dark:text-gray-400">
-                  Drag on the video to draw the area to keep — drag inside it to move, drag the white handles to resize. Use the playback bar under
-                  the video (or the trim handles above) to check other frames.
+                  Drag on the video to draw the area to keep — drag inside it to move, drag the white handles to resize. Use the playback bar under the video
+                  (or the trim handles above) to check other frames.
                 </p>
                 <div class="flex flex-wrap items-center gap-1">
                   <span class="text-xs text-gray-500 mr-1">Shape</span>
@@ -125,10 +196,25 @@
                   >
                     {{ a.label }}
                   </UButton>
-                  <UButton size="xs" color="neutral" variant="ghost" icon="i-lucide-maximize" class="ml-auto" @click="cropFull">Whole frame</UButton>
+                  <UButton
+                    v-if="cropAspect"
+                    size="xs"
+                    color="neutral"
+                    variant="ghost"
+                    icon="i-lucide-scan-face"
+                    :loading="autoCentering"
+                    class="ml-auto"
+                    title="Centre the crop on wherever the video moves the most"
+                    @click="onAutoCenter"
+                  >
+                    Auto-center
+                  </UButton>
+                  <UButton size="xs" color="neutral" variant="ghost" icon="i-lucide-maximize" :class="cropAspect ? '' : 'ml-auto'" @click="cropFull"
+                    >Whole frame</UButton
+                  >
                 </div>
               </template>
-              <div v-if="cropOn" class="grid grid-cols-4 gap-2">
+              <div v-if="cropOn" class="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 <UFormField label="X"><UInput v-model.number="crop.x" type="number" size="sm" /></UFormField>
                 <UFormField label="Y"><UInput v-model.number="crop.y" type="number" size="sm" /></UFormField>
                 <UFormField label="Width"><UInput v-model.number="crop.w" type="number" size="sm" /></UFormField>
@@ -185,6 +271,18 @@
             </div>
           </template>
           <!-- ── Audio ─────────────────────────────────────────────────── -->
+          <template #overlay>
+            <OverlayPanel
+              :edit="overlayEdit"
+              :video-id="video.id"
+              :duration-ms="durationMs"
+              :current-ms="currentMs"
+              :can-write="canWrite"
+              :busy="busy"
+              @queued="load"
+            />
+          </template>
+
           <template #audio>
             <AudioEditPanel
               :edit="audioEdit"
@@ -214,7 +312,12 @@
           <span class="font-medium text-gray-900 dark:text-white truncate">{{ jobLabel(job) }}</span>
           <UButton size="xs" color="neutral" variant="link" :to="`/processing-jobs/${job.id}`" :padded="false">Job #{{ job.id }}</UButton>
         </div>
-        <JobProgress :status="job.status" :progress="job.progress" :current-step="job.status === 'FAILED' ? job.errorMessage : job.currentStep" />
+        <JobProgress
+          :status="job.status"
+          :progress="job.progress"
+          :current-step="job.status === 'FAILED' ? job.errorMessage : job.currentStep"
+          :queue-position="job.queuePosition"
+        />
       </div>
 
       <EmptyState
@@ -226,30 +329,30 @@
       />
 
       <ul v-if="data?.clips.length" class="divide-y divide-gray-100 dark:divide-gray-800 rounded-lg border border-gray-200 dark:border-gray-800">
-          <li v-for="clip in data.clips" :key="clip.id" class="flex items-center gap-3 px-3 py-2">
-            <UIcon :name="CLIP_ICONS[clip.operation]" class="w-5 h-5 text-primary-500 shrink-0" />
-            <div class="min-w-0 flex-1">
-              <p class="text-sm font-medium text-gray-900 dark:text-white truncate">{{ clipTitle(clip) }}</p>
-              <p class="text-xs text-gray-500 dark:text-gray-400">
-                <template v-if="clip.summary">{{ clip.summary }} · </template>
-                {{ formatFileSize(clip.sizeBytes) }}
-                <template v-if="clip.crop"> · cropped {{ clip.crop.w }}×{{ clip.crop.h }}</template>
-                <template v-if="clip.scale"> · resized {{ clip.scale.w }}×{{ clip.scale.h }}</template>
-                · expires {{ formatTimeUntil(clip.expiresAt) }}
-              </p>
-              <audio v-if="clip.operation === 'EXTRACT'" :src="clip.url" controls preload="none" class="mt-1 h-8 w-full max-w-sm" />
-            </div>
-            <template v-if="clip.operation === 'EXTRACT'">
-              <UButton size="xs" color="primary" variant="soft" icon="i-lucide-download" :href="clip.url" download>Download</UButton>
-            </template>
-            <template v-else>
-              <UButton size="xs" color="neutral" variant="soft" icon="i-lucide-play" :to="clip.url" target="_blank">Preview</UButton>
-              <UButton v-if="canWrite" size="xs" :color="replaces(clip) ? 'warning' : 'primary'" @click="confirmPromote = clip">
-                {{ replaces(clip) ? 'Replace original' : 'Add as new video' }}
-              </UButton>
-            </template>
-            <UButton v-if="canWrite" size="xs" color="neutral" variant="ghost" icon="i-lucide-trash-2" aria-label="Discard clip" @click="onDiscard(clip)" />
-          </li>
+        <li v-for="clip in data.clips" :key="clip.id" class="flex items-center gap-3 px-3 py-2">
+          <UIcon :name="CLIP_ICONS[clip.operation]" class="w-5 h-5 text-primary-500 shrink-0" />
+          <div class="min-w-0 flex-1">
+            <p class="text-sm font-medium text-gray-900 dark:text-white truncate">{{ clipTitle(clip) }}</p>
+            <p class="text-xs text-gray-500 dark:text-gray-400">
+              <template v-if="clip.summary">{{ clip.summary }} · </template>
+              {{ formatFileSize(clip.sizeBytes) }}
+              <template v-if="clip.crop"> · cropped {{ clip.crop.w }}×{{ clip.crop.h }}</template>
+              <template v-if="clip.scale"> · resized {{ clip.scale.w }}×{{ clip.scale.h }}</template>
+              · expires {{ formatTimeUntil(clip.expiresAt) }}
+            </p>
+            <audio v-if="clip.operation === 'EXTRACT'" :src="clip.url" controls preload="none" class="mt-1 h-8 w-full max-w-sm" />
+          </div>
+          <template v-if="clip.operation === 'EXTRACT'">
+            <UButton size="xs" color="primary" variant="soft" icon="i-lucide-download" :href="clip.url" download>Download</UButton>
+          </template>
+          <template v-else>
+            <UButton size="xs" color="neutral" variant="soft" icon="i-lucide-play" :to="clip.url" target="_blank">Preview</UButton>
+            <UButton v-if="canWrite" size="xs" :color="replaces(clip) ? 'warning' : 'primary'" @click="confirmPromote = clip">
+              {{ replaces(clip) ? 'Replace original' : 'Add as new video' }}
+            </UButton>
+          </template>
+          <UButton v-if="canWrite" size="xs" color="neutral" variant="ghost" icon="i-lucide-trash-2" aria-label="Discard clip" @click="onDiscard(clip)" />
+        </li>
       </ul>
     </UCard>
 
@@ -258,7 +361,7 @@
       :title="confirmPromote && replaces(confirmPromote) ? 'Replace the original video' : 'Add as a new video'"
       :description="
         confirmPromote && replaces(confirmPromote)
-          ? `This replaces the video's current file with ${confirmPromote.operation === 'AUDIO' ? 'the version with the edited sound' : 'this trimmed/cropped clip'}. The current file is kept under Versions, so you can restore it.`
+          ? `This replaces the video's current file with ${confirmPromote.operation === 'AUDIO' ? 'the version with the edited sound' : confirmPromote.operation === 'OVERLAY' ? 'the version with the text & overlays' : 'this trimmed/cropped clip'}. The current file is kept under Versions, so you can restore it.`
           : 'Creates a new, disabled video from this segment — review it before enabling it for learners.'
       "
       :confirm-label="confirmPromote && replaces(confirmPromote) ? 'Replace original' : 'Add as new video'"
@@ -284,12 +387,13 @@ import type VideoPlayer from '~/components/VideoPlayer.vue'
 import { validateCrop, validateScale, validateSegments, validateTrim } from '#shared/utils/videoEdit'
 import { isMutedAt } from '#shared/utils/audioEdit'
 import { formatTimeUntil } from '#shared/utils/format'
+import type { EditorDraft } from '~/composables/useEditorHistory'
 
 const props = defineProps<{ video: Video; canWrite: boolean }>()
 const emit = defineEmits<{ replaced: []; created: [videoId: number] }>()
 
 const toast = useToast()
-const { overview, startTrim, startSplit, promote, remove } = useVideoEdits()
+const { overview, startTrim, startSplit, autoCrop, promote, remove } = useVideoEdits()
 
 const data = ref<EditOverview | null>(null)
 const error = ref('')
@@ -303,11 +407,27 @@ async function load() {
   }
 }
 
-const mode = ref<'trim' | 'split' | 'audio'>('trim')
+const mode = ref<'trim' | 'split' | 'audio' | 'overlay'>('trim')
 const tabItems = [
   { label: 'Trim & crop', value: 'trim', slot: 'trim' as const, icon: 'i-lucide-scissors' },
   { label: 'Split', value: 'split', slot: 'split' as const, icon: 'i-lucide-split' },
-  { label: 'Audio', value: 'audio', slot: 'audio' as const, icon: 'i-lucide-audio-lines' }
+  { label: 'Audio', value: 'audio', slot: 'audio' as const, icon: 'i-lucide-audio-lines' },
+  { label: 'Text & overlay', value: 'overlay', slot: 'overlay' as const, icon: 'i-lucide-type' }
+]
+
+const EDITOR_SHORTCUTS = [
+  { keys: 'space', label: 'Play / pause' },
+  { keys: 'K', label: 'Play / pause' },
+  { keys: '←', label: 'Previous frame' },
+  { keys: '→', label: 'Next frame' },
+  { keys: 'shift ←', label: 'Back 1 second' },
+  { keys: 'shift →', label: 'Forward 1 second' },
+  { keys: 'J', label: 'Back 5 seconds' },
+  { keys: 'L', label: 'Forward 5 seconds' },
+  { keys: 'F', label: 'Full screen' },
+  { keys: 'ctrl/⌘ Z', label: 'Undo' },
+  { keys: 'ctrl/⌘ shift Z', label: 'Redo' },
+  { keys: 'space (drag)', label: 'Move around when zoomed in' }
 ]
 
 // ── Preview player ───────────────────────────────────────────────────────────
@@ -325,6 +445,7 @@ function onDuration(seconds: number) {
   const el = preview.value?.videoEl
   if (el?.videoWidth) naturalWidth.value = el.videoWidth
   if (el?.videoHeight) naturalHeight.value = el.videoHeight
+  settle()
 }
 
 // ── Zoom & pan the preview ───────────────────────────────────────────────────
@@ -517,6 +638,37 @@ function cropFull() {
   Object.assign(crop, { x: 0, y: 0, w: naturalWidth.value, h: naturalHeight.value })
 }
 
+// One-click sizing for common destinations: crop shape + output resolution together.
+const EXPORT_PRESETS = [
+  { label: 'YouTube 1080p', aspect: 16 / 9, w: 1920, h: 1080, icon: 'i-simple-icons-youtube' },
+  { label: 'Shorts / Reels / TikTok', aspect: 9 / 16, w: 1080, h: 1920, icon: 'i-lucide-smartphone' },
+  { label: 'Square', aspect: 1, w: 1080, h: 1080, icon: 'i-lucide-square' },
+  { label: 'Twitter/X', aspect: 16 / 9, w: 1280, h: 720, icon: 'i-lucide-message-square' }
+]
+function applyPreset(preset: (typeof EXPORT_PRESETS)[number]) {
+  cropOn.value = true
+  setAspect(preset.aspect)
+  scaleOn.value = true
+  Object.assign(scale, { w: preset.w, h: preset.h })
+}
+
+// "Auto-center": a crop box centred on wherever the video moves the most,
+// instead of eyeballing it — a scoped stand-in for continuous face/subject
+// tracking, which this server's ffmpeg build can't do reliably.
+const autoCentering = ref(false)
+async function onAutoCenter() {
+  if (!cropAspect.value) return
+  autoCentering.value = true
+  try {
+    const r = await autoCrop(props.video.id, cropAspect.value)
+    Object.assign(crop, r)
+  } catch (err) {
+    toast.add({ title: 'Could not suggest a crop', description: apiErrorMessage(err), color: 'error' })
+  } finally {
+    autoCentering.value = false
+  }
+}
+
 // While cropping, the crop layer covers the player's own controls — moving a
 // trim handle shows that frame instead, so the crop can be checked anywhere.
 watch(
@@ -610,7 +762,7 @@ const visibleJobs = computed<ProcessingJob[]>(() => {
   return latest && latest.status === 'FAILED' ? [...active, latest] : active
 })
 const busy = computed(() => visibleJobs.value.some((j) => isActiveJobStatus(j.status)))
-const JOB_LABELS: Record<string, string> = { TRIM: 'Trim', SPLIT: 'Split', AUDIO: 'Audio edit', EXTRACT: 'Audio extract' }
+const JOB_LABELS: Record<string, string> = { TRIM: 'Trim', SPLIT: 'Split', AUDIO: 'Audio edit', EXTRACT: 'Audio extract', OVERLAY: 'Text & overlay' }
 function jobLabel(job: ProcessingJob) {
   let operation = 'Edit'
   try {
@@ -644,6 +796,9 @@ function reset() {
   naturalHeight.value = props.video.height ?? 0
   range.value = [0, durationMs.value]
   audioEdit.reset()
+  overlayEdit.reset()
+  draftOffered = false
+  settle()
   load()
 }
 onMounted(reset)
@@ -667,15 +822,78 @@ watchEffect(() => {
   el.muted = s.volume === 0 || isMutedAt(s.mutes, currentMs.value)
 })
 
+// ── Undo / redo, and the draft kept in this browser ─────────────────────────
+// Everything the tabs edit (not which tab or item is selected). audioEdit
+// must exist before this: useEditorHistory reads the current state right
+// away to seed history, and takeState() below touches audioEdit.state.
+const overlayEdit = useOverlayEdit(durationMs)
+function takeState() {
+  const { selectedId: _a, ...audio } = audioEdit.state
+  return {
+    trim: { range: range.value, cropOn: cropOn.value, crop: { ...crop }, cropAspect: cropAspect.value, scaleOn: scaleOn.value, scale: { ...scale } },
+    split: segments.value,
+    audio,
+    overlay: overlayEdit.state.layers
+  }
+}
+async function applyState(st: ReturnType<typeof takeState>) {
+  range.value = st.trim.range
+  cropOn.value = st.trim.cropOn
+  Object.assign(crop, st.trim.crop)
+  cropAspect.value = st.trim.cropAspect
+  scaleOn.value = st.trim.scaleOn
+  Object.assign(scale, st.trim.scale)
+  segments.value = st.split
+  const { clips, ...audio } = st.audio
+  Object.assign(audioEdit.state, audio)
+  audioEdit.state.clips = clips
+  overlayEdit.state.layers = st.overlay
+  if (!st.overlay.some((l) => l.id === overlayEdit.state.selectedId)) overlayEdit.state.selectedId = null
+  // A changed audio source starts its clips over (useAudioEdit); put them back after that.
+  await nextTick()
+  audioEdit.state.clips = clips
+}
+const history = useEditorHistory({
+  take: takeState,
+  apply: applyState,
+  draftKey: () => `videolingo:editor-draft:${props.video.id}`,
+  videoUrl: () => props.video.videoUrl ?? null
+})
+
+// Once the state is loaded (and again when the real duration arrives, which
+// fills in ranges and clips), that's the starting point: no undo past it,
+// and a saved draft is offered once.
+const draft = ref<EditorDraft | null>(null)
+let draftOffered = false
+function settle() {
+  nextTick(() => {
+    history.start()
+    if (!draftOffered) {
+      draftOffered = true
+      draft.value = history.pendingDraft()
+    }
+  })
+}
+async function onRestoreDraft() {
+  if (!draft.value) return
+  await history.restoreDraft(draft.value)
+  draft.value = null
+}
+function onDiscardDraft() {
+  history.discardDraft()
+  draft.value = null
+}
+
 // ── Promote / discard ────────────────────────────────────────────────────────
 const CLIP_ICONS: Record<VideoClip['operation'], string> = {
   TRIM: 'i-lucide-scissors',
   SPLIT: 'i-lucide-split',
   AUDIO: 'i-lucide-audio-lines',
-  EXTRACT: 'i-lucide-file-audio'
+  EXTRACT: 'i-lucide-file-audio',
+  OVERLAY: 'i-lucide-layers'
 }
 function replaces(clip: VideoClip) {
-  return clip.operation === 'TRIM' || clip.operation === 'AUDIO'
+  return clip.operation === 'TRIM' || clip.operation === 'AUDIO' || clip.operation === 'OVERLAY'
 }
 function clipTitle(clip: VideoClip) {
   switch (clip.operation) {
@@ -685,6 +903,8 @@ function clipTitle(clip: VideoClip) {
       return 'Audio edit'
     case 'EXTRACT':
       return 'Extracted audio'
+    case 'OVERLAY':
+      return 'Text & overlay'
     default:
       return `Trim · ${formatMsShort(clip.startMs)}${clip.endMs != null ? ` – ${formatMsShort(clip.endMs)}` : ' – end'}`
   }

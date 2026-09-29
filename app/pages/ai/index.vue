@@ -144,6 +144,7 @@ watch(search, (value) => {
 })
 const page = ref(1)
 const pageSize = ref(10)
+useListQuerySync({ search, page })
 const videoRows = ref<Video[]>([])
 const videoTotal = ref(0)
 const loadingVideos = ref(true)

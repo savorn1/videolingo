@@ -46,6 +46,7 @@
         :to="`/videos/${v.id}`"
         :title="v.title"
         :thumbnail-url="v.thumbnailUrl"
+        :video-url="v.videoUrl"
         :duration-seconds="v.durationSeconds"
         :progress="progress.get(v.id)"
       >

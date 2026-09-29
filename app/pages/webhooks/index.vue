@@ -12,7 +12,10 @@
     <UAlert v-if="error" color="error" variant="subtle" class="mb-4" :title="error" icon="i-lucide-triangle-alert" />
 
     <UCard>
-      <DataTable :rows="rows" :columns="columns" :loading="loading" refreshable @refresh="load">
+      <DataTable v-model:selected="selected" :rows="rows" :columns="columns" :loading="loading" :selectable="canWrite" refreshable @refresh="load">
+        <template v-if="canWrite" #bulk-actions="{ selected: picked, clear }">
+          <GenericBulkActions :items="picked" entity-label="webhook" :label="(w: Webhook) => w.name" :remove="remove" @done="clear(), load()" />
+        </template>
         <template #name-data="{ row }">
           <div class="min-w-0 max-w-md">
             <p class="font-medium text-gray-900 dark:text-white">{{ row.name }}</p>
@@ -195,6 +198,7 @@ const toast = useToast()
 const canWrite = computed(() => can('webhooks', 'WRITE'))
 
 const rows = ref<Webhook[]>([])
+const selected = ref<Webhook[]>([])
 const loading = ref(false)
 const error = ref('')
 const saving = ref(false)

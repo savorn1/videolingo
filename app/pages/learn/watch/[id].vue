@@ -247,9 +247,12 @@
                   @click="toggleFullscreen"
                 />
               </UTooltip>
+              <ShortcutsHelp :items="SHORTCUT_HELP" />
             </div>
           </div>
         </div>
+
+        <PracticePanel :cues="primaryCues" :current-ms="currentMs" :language="primaryTrack?.language ?? page.video.language" @play="playLine" />
 
         <div ref="studyPanelEl">
           <StudyPanel :video-id="page.video.id" :items="studyItems" :preferred-language="secondTrack?.language ?? primaryTrack?.language" @seek="seek" />
@@ -322,11 +325,38 @@ const canControl = computed(() => !!player.value?.canControl)
 function onTime(ms: number) {
   currentMs.value = ms
   tracker.onTime(ms)
+  if (stopAtMs !== null && ms >= stopAtMs) {
+    stopAtMs = null
+    player.value?.pause()
+    restoreSpeed()
+    return
+  }
   followLines(ms)
+}
+
+// ── Practice: play one line (optionally slower), then stop ─────────────────
+let stopAtMs: number | null = null
+let speedBefore: number | null = null
+function restoreSpeed() {
+  if (speedBefore !== null) {
+    player.value?.setRate(speedBefore)
+    speedBefore = null
+  }
+}
+function playLine(range: { startMs: number; endMs: number; slow: boolean }) {
+  restoreSpeed()
+  if (range.slow) {
+    speedBefore = speed.value
+    player.value?.setRate(0.75)
+  }
+  seek(range.startMs)
+  stopAtMs = range.endMs
 }
 function seek(ms: number, play = true) {
   // Follow the line we land on — not the one we left, whose end we may be sitting on.
   pausedLine = null
+  // Any seek ends a practice line's "stop at its end" (playLine sets it again right after).
+  stopAtMs = null
   followed = lineAt(primaryCues.value, ms)
   finished.value = false
   player.value?.seek(ms, play)

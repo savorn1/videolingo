@@ -86,21 +86,7 @@
         <template #title-data="{ row }">
           <div class="flex items-center gap-3 min-w-0 max-w-xs">
             <div class="relative w-24 aspect-video shrink-0 rounded-md overflow-hidden bg-gray-100 dark:bg-gray-800">
-              <img
-                v-if="row.thumbnailUrl && !brokenThumbnails.has(row.id)"
-                :src="row.thumbnailUrl"
-                alt=""
-                class="w-full h-full object-cover"
-                loading="lazy"
-                @error="brokenThumbnails.add(row.id)"
-              />
-              <UIcon v-else name="i-lucide-clapperboard" class="absolute inset-0 m-auto w-5 h-5 text-gray-400" />
-              <span
-                v-if="row.durationSeconds !== null"
-                class="absolute bottom-1 right-1 rounded bg-black/75 px-1 text-[10px] font-semibold text-white tabular-nums"
-              >
-                {{ formatDuration(row.durationSeconds) }}
-              </span>
+              <HoverScrubThumbnail :thumbnail-url="row.thumbnailUrl" :video-url="row.videoUrl" :duration-seconds="row.durationSeconds" />
             </div>
             <div class="min-w-0">
               <p class="font-semibold text-gray-900 dark:text-white truncate" :title="row.title">{{ row.title }}</p>
@@ -169,6 +155,17 @@
     </UCard>
 
     <VideoEditModal v-model="showEdit" :video="editing" @saved="load" />
+    <VideoPeekModal
+      :video="peeking"
+      can-write
+      @close="peeking = null"
+      @edit="
+        (v: Video) => {
+          peeking = null
+          openEdit(v)
+        }
+      "
+    />
 
     <ConfirmModal
       :model-value="confirmDelete !== null"
@@ -207,9 +204,6 @@ const { list: listTags } = useTags()
 const toast = useToast()
 
 const rows = ref<Video[]>([])
-// Thumbnails whose URL failed to load — shown as the placeholder icon instead
-// of the browser's broken-image glyph.
-const brokenThumbnails = reactive(new Set<number>())
 const total = ref(0)
 const loading = ref(false)
 const error = ref('')
@@ -428,10 +422,12 @@ function rowActions(row: Video): RowAction[] {
   // One inline button (the likeliest next step) and the rest in the "…" menu —
   // the whole row already opens the video, so View doesn't need a button.
   const view: RowAction = { label: 'View', icon: 'i-lucide-play', onClick: () => navigateTo(`/videos/${row.id}`) }
+  const peek: RowAction = { label: 'Quick view', icon: 'i-lucide-eye', onClick: () => (peeking.value = row) }
   if (row.deleted) {
-    return [{ label: 'Restore', icon: 'i-lucide-rotate-ccw', color: 'success', loading: busy.value, onClick: () => onRestore(row) }, view]
+    return [{ label: 'Restore', icon: 'i-lucide-rotate-ccw', color: 'success', loading: busy.value, onClick: () => onRestore(row) }, peek, view]
   }
   return [
+    peek,
     { label: 'Edit', icon: 'i-lucide-pencil', color: 'primary', onClick: () => openEdit(row) },
     view,
     row.enabled
@@ -449,6 +445,7 @@ function rowActions(row: Video): RowAction[] {
 const busy = ref(false)
 const confirmDisable = ref<Video | null>(null)
 const confirmDelete = ref<Video | null>(null)
+const peeking = ref<Video | null>(null)
 
 async function run(action: () => Promise<unknown>, success: string, failure: string) {
   busy.value = true

@@ -45,7 +45,13 @@
           </div>
           <UButton size="xs" color="neutral" variant="soft" icon="i-lucide-cpu" :to="`/processing-jobs/${job.id}`">Job #{{ job.id }}</UButton>
         </div>
-        <JobProgress :status="job.status" :progress="job.progress" :current-step="job.status === 'FAILED' ? job.errorMessage : job.currentStep" size="lg" />
+        <JobProgress
+          :status="job.status"
+          :progress="job.progress"
+          :current-step="job.status === 'FAILED' ? job.errorMessage : job.currentStep"
+          :queue-position="job.queuePosition"
+          size="lg"
+        />
         <p v-if="regenerating" class="text-xs text-gray-500 dark:text-gray-400 mt-2">
           Editing is paused — the segments below are replaced when the job finishes.
         </p>
@@ -331,7 +337,8 @@ async function load() {
           errorMessage: null,
           durationSeconds: null,
           updatedAt: null,
-          lastLogId: null
+          lastLogId: null,
+          queuePosition: null
         }
       : null
   } catch (err) {
@@ -568,7 +575,8 @@ async function onRegenerate() {
       errorMessage: null,
       durationSeconds: null,
       updatedAt: queued.updatedAt,
-      lastLogId: null
+      lastLogId: null,
+      queuePosition: queued.queuePosition
     }
     confirmRegenerate.value = false
     toast.add({ title: `Regeneration queued — job #${queued.id}`, color: 'success' })

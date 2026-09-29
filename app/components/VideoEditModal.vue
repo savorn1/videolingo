@@ -1,6 +1,20 @@
 <template>
   <UModal v-model:open="open" :title="`Edit '${video?.title ?? ''}'`" :ui="{ content: 'sm:max-w-xl' }">
     <template #body>
+      <div v-if="canPickFrame" class="mb-4 space-y-2">
+        <div class="flex items-center gap-3">
+          <img
+            v-if="form.thumbnailUrl"
+            :src="form.thumbnailUrl"
+            alt="Current thumbnail"
+            class="w-32 aspect-video rounded object-cover bg-gray-100 dark:bg-gray-800"
+          />
+          <UButton size="xs" color="neutral" variant="soft" icon="i-lucide-film" @click="showFramePicker = !showFramePicker">
+            {{ showFramePicker ? 'Hide frame picker' : 'Choose a thumbnail frame…' }}
+          </UButton>
+        </div>
+        <ThumbnailPicker v-if="showFramePicker" :src="video!.videoUrl" @picked="onFramePicked" />
+      </div>
       <DynamicForm
         v-model="form"
         :fields="fields"
@@ -64,6 +78,16 @@ const fields = computed<FieldDef[]>(() => [
   }
 ])
 
+// Only files we can load in the browser — platform embeds (YouTube, …) can't be captured.
+const canPickFrame = computed(() => !!props.video?.videoUrl && !props.video.embedUrl)
+const showFramePicker = ref(false)
+
+function onFramePicked(url: string) {
+  form.value = { ...form.value, thumbnailUrl: url }
+  showFramePicker.value = false
+  toast.add({ title: 'Frame captured — save to keep it', color: 'info' })
+}
+
 // Refill from the target each time the modal opens, so a previous video's
 // unsaved edits never carry over.
 watch(open, (value) => {
@@ -77,6 +101,7 @@ watch(open, (value) => {
     categoryIds: props.video.categories.map((c) => c.id)
   }
   error.value = ''
+  showFramePicker.value = false
 })
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
