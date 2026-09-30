@@ -5,6 +5,7 @@
         <UDropdownMenu :items="relatedItems" :content="{ align: 'end' }">
           <UButton color="neutral" variant="soft" icon="i-lucide-layers" trailing-icon="i-lucide-chevron-down">Related</UButton>
         </UDropdownMenu>
+        <UButton color="neutral" variant="soft" icon="i-lucide-share-2" @click="showShare = true">Share</UButton>
         <UButton v-if="!video.deleted" color="neutral" variant="soft" icon="i-lucide-download" @click="showDownload = true">Download</UButton>
         <UButton v-if="!video.deleted" color="neutral" variant="soft" icon="i-lucide-scissors" :to="`/videos/${video.id}/editor`">Edit video</UButton>
         <template v-if="video.deleted">
@@ -80,7 +81,9 @@
             @time="onPlayerTime"
             @ended="tracker.onEnded"
           />
-          <div v-else class="w-full aspect-video bg-black rounded-lg" />
+          <div v-else class="w-full aspect-video rounded-lg bg-gray-900 flex items-center justify-center animate-pulse" aria-label="Loading video" role="status">
+            <UIcon name="i-lucide-play" class="w-10 h-10 text-white/30" />
+          </div>
         </UCard>
 
         <div class="space-y-4 min-w-0">
@@ -255,6 +258,7 @@
     </template>
 
     <VideoEditModal v-model="showEdit" :video="video" @saved="(saved) => (video = saved)" />
+    <VideoShareModal v-if="video" v-model="showShare" :video="video" :current-ms="currentMs" />
     <VideoDownloadModal v-if="video" v-model="showDownload" :video="video" :can-write="canWriteVideos" @imported="load" />
     <VideoReplaceModal v-if="video" v-model="showReplace" :video="video" @replaced="(v) => (video = v)" />
     <VideoMoveModal v-if="video" v-model="showMove" :video="video" @moved="(v) => (video = v)" />
@@ -467,6 +471,7 @@ onMounted(() => {
 // ── Actions ────────────────────────────────────────────────────────────────
 const showEdit = ref(false)
 const showDownload = ref(false)
+const showShare = ref(false)
 const busy = ref(false)
 const confirmDisable = ref(false)
 const confirmDelete = ref(false)

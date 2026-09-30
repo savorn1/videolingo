@@ -110,6 +110,7 @@
           :selection="mode === 'trim' ? range : mode === 'audio' ? audioEdit.state.range : null"
           :fullscreen-target="stage"
           :space-taken="hovering && zoom > 1"
+          :arrow-keys-taken="mode === 'overlay' && !!overlayEdit.state.selectedId"
           :style="fitStyle"
         />
         <AudioStrip
@@ -162,30 +163,121 @@
             </div>
           </div>
         </template>
-        <UTabs v-model="mode" :items="tabItems" variant="link" :ui="{ list: 'mb-3' }">
+        <!-- Short labels + stacked icons so all four tabs fit the narrow panel; the full names are in the tooltip. -->
+        <UTabs
+          v-model="mode"
+          :items="tabItems"
+          variant="link"
+          :ui="{ list: 'mb-4', trigger: 'flex-1 flex-col gap-1 px-1 text-xs', leadingIcon: 'size-5', label: 'truncate' }"
+        >
           <!-- ── Trim & crop ───────────────────────────────────────────── -->
           <template #trim>
-            <div class="space-y-3">
-              <div class="flex items-center justify-between text-sm">
-                <span class="tabular-nums font-medium text-gray-900 dark:text-white">{{ formatMsShort(range[0]) }} – {{ formatMsShort(range[1]) }}</span>
-                <span class="text-gray-500">of {{ formatMsShort(durationMs) }}</span>
-              </div>
-              <USlider v-model="range" :min="0" :max="Math.max(durationMs, 1)" :step="100" :min-steps-between-thumbs="500" />
-              <div class="flex flex-wrap gap-2">
-                <UButton size="xs" color="neutral" variant="soft" @click="range = [Math.round(currentMs), range[1]]">Set start to current time</UButton>
-                <UButton size="xs" color="neutral" variant="soft" @click="range = [range[0], Math.round(currentMs)]">Set end to current time</UButton>
-              </div>
-
-              <div class="space-y-1">
-                <span class="text-xs text-gray-500 dark:text-gray-400">Export for</span>
-                <div class="flex flex-wrap gap-1">
-                  <UButton v-for="p in EXPORT_PRESETS" :key="p.label" size="xs" color="neutral" variant="soft" :icon="p.icon" @click="applyPreset(p)">
-                    {{ p.label }}
+            <div class="space-y-5">
+              <!-- Range -->
+              <section class="space-y-3" aria-labelledby="trim-range-h">
+                <div class="flex items-center justify-between gap-2">
+                  <h3 id="trim-range-h" class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Range</h3>
+                  <UButton v-if="trimDirty" size="xs" color="neutral" variant="ghost" icon="i-lucide-rotate-ccw" title="Undoable — Ctrl/⌘+Z brings the settings back" @click="resetTrim">
+                    Reset trim
                   </UButton>
                 </div>
-              </div>
+                <div class="flex items-end justify-between gap-3">
+                  <div>
+                    <p class="text-xs text-gray-500 dark:text-gray-400">Clip length</p>
+                    <p class="text-2xl font-semibold tabular-nums text-gray-900 dark:text-white" data-testid="clip-length">{{ formatMsShort(range[1] - range[0]) }}</p>
+                  </div>
+                  <p class="text-xs text-gray-500 dark:text-gray-400 tabular-nums text-right">
+                    {{ formatMsShort(range[0]) }} – {{ formatMsShort(range[1]) }}<br />
+                    of {{ formatMsShort(durationMs) }}
+                  </p>
+                </div>
+                <USlider
+                  v-model="range"
+                  :min="0"
+                  :max="Math.max(durationMs, 1)"
+                  :step="100"
+                  :min-steps-between-thumbs="500"
+                  :ui="{ thumb: 'size-5' }"
+                  aria-label="Trim range"
+                />
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div v-for="edge in TRIM_EDGES" :key="edge.key" class="space-y-1">
+                    <label :for="`trim-${edge.key}`" class="text-xs font-medium text-gray-700 dark:text-gray-300">{{ edge.label }}</label>
+                    <div class="flex items-center gap-1">
+                      <UButton size="xs" color="neutral" variant="soft" aria-label="1 second earlier" @click="nudgeEdge(edge.key, -1000)">−1s</UButton>
+                      <UInput
+                        :id="`trim-${edge.key}`"
+                        :model-value="formatTimecode(range[edge.key === 'start' ? 0 : 1])"
+                        size="sm"
+                        class="flex-1 min-w-0"
+                        :ui="{ base: 'tabular-nums text-center' }"
+                        inputmode="decimal"
+                        @change="(e: Event) => typeEdge(edge.key, e)"
+                        @keydown.enter="(e: KeyboardEvent) => (e.target as HTMLInputElement).blur()"
+                      />
+                      <UButton size="xs" color="neutral" variant="soft" aria-label="1 second later" @click="nudgeEdge(edge.key, 1000)">+1s</UButton>
+                    </div>
+                    <UButton size="xs" color="neutral" variant="link" icon="i-lucide-crosshair" :padded="false" @click="setEdge(edge.key, Math.round(currentMs))">
+                      Use current time
+                    </UButton>
+                  </div>
+                </div>
+                <p class="text-xs text-gray-500 dark:text-gray-400">Type a time like 1:23.5, or step by single frames with ← → under the video.</p>
+              </section>
 
-              <USwitch v-model="cropOn" label="Also crop" @update:model-value="onCropToggle" />
+              <!-- Output -->
+              <section class="space-y-3" aria-labelledby="trim-output-h">
+                <h3 id="trim-output-h" class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Output</h3>
+                <div>
+                  <p class="text-xs text-gray-500 dark:text-gray-400 mb-1.5">Export for</p>
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-2" role="group" aria-label="Export presets">
+                    <div v-for="p in EXPORT_PRESETS" :key="p.key" class="group relative">
+                      <button
+                        type="button"
+                        :aria-pressed="activePreset?.key === p.key"
+                        class="flex w-full items-center gap-2.5 rounded-lg border px-3 py-2 text-left transition-colors focus-visible:outline-2 focus-visible:outline-primary-500"
+                        :class="
+                          activePreset?.key === p.key
+                            ? 'border-primary-500 bg-primary-50 dark:bg-primary-950 text-primary-700 dark:text-primary-300'
+                            : 'border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50 text-gray-700 dark:text-gray-300'
+                        "
+                        @click="togglePreset(p)"
+                      >
+                        <UIcon :name="p.icon" class="w-4 h-4 shrink-0" />
+                        <span class="min-w-0" :class="p.customId ? 'pr-6' : ''">
+                          <span class="block text-sm font-medium truncate" :title="p.label">{{ p.label }}</span>
+                          <span class="block text-xs opacity-70 tabular-nums">{{ p.ratio }} · {{ p.w }}×{{ p.h }}</span>
+                        </span>
+                      </button>
+                      <UButton
+                        v-if="p.customId"
+                        size="xs"
+                        color="neutral"
+                        variant="ghost"
+                        icon="i-lucide-x"
+                        class="absolute right-1 top-1 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100"
+                        :aria-label="`Delete preset ${p.label}`"
+                        @click="removePreset(p)"
+                      />
+                    </div>
+                  </div>
+                  <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+                    <UPopover v-model:open="savingPreset">
+                      <UButton size="xs" color="neutral" variant="ghost" icon="i-lucide-bookmark-plus" :disabled="!presetToSave">Save as preset</UButton>
+                      <template #content>
+                        <form class="flex items-center gap-2 p-2" @submit.prevent="onSavePreset">
+                          <UInput v-model="presetName" size="sm" placeholder="Preset name" autofocus class="w-48" aria-label="Preset name" />
+                          <UButton size="sm" type="submit" :disabled="!presetName.trim()">Save</UButton>
+                        </form>
+                      </template>
+                    </UPopover>
+                    <span v-if="!presetToSave && !activePreset" class="text-xs text-gray-500 dark:text-gray-400">
+                      To save your own, turn on crop and resize and pick a shape such as 16:9.
+                    </span>
+                  </div>
+                </div>
+
+              <USwitch v-model="cropOn" label="Also crop" description="Keep only part of the picture." @update:model-value="onCropToggle" />
               <template v-if="cropOn">
                 <p class="text-xs text-gray-500 dark:text-gray-400">
                   Drag on the video to draw the area to keep — drag inside it to move, drag the white handles to resize. Use the playback bar under the video
@@ -221,71 +313,140 @@
                   >
                 </div>
               </template>
-              <div v-if="cropOn" class="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                <UFormField label="X"><UInput v-model.number="crop.x" type="number" size="sm" /></UFormField>
-                <UFormField label="Y"><UInput v-model.number="crop.y" type="number" size="sm" /></UFormField>
-                <UFormField label="Width"><UInput v-model.number="crop.w" type="number" size="sm" /></UFormField>
-                <UFormField label="Height"><UInput v-model.number="crop.h" type="number" size="sm" /></UFormField>
-              </div>
+              <EditorSection v-if="cropOn" v-model:open="cropFieldsOpen" title="Exact crop values" :hint="crop.w && crop.h ? `${crop.w}×${crop.h} at ${crop.x}, ${crop.y}` : 'not drawn yet'">
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  <UFormField label="X"><UInput v-model.number="crop.x" type="number" size="sm" /></UFormField>
+                  <UFormField label="Y"><UInput v-model.number="crop.y" type="number" size="sm" /></UFormField>
+                  <UFormField label="Width"><UInput v-model.number="crop.w" type="number" size="sm" /></UFormField>
+                  <UFormField label="Height"><UInput v-model.number="crop.h" type="number" size="sm" /></UFormField>
+                </div>
+              </EditorSection>
 
-              <USwitch v-model="scaleOn" label="Also resize the output" @update:model-value="onScaleToggle" />
+              <USwitch v-model="scaleOn" label="Also resize the output" description="Set the exact width and height of the result." @update:model-value="onScaleToggle" />
               <div v-if="scaleOn" class="grid grid-cols-2 gap-2">
                 <UFormField label="Width"><UInput v-model.number="scale.w" type="number" size="sm" /></UFormField>
                 <UFormField label="Height"><UInput v-model.number="scale.h" type="number" size="sm" /></UFormField>
               </div>
+              </section>
 
-              <!-- Always takes its line, so the layout (and the video) don't jump while a crop is being drawn. -->
-              <p class="text-xs text-error-500 min-h-4">{{ trimError }}</p>
-              <UButton v-if="canWrite" block icon="i-lucide-scissors" :loading="starting" :disabled="!!trimError || busy" @click="onStartTrim">
-                Start trim
-              </UButton>
+              <!-- Action: says what will be made before it is made -->
+              <section class="space-y-2 border-t border-gray-100 dark:border-gray-800 pt-4" aria-label="Start trim">
+                <p class="text-sm text-gray-700 dark:text-gray-300" data-testid="trim-summary">{{ trimSummary }}</p>
+                <!-- Always takes its line, so the layout (and the video) don't jump while a crop is being drawn. -->
+                <p class="text-xs min-h-4" :class="trimError ? 'text-error-500' : 'text-gray-500 dark:text-gray-400'">
+                  {{ trimError ?? (trimDirty ? '' : 'Change the range, or turn on crop or resize, to make a trim.') }}
+                </p>
+                <UButton v-if="canWrite" block icon="i-lucide-scissors" :loading="starting" :disabled="!!trimError || !trimDirty || busy" @click="onStartTrim">
+                  Start trim
+                </UButton>
+                <p class="text-xs text-gray-500 dark:text-gray-400">
+                  The result appears under Results, where you can replace the original (kept under Versions) or add it as a new video.
+                </p>
+              </section>
             </div>
           </template>
 
           <!-- ── Split into segments ──────────────────────────────────────── -->
           <template #split>
-            <div class="space-y-3">
-              <div v-if="durationMs" class="relative h-6 rounded-md bg-gray-100 dark:bg-gray-800 overflow-hidden">
-                <div
-                  v-for="(bar, i) in segmentBars"
-                  :key="i"
-                  class="absolute inset-y-0 flex items-center justify-center text-[10px] font-medium text-white border-r border-white dark:border-gray-900 last:border-r-0"
-                  :class="bar.valid ? bar.color : 'bg-error-500'"
-                  :style="{ left: bar.leftPct + '%', width: bar.widthPct + '%' }"
-                >
-                  {{ i + 1 }}
+            <div class="space-y-4">
+              <!-- Strip: click a segment to select it and jump the video to its start -->
+              <section class="space-y-2" aria-labelledby="split-strip-h">
+                <div class="flex items-center justify-between gap-2">
+                  <h3 id="split-strip-h" class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Segments</h3>
+                  <UButton v-if="splitDirty" size="xs" color="neutral" variant="ghost" icon="i-lucide-rotate-ccw" title="Undoable — Ctrl/⌘+Z brings the segments back" @click="resetSplit">
+                    Reset split
+                  </UButton>
                 </div>
-              </div>
-              <div v-for="(seg, i) in segments" :key="i" class="flex items-center gap-2">
-                <span class="w-5 text-xs text-gray-400 tabular-nums">{{ i + 1 }}</span>
-                <UInput v-model.number="seg.startMsSeconds" type="number" size="sm" :min="0" class="w-24" />
-                <span class="text-xs text-gray-400">to</span>
-                <UInput v-model.number="seg.endMsSeconds" type="number" size="sm" :min="0" class="w-24" placeholder="end" />
-                <span class="text-xs text-gray-400">sec</span>
-                <UButton
-                  size="xs"
-                  color="error"
-                  variant="ghost"
-                  icon="i-lucide-x"
-                  aria-label="Remove segment"
-                  :disabled="segments.length <= 1"
-                  @click="segments.splice(i, 1)"
-                />
-              </div>
-              <div class="flex flex-wrap items-center gap-2">
-                <UButton size="xs" color="neutral" variant="soft" icon="i-lucide-plus" @click="segments.push({ startMsSeconds: 0, endMsSeconds: null })">
-                  Add segment
-                </UButton>
-                <span class="text-xs text-gray-500">Split evenly:</span>
-                <UButton v-for="n in [2, 3, 4]" :key="n" size="xs" color="neutral" variant="ghost" :disabled="!durationMs" @click="splitEvenly(n)">
-                  {{ n }} parts
-                </UButton>
-              </div>
+                <div v-if="durationMs" class="relative h-8 rounded-md bg-gray-100 dark:bg-gray-800 overflow-hidden">
+                  <button
+                    v-for="(bar, i) in segmentBars"
+                    :key="i"
+                    type="button"
+                    class="absolute inset-y-0 flex items-center justify-center text-[11px] font-medium text-white border-r border-white dark:border-gray-900 last:border-r-0 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-white"
+                    :class="[bar.valid ? bar.color : 'bg-error-500', selectedSegment === i ? 'ring-2 ring-inset ring-white' : 'opacity-80 hover:opacity-100']"
+                    :style="{ left: bar.leftPct + '%', width: bar.widthPct + '%' }"
+                    :aria-label="`Segment ${i + 1}`"
+                    @click="selectSegment(i)"
+                  >
+                    {{ i + 1 }}
+                  </button>
+                  <!-- Playhead -->
+                  <span class="absolute inset-y-0 w-0.5 bg-black/70 dark:bg-white/80 pointer-events-none" :style="{ left: `${Math.min(100, (currentMs / durationMs) * 100)}%` }" />
+                </div>
+                <p v-if="uncoveredMs > 0 && !splitError" class="text-xs text-gray-500 dark:text-gray-400">
+                  {{ formatMsShort(uncoveredMs) }} of the video isn't in any segment and will be left out.
+                </p>
+              </section>
 
-              <p v-if="splitError" class="text-xs text-error-500">{{ splitError }}</p>
-              <UButton v-if="canWrite" block icon="i-lucide-split" :loading="starting" :disabled="!!splitError || busy" @click="onStartSplit">
-                Start split
-              </UButton>
+              <!-- Rows: typed times (1:23 or 1:23.5), length, remove -->
+              <section class="space-y-1.5" aria-label="Segment times">
+                <div
+                  v-for="(seg, i) in segments"
+                  :key="i"
+                  class="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-md px-1.5 py-1 -mx-1.5"
+                  :class="selectedSegment === i ? 'bg-primary-50 dark:bg-primary-950/40' : ''"
+                  @focusin="selectedSegment = i"
+                >
+                  <span class="w-5 text-xs text-gray-400 tabular-nums">{{ i + 1 }}</span>
+                  <UInput
+                    :model-value="formatTimecode(seg.startMsSeconds * 1000)"
+                    size="sm"
+                    class="w-24"
+                    :ui="{ base: 'tabular-nums' }"
+                    :aria-label="`Segment ${i + 1} start`"
+                    @change="(e: Event) => typeSegment(i, 'start', e)"
+                  />
+                  <span class="text-xs text-gray-400">to</span>
+                  <UInput
+                    :model-value="seg.endMsSeconds == null ? '' : formatTimecode(seg.endMsSeconds * 1000)"
+                    size="sm"
+                    class="w-24"
+                    placeholder="end"
+                    :ui="{ base: 'tabular-nums' }"
+                    :aria-label="`Segment ${i + 1} end`"
+                    @change="(e: Event) => typeSegment(i, 'end', e)"
+                  />
+                  <span class="text-xs text-gray-500 dark:text-gray-400 tabular-nums ml-auto">{{ segmentLength(seg) }}</span>
+                  <UButton
+                    size="xs"
+                    color="error"
+                    variant="ghost"
+                    icon="i-lucide-x"
+                    aria-label="Remove segment"
+                    :disabled="segments.length <= 1"
+                    @click="removeSegment(i)"
+                  />
+                </div>
+              </section>
+
+              <!-- Add -->
+              <section class="space-y-2" aria-label="Add segments">
+                <div class="flex flex-wrap items-center gap-2">
+                  <UButton size="xs" icon="i-lucide-scissors-line-dashed" :disabled="!canSplitHere" @click="splitAtPlayhead">Split at playhead</UButton>
+                  <UButton size="xs" color="neutral" variant="soft" icon="i-lucide-plus" @click="segments.push({ startMsSeconds: 0, endMsSeconds: null })">
+                    Add segment
+                  </UButton>
+                </div>
+                <div class="flex flex-wrap items-center gap-2">
+                  <span class="text-xs text-gray-500">Split evenly:</span>
+                  <UButton v-for="n in [2, 3, 4]" :key="n" size="xs" color="neutral" variant="ghost" :disabled="!durationMs" @click="splitEvenly(n)">
+                    {{ n }} parts
+                  </UButton>
+                </div>
+                <p class="text-xs text-gray-500 dark:text-gray-400">Play to a moment and press “Split at playhead” to cut the segment there in two.</p>
+              </section>
+
+              <!-- Action -->
+              <section class="space-y-2 border-t border-gray-100 dark:border-gray-800 pt-4" aria-label="Start split">
+                <p class="text-sm text-gray-700 dark:text-gray-300" data-testid="split-summary">{{ splitSummary }}</p>
+                <p class="text-xs min-h-4" :class="splitError ? 'text-error-500' : 'text-gray-500 dark:text-gray-400'">
+                  {{ splitError ?? (splitDirty ? '' : 'Add a split point, or use “Split evenly”, to make more than one segment.') }}
+                </p>
+                <UButton v-if="canWrite" block icon="i-lucide-split" :loading="starting" :disabled="!!splitError || !splitDirty || busy" @click="onStartSplit">
+                  Start split
+                </UButton>
+                <p class="text-xs text-gray-500 dark:text-gray-400">Each segment becomes a new video, disabled until you review and enable it.</p>
+              </section>
             </div>
           </template>
           <!-- ── Audio ─────────────────────────────────────────────────── -->
@@ -373,7 +534,7 @@
               {{ replaces(clip) ? 'Replace original' : 'Add as new video' }}
             </UButton>
           </template>
-          <UButton v-if="canWrite" size="xs" color="neutral" variant="ghost" icon="i-lucide-trash-2" aria-label="Discard clip" @click="onDiscard(clip)" />
+          <UButton v-if="canWrite" size="xs" color="error" variant="ghost" icon="i-lucide-trash-2" aria-label="Discard clip" @click="onDiscard(clip)" />
         </li>
       </ul>
     </UCard>
@@ -416,8 +577,19 @@ import type { EditOverview, VideoClip } from '~/composables/useVideoEdits'
 import type { ProcessingJob } from '~/composables/useProcessingJobs'
 import type { Video } from '~/composables/useVideos'
 import type VideoPlayer from '~/components/VideoPlayer.vue'
-import { validateCrop, validateScale, validateSegments, validateTrim } from '#shared/utils/videoEdit'
+import {
+  findSplitTarget,
+  splitRowAt,
+  uncoveredMs as uncoveredTime,
+  validateCrop,
+  validateScale,
+  validateSegments,
+  validateTrim,
+  withTrimEdge
+} from '#shared/utils/videoEdit'
 import { isMutedAt } from '#shared/utils/audioEdit'
+import { formatTimecode, parseTimecode } from '#shared/utils/transport'
+import { presetFromSettings, ratioLabel } from '#shared/utils/exportPreset'
 import { formatTimeUntil } from '#shared/utils/format'
 import type { EditorDraft } from '~/composables/useEditorHistory'
 
@@ -465,7 +637,10 @@ const EDITOR_SHORTCUTS = [
   { keys: 'F', label: 'Full screen' },
   { keys: 'ctrl/⌘ Z', label: 'Undo' },
   { keys: 'ctrl/⌘ shift Z', label: 'Redo' },
-  { keys: 'space (drag)', label: 'Move around when zoomed in' }
+  { keys: 'space (drag)', label: 'Move around when zoomed in' },
+  { keys: '←→↑↓', label: 'Nudge the selected layer (Text & overlay)' },
+  { keys: 'shift ←→↑↓', label: 'Nudge further' },
+  { keys: 'delete', label: 'Remove the selected layer (Text & overlay)' }
 ]
 
 // ── Preview player ───────────────────────────────────────────────────────────
@@ -677,18 +852,97 @@ function cropFull() {
 }
 
 // One-click sizing for common destinations: crop shape + output resolution together.
-const EXPORT_PRESETS = [
-  { label: 'YouTube 1080p', aspect: 16 / 9, w: 1920, h: 1080, icon: 'i-simple-icons-youtube' },
-  { label: 'Shorts / Reels / TikTok', aspect: 9 / 16, w: 1080, h: 1920, icon: 'i-lucide-smartphone' },
-  { label: 'Square', aspect: 1, w: 1080, h: 1080, icon: 'i-lucide-square' },
-  { label: 'Twitter/X', aspect: 16 / 9, w: 1280, h: 720, icon: 'i-lucide-message-square' }
+interface ExportPreset {
+  key: string
+  label: string
+  ratio: string
+  aspect: number
+  w: number
+  h: number
+  icon: string
+  /** Set on presets saved in this browser — only those can be deleted. */
+  customId?: string
+}
+const BUILTIN_PRESETS: ExportPreset[] = [
+  { key: 'youtube', label: 'YouTube 1080p', ratio: '16:9', aspect: 16 / 9, w: 1920, h: 1080, icon: 'i-simple-icons-youtube' },
+  { key: 'shorts', label: 'Shorts / Reels / TikTok', ratio: '9:16', aspect: 9 / 16, w: 1080, h: 1920, icon: 'i-lucide-smartphone' },
+  { key: 'square', label: 'Square', ratio: '1:1', aspect: 1, w: 1080, h: 1080, icon: 'i-lucide-square' },
+  { key: 'twitter', label: 'Twitter/X', ratio: '16:9', aspect: 16 / 9, w: 1280, h: 720, icon: 'i-lucide-message-square' }
 ]
-function applyPreset(preset: (typeof EXPORT_PRESETS)[number]) {
+const exportPresets = useExportPresets()
+const EXPORT_PRESETS = computed<ExportPreset[]>(() => [
+  ...BUILTIN_PRESETS,
+  ...exportPresets.saved.value.map((e) => ({ key: e.id, label: e.name, ratio: ratioLabel(e.data.aspect), ...e.data, icon: 'i-lucide-bookmark', customId: e.id }))
+])
+function applyPreset(preset: ExportPreset) {
   cropOn.value = true
   setAspect(preset.aspect)
   scaleOn.value = true
   Object.assign(scale, { w: preset.w, h: preset.h })
   toast.add({ title: `Crop and resize set for ${preset.label}`, color: 'info' })
+}
+// A preset counts as chosen while its crop shape and output size are what is set,
+// so it un-highlights as soon as either is changed by hand.
+const activePreset = computed(() =>
+  cropOn.value && scaleOn.value ? (EXPORT_PRESETS.value.find((p) => p.aspect === cropAspect.value && p.w === scale.w && p.h === scale.h) ?? null) : null
+)
+function togglePreset(preset: ExportPreset) {
+  if (activePreset.value?.key !== preset.key) return applyPreset(preset)
+  // Choosing the active preset again clears what it set.
+  cropOn.value = false
+  onCropToggle(false)
+  scaleOn.value = false
+}
+
+// Saving the current crop shape + output size as a preset of your own.
+const savingPreset = ref(false)
+const presetName = ref('')
+const presetToSave = computed(() => (activePreset.value ? null : presetFromSettings(cropOn.value, cropAspect.value, scaleOn.value, scale)))
+function onSavePreset() {
+  const data = presetToSave.value
+  if (!data || !presetName.value.trim()) return
+  exportPresets.save(presetName.value, data)
+  toast.add({ title: `Saved preset “${presetName.value.trim()}”`, color: 'success' })
+  presetName.value = ''
+  savingPreset.value = false
+}
+function removePreset(preset: ExportPreset) {
+  if (!preset.customId) return
+  exportPresets.remove(preset.customId)
+  toast.add({ title: `Deleted preset “${preset.label}”`, color: 'info' })
+}
+
+// The crop is normally drawn on the video; the four numbers are for exact values.
+const cropFieldsOpen = ref(false)
+
+function resetTrim() {
+  range.value = [0, durationMs.value]
+  cropOn.value = false
+  onCropToggle(false)
+  scaleOn.value = false
+}
+
+// ── Trim range: typed times and nudges ───────────────────────────────────────
+const TRIM_EDGES = [
+  { key: 'start' as const, label: 'Start' },
+  { key: 'end' as const, label: 'End' }
+]
+function setEdge(edge: 'start' | 'end', ms: number) {
+  range.value = withTrimEdge(range.value, edge, ms, durationMs.value)
+}
+function nudgeEdge(edge: 'start' | 'end', deltaMs: number) {
+  setEdge(edge, range.value[edge === 'start' ? 0 : 1] + deltaMs)
+}
+function typeEdge(edge: 'start' | 'end', event: Event) {
+  const input = event.target as HTMLInputElement
+  const ms = parseTimecode(input.value)
+  if (ms === null) {
+    toast.add({ title: 'Not a time', description: 'Type it like 1:23 or 1:23.5.', color: 'warning' })
+  } else {
+    setEdge(edge, ms)
+  }
+  // Show the accepted (clamped) value, or put the old one back.
+  input.value = formatTimecode(range.value[edge === 'start' ? 0 : 1])
 }
 
 // "Auto-center": a crop box centred on wherever the video moves the most,
@@ -778,6 +1032,63 @@ const segmentBars = computed(() => {
   })
 })
 
+function resetSplit() {
+  segments.value = [{ startMsSeconds: 0, endMsSeconds: null }]
+  selectedSegment.value = null
+}
+
+const selectedSegment = ref<number | null>(null)
+function selectSegment(i: number) {
+  selectedSegment.value = i
+  const seg = segments.value[i]
+  if (seg) preview.value?.seek(seg.startMsSeconds * 1000, false)
+}
+function removeSegment(i: number) {
+  segments.value.splice(i, 1)
+  selectedSegment.value = null
+}
+
+function segmentEndSeconds(seg: SegmentInput) {
+  return seg.endMsSeconds ?? durationMs.value / 1000
+}
+function segmentLength(seg: SegmentInput) {
+  return formatMsShort(Math.max(0, (segmentEndSeconds(seg) - seg.startMsSeconds) * 1000))
+}
+
+// Typed times ("1:23", "1:23.5"); an empty end means "to the end of the video".
+function typeSegment(i: number, edge: 'start' | 'end', event: Event) {
+  const seg = segments.value[i]
+  const input = event.target as HTMLInputElement
+  if (!seg) return
+  if (edge === 'end' && input.value.trim() === '') {
+    seg.endMsSeconds = null
+  } else {
+    const ms = parseTimecode(input.value)
+    if (ms === null) toast.add({ title: 'Not a time', description: 'Type it like 1:23 or 1:23.5.', color: 'warning' })
+    else if (edge === 'start') seg.startMsSeconds = ms / 1000
+    else seg.endMsSeconds = ms / 1000
+  }
+  // Show what was accepted, or put the old value back.
+  input.value = edge === 'start' ? formatTimecode(seg.startMsSeconds * 1000) : seg.endMsSeconds == null ? '' : formatTimecode(seg.endMsSeconds * 1000)
+}
+
+// The segment the playhead is inside, if it can be cut in two there.
+const splitTarget = computed(() => findSplitTarget(segments.value, currentMs.value / 1000, durationMs.value / 1000))
+const canSplitHere = computed(() => !!durationMs.value && splitTarget.value !== null)
+function splitAtPlayhead() {
+  const i = splitTarget.value
+  if (i === null) return
+  segments.value = splitRowAt(segments.value, i, currentMs.value / 1000)
+  selectedSegment.value = i + 1
+}
+
+// Video not covered by any segment (gaps between them, or before the first).
+const uncoveredMs = computed(() => uncoveredTime(segments.value, durationMs.value))
+const splitSummary = computed(() => {
+  const n = segments.value.length
+  return `${n} segment${n === 1 ? '' : 's'} → ${n} new video${n === 1 ? '' : 's'}${uncoveredMs.value > 0 && !splitError.value ? ` · ${formatMsShort(uncoveredMs.value)} left out` : ''}`
+})
+
 function splitEvenly(n: number) {
   if (!durationMs.value) return
   const stepSeconds = durationMs.value / 1000 / n
@@ -818,7 +1129,7 @@ const visibleJobs = computed<ProcessingJob[]>(() => {
   return latest && latest.status === 'FAILED' ? [...active, latest] : active
 })
 const busy = computed(() => visibleJobs.value.some((j) => isActiveJobStatus(j.status)))
-const JOB_LABELS: Record<string, string> = { TRIM: 'Trim', SPLIT: 'Split', AUDIO: 'Audio edit', EXTRACT: 'Audio extract', OVERLAY: 'Text & overlay' }
+const JOB_LABELS: Record<string, string> = { TRIM: 'Trim', SPLIT: 'Split', AUDIO: 'Audio edit', EXTRACT: 'Audio extract', OVERLAY: 'Text & overlay', AUDIO_TO_VIDEO: 'Audio to video' }
 function jobLabel(job: ProcessingJob) {
   let operation = 'Edit'
   try {
@@ -860,6 +1171,25 @@ function reset() {
 onMounted(reset)
 watch(() => props.video.videoUrl, reset)
 
+// The last tab used on this video comes back next time (a convenience only).
+const tabKey = () => `videolingo:editor-tab:${props.video.id}`
+const MODES = ['trim', 'split', 'audio', 'overlay']
+onMounted(() => {
+  try {
+    const saved = localStorage.getItem(tabKey())
+    if (saved && MODES.includes(saved)) mode.value = saved as typeof mode.value
+  } catch {
+    // Storage can be blocked; starting on Trim is fine.
+  }
+})
+watch(mode, (m) => {
+  try {
+    localStorage.setItem(tabKey(), m)
+  } catch {
+    // See above.
+  }
+})
+
 // ── Audio ────────────────────────────────────────────────────────────────────
 const audioEdit = useAudioEdit(durationMs)
 
@@ -889,12 +1219,23 @@ const overlayEdit = useOverlayEdit(durationMs)
 const trimDirty = computed(() => cropOn.value || scaleOn.value || range.value[0] !== 0 || range.value[1] !== durationMs.value)
 const splitDirty = computed(() => segments.value.length > 1 || segments.value[0]?.startMsSeconds !== 0 || segments.value[0]?.endMsSeconds != null)
 const DIRTY_BADGE = { color: 'warning' as const, size: 'xs' as const }
+
+// What "Start trim" will make, in one line.
+const trimSummary = computed(() => {
+  const parts = [`Trim ${formatMsShort(range.value[0])}–${formatMsShort(range.value[1])} (${formatMsShort(range.value[1] - range.value[0])})`]
+  if (activePreset.value) parts.push(activePreset.value.label)
+  else {
+    if (cropOn.value && crop.w && crop.h) parts.push(`crop ${crop.w}×${crop.h}`)
+    if (scaleOn.value && scale.w && scale.h) parts.push(`resize ${scale.w}×${scale.h}`)
+  }
+  return parts.join(' · ')
+})
 const tabItems = computed(() => [
-  { label: 'Trim & crop', value: 'trim', slot: 'trim' as const, icon: 'i-lucide-scissors', badge: trimDirty.value ? DIRTY_BADGE : undefined },
+  { label: 'Trim', value: 'trim', slot: 'trim' as const, icon: 'i-lucide-scissors', badge: trimDirty.value ? DIRTY_BADGE : undefined },
   { label: 'Split', value: 'split', slot: 'split' as const, icon: 'i-lucide-split', badge: splitDirty.value ? DIRTY_BADGE : undefined },
   { label: 'Audio', value: 'audio', slot: 'audio' as const, icon: 'i-lucide-audio-lines', badge: audioEdit.changed.value ? DIRTY_BADGE : undefined },
   {
-    label: 'Text & overlay',
+    label: 'Text',
     value: 'overlay',
     slot: 'overlay' as const,
     icon: 'i-lucide-type',

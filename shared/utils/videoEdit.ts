@@ -44,3 +44,55 @@ export function validateSegments(segments: Segment[], durationMs: number | null)
   }
   return null
 }
+
+// ── Editor helpers ───────────────────────────────────────────────────────────
+// The arithmetic behind the trim and split tabs, kept out of the component so
+// it can be tested. Trim ranges are in ms; the split tab's rows are in seconds
+// (that is what its fields edit), with a null end meaning "to the end".
+
+/** The smallest trim the slider allows between its two handles. */
+export const MIN_TRIM_MS = 500
+
+/** A row of the split tab. */
+export interface SegmentRow {
+  startMsSeconds: number
+  endMsSeconds: number | null
+}
+
+/** Moves one edge of the trim range, keeping it inside the video and at least MIN_TRIM_MS long. */
+export function withTrimEdge(range: [number, number], edge: 'start' | 'end', ms: number, durationMs: number): [number, number] {
+  if (edge === 'start') return [Math.round(Math.min(Math.max(0, ms), range[1] - MIN_TRIM_MS)), range[1]]
+  const max = Math.max(durationMs, MIN_TRIM_MS)
+  return [range[0], Math.round(Math.max(Math.min(max, ms), range[0] + MIN_TRIM_MS))]
+}
+
+/** The row the playhead is strictly inside (by `margin` seconds each side), or null when no row can be cut there. */
+export function findSplitTarget(rows: SegmentRow[], seconds: number, durationSeconds: number, margin = 0.1): number | null {
+  const i = rows.findIndex((r) => seconds > r.startMsSeconds + margin && seconds < (r.endMsSeconds ?? durationSeconds) - margin)
+  return i === -1 ? null : i
+}
+
+/** Cuts row `index` in two at `seconds` (rounded to hundredths). Returns a new list. */
+export function splitRowAt(rows: SegmentRow[], index: number, seconds: number): SegmentRow[] {
+  const row = rows[index]
+  if (!row) return rows
+  const t = Math.round(seconds * 100) / 100
+  return [...rows.slice(0, index), { startMsSeconds: row.startMsSeconds, endMsSeconds: t }, { startMsSeconds: t, endMsSeconds: row.endMsSeconds }, ...rows.slice(index + 1)]
+}
+
+/** Milliseconds of the video that no row covers (gaps, or before the first / after the last). Overlaps count once. */
+export function uncoveredMs(rows: SegmentRow[], durationMs: number): number {
+  if (!durationMs) return 0
+  const spans = rows
+    .map((r) => [Math.max(0, r.startMsSeconds * 1000), Math.min(durationMs, (r.endMsSeconds ?? durationMs / 1000) * 1000)] as const)
+    .filter(([a, b]) => b > a)
+    .sort((a, b) => a[0] - b[0])
+  let covered = 0
+  let cursor = 0
+  for (const [a, b] of spans) {
+    const from = Math.max(a, cursor)
+    if (b > from) covered += b - from
+    cursor = Math.max(cursor, b)
+  }
+  return Math.max(0, durationMs - covered)
+}

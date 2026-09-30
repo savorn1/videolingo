@@ -1,5 +1,7 @@
 <template>
+  <img v-if="src" :src="src" :alt="name ?? 'Avatar'" class="rounded-full object-cover shrink-0 select-none" :class="SIZE_CLASSES[size]" />
   <span
+    v-else
     class="inline-flex items-center justify-center rounded-full font-semibold leading-none shrink-0 select-none"
     :class="[SIZE_CLASSES[size], colorClasses]"
   >
@@ -13,9 +15,10 @@
 // person rather than an empty placeholder, same idea as UserChip.
 import { avatarColorClasses, avatarInitials } from '#shared/utils/avatarColor'
 
-const props = withDefaults(defineProps<{ name: string | null | undefined; size?: '2xs' | 'xs' | 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl' }>(), {
-  size: 'md'
-})
+const props = withDefaults(
+  defineProps<{ name: string | null | undefined; src?: string | null; size?: '2xs' | 'xs' | 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl' }>(),
+  { size: 'md', src: null }
+)
 
 const SIZE_CLASSES: Record<NonNullable<typeof props.size>, string> = {
   '2xs': 'w-5 h-5 text-[10px]',

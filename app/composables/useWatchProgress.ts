@@ -70,6 +70,7 @@ function newSessionId() {
  */
 export function useProgressTracker() {
   const { forVideos, heartbeat } = useWatchProgress()
+  const { record } = useStudyActivity()
 
   const progress = ref<WatchProgress | null>(null)
   /** Seconds to resume from (null = the beginning). */
@@ -89,6 +90,8 @@ export function useProgressTracker() {
     if (videoId === null || (!ended && pendingS < 1)) return
     const body = { sessionId, positionSeconds: positionS, durationSeconds: duration, watchedSeconds: pendingS, ended }
     pendingS = 0
+    // Counted toward the learner's streak and daily goal as soon as it is watched.
+    if (body.watchedSeconds > 0) record({ watchSeconds: body.watchedSeconds })
     try {
       const saved = await heartbeat(videoId, body, keepalive)
       if (saved.videoId === videoId) progress.value = saved

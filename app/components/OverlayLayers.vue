@@ -188,4 +188,47 @@ function onDown(l: EditorLayer, e: PointerEvent) {
   window.addEventListener('pointermove', move)
   window.addEventListener('pointerup', up, { once: true })
 }
+
+// ── Keyboard: nudge or delete the selected layer ────────────────────────────
+// Dragging is imprecise for a one-pixel adjustment; arrow keys fill that gap,
+// the same way most design tools let you nudge a selected object. Delete/
+// Backspace removes it outright — EditorTransport yields its own arrow-key
+// frame-stepping while a layer is selected here (see arrowKeysTaken).
+function isEditable(t: EventTarget | null) {
+  const el = t as HTMLElement | null
+  return !!el && (el.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName))
+}
+const NUDGE = 0.005
+const NUDGE_BIG = 0.02
+function clamp01(v: number) {
+  return Math.round(Math.min(1, Math.max(0, v)) * 1000) / 1000
+}
+function onKeyDown(e: KeyboardEvent) {
+  const l = props.edit.selected.value
+  if (!l || isEditable(e.target)) return
+  const step = e.shiftKey ? NUDGE_BIG : NUDGE
+  switch (e.key) {
+    case 'ArrowLeft':
+      l.x = clamp01(l.x - step)
+      break
+    case 'ArrowRight':
+      l.x = clamp01(l.x + step)
+      break
+    case 'ArrowUp':
+      l.y = clamp01(l.y - step)
+      break
+    case 'ArrowDown':
+      l.y = clamp01(l.y + step)
+      break
+    case 'Delete':
+    case 'Backspace':
+      props.edit.remove(l.id)
+      break
+    default:
+      return
+  }
+  e.preventDefault()
+}
+onMounted(() => window.addEventListener('keydown', onKeyDown))
+onBeforeUnmount(() => window.removeEventListener('keydown', onKeyDown))
 </script>

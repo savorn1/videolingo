@@ -5,6 +5,7 @@
         <UButton v-if="filter.deleted" color="error" variant="soft" icon="i-lucide-trash-2" :loading="clearingTrash" @click="onClearTrashClick">
           Clear trash
         </UButton>
+        <UButton color="neutral" variant="soft" icon="i-lucide-audio-lines" to="/videos/from-audio">From audio</UButton>
         <UButton icon="i-lucide-plus" to="/videos/new">Add video</UButton>
       </template>
     </PageHeader>

@@ -7,7 +7,7 @@ const backendBase = process.env.NUXT_BACKEND_BASE || 'http://localhost:8080'
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
   compatibilityDate: '2025-07-15',
-  devtools: { enabled: true },
+  devtools: { enabled: false },
 
   modules: ['@nuxt/ui'],
 

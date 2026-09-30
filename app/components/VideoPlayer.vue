@@ -8,15 +8,29 @@
       <button
         v-if="!activated"
         type="button"
-        class="group absolute inset-0 w-full h-full cursor-pointer"
+        class="group absolute inset-0 w-full h-full cursor-pointer focus-visible:outline-2 focus-visible:-outline-offset-4 focus-visible:outline-primary-400"
         :aria-label="`Play ${title ?? 'video'}`"
         @click="activate()"
       >
-        <img v-if="coverImage" :src="coverImage" alt="" class="w-full h-full object-cover" />
+        <img
+          v-if="coverImage"
+          :src="coverImage"
+          alt=""
+          class="w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.03] motion-reduce:transition-none motion-reduce:group-hover:scale-100"
+        />
+        <!-- No thumbnail: a quiet gradient instead of a flat black box. -->
+        <span v-else class="absolute inset-0 bg-gradient-to-br from-gray-800 via-gray-900 to-black" aria-hidden="true" />
+        <!-- Bottom shade keeps the title legible on any thumbnail. -->
+        <span v-if="title" class="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-black/70 to-transparent" aria-hidden="true" />
         <span class="absolute inset-0 flex items-center justify-center bg-black/10 group-hover:bg-black/25 transition-colors">
-          <span class="flex items-center justify-center w-16 h-16 rounded-full bg-black/60 group-hover:bg-primary-600 transition-colors">
-            <UIcon name="i-lucide-play" class="w-8 h-8 text-white ml-1" />
+          <span
+            class="flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-black/60 ring-2 ring-white/70 backdrop-blur-sm group-hover:bg-primary-600 group-hover:ring-white group-hover:scale-105 transition-all motion-reduce:transition-none motion-reduce:group-hover:scale-100"
+          >
+            <UIcon name="i-lucide-play" class="w-8 h-8 sm:w-10 sm:h-10 text-white ml-1" />
           </span>
+        </span>
+        <span v-if="title" class="absolute inset-x-0 bottom-0 px-4 pb-3 text-left text-sm sm:text-base font-medium text-white line-clamp-1 drop-shadow">
+          {{ title }}
         </span>
       </button>
       <iframe
@@ -38,6 +52,7 @@
         :src="videoUrl ?? undefined"
         :poster="poster ?? undefined"
         controls
+        playsinline
         :controlslist="ownFullscreen ? 'nofullscreen' : undefined"
         preload="metadata"
         class="w-full h-full"

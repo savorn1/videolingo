@@ -5,6 +5,7 @@
 
 import type { ApiEnvelope, PageEnvelope } from '#shared/types'
 import type { VideoSourceKind } from '#shared/utils/videoSources'
+import type { ProcessingJob } from '~/composables/useProcessingJobs'
 
 export type VideoVisibility = 'PUBLIC' | 'UNLISTED' | 'PRIVATE'
 
@@ -199,6 +200,11 @@ export function useVideos() {
     return (await api<ApiEnvelope<Video>>('/api/admin/videos', { method: 'POST', body: payload })).data
   }
 
+  /** A video made from an uploaded sound (a still picture plus the audio). Queues a job; the video stays disabled until reviewed. */
+  async function createFromAudio(payload: AudioToVideoPayload) {
+    return (await api<ApiEnvelope<{ video: Video; job: ProcessingJob }>>('/api/admin/videos/from-audio', { method: 'POST', body: payload })).data
+  }
+
   return {
     list,
     get,
@@ -217,7 +223,8 @@ export function useVideos() {
     inspect,
     detectLanguage,
     requestUpload,
-    create
+    create,
+    createFromAudio
   }
 }
 
@@ -263,6 +270,20 @@ export interface UploadTicket {
   expiresAt: string
   publicUrl: string
   contentType: string
+}
+
+export interface AudioToVideoPayload {
+  /** From an upload ticket of kind AUDIO. */
+  audioKey: string
+  /** From an upload ticket of kind OVERLAY. */
+  coverKey?: string
+  /** "#rrggbb". */
+  background?: string
+  resolution?: string
+  title: string
+  description?: string
+  language?: string
+  categoryIds?: number[]
 }
 
 export interface CreateVideoPayload {

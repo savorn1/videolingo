@@ -112,6 +112,8 @@ const props = defineProps<{
   fullscreenTarget?: HTMLElement | null
   /** Space is busy elsewhere (panning the zoomed preview under the pointer). */
   spaceTaken?: boolean
+  /** Arrow keys are busy elsewhere (nudging a selected overlay layer). */
+  arrowKeysTaken?: boolean
 }>()
 
 const btn = { size: 'sm', color: 'neutral', variant: 'ghost', square: true } as const
@@ -328,7 +330,7 @@ function onKeyDown(e: KeyboardEvent) {
       break
     case 'ArrowLeft':
     case 'ArrowRight':
-      if (onSlider) return
+      if (onSlider || props.arrowKeysTaken) return
       if (e.shiftKey) skip(e.code === 'ArrowLeft' ? -1 : 1)
       else step(e.code === 'ArrowLeft' ? -1 : 1)
       break

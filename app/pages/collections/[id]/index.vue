@@ -213,14 +213,8 @@
         </div>
         <div v-else-if="analytics" class="space-y-4">
           <div class="grid grid-cols-2 gap-3">
-            <UCard :ui="{ body: 'p-3' }">
-              <p class="text-xs text-gray-500">Unique learners</p>
-              <p class="text-2xl font-bold text-gray-900 dark:text-white tabular-nums">{{ analytics.uniqueLearners }}</p>
-            </UCard>
-            <UCard :ui="{ body: 'p-3' }">
-              <p class="text-xs text-gray-500">Finished the whole course</p>
-              <p class="text-2xl font-bold text-gray-900 dark:text-white tabular-nums">{{ analytics.finishedCourse }}</p>
-            </UCard>
+            <StatTile label="Unique learners" :value="analytics.uniqueLearners.toLocaleString()" icon="i-lucide-users" color="primary" />
+            <StatTile label="Finished the whole course" :value="analytics.finishedCourse.toLocaleString()" icon="i-lucide-flag" color="success" />
           </div>
           <div v-if="analytics.videos.length" class="rounded-lg border border-gray-200 dark:border-gray-800 max-h-96 overflow-y-auto">
             <table class="w-full text-sm">

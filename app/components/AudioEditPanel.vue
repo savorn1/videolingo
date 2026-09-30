@@ -1,26 +1,9 @@
 <template>
   <div class="space-y-4 text-sm">
-    <!-- ── Extract ─────────────────────────────────────────────────────── -->
-    <section class="flex flex-wrap items-center gap-2">
-      <span class="text-xs text-gray-500 dark:text-gray-400">Extract audio as</span>
-      <UButton
-        v-for="f in ['MP3', 'WAV'] as const"
-        :key="f"
-        size="xs"
-        color="neutral"
-        variant="soft"
-        icon="i-lucide-file-audio"
-        :disabled="!canWrite || busy"
-        :loading="extracting === f"
-        @click="onExtract(f)"
-      >
-        {{ f }}
-      </UButton>
-    </section>
+    <!-- Groups fold away; a dot on a heading means it holds changes. -->
 
     <!-- ── Source ──────────────────────────────────────────────────────── -->
-    <section :class="SECTION">
-      <h3 :class="HEADING">Sound</h3>
+    <EditorSection v-model:open="open.sound" title="Sound" :changed="changed.sound" :hint="s.source === 'ORIGINAL' ? 'The video’s own' : 'Replaced by a file'">
       <div class="flex flex-wrap gap-1">
         <UButton
           size="xs"
@@ -49,11 +32,10 @@
         <UploadButton v-else label="Upload audio" :progress="uploading === 'replacement' ? uploadProgress : null" @pick="(f) => onUpload(f, 'replacement')" />
         <p class="text-xs text-gray-500 dark:text-gray-400">Plays from the start of the video; longer files are cut at its end, shorter ones leave silence.</p>
       </template>
-    </section>
+    </EditorSection>
 
     <!-- ── Clips ───────────────────────────────────────────────────────── -->
-    <section :class="SECTION">
-      <h3 :class="HEADING">Clips <span class="normal-case font-normal">— on the strip under the video</span></h3>
+    <EditorSection v-model:open="open.clips" title="Clips" :changed="changed.clips" hint="on the strip under the video">
       <div class="flex flex-wrap gap-1">
         <UButton size="xs" color="neutral" variant="soft" icon="i-lucide-scissors-line-dashed" :disabled="!splittable" @click="onSplit"
           >Split at playhead</UButton
@@ -62,7 +44,7 @@
           >Duplicate</UButton
         >
         <UButton size="xs" color="neutral" variant="soft" icon="i-lucide-merge" :disabled="!hasNext" @click="onMerge">Merge with next</UButton>
-        <UButton size="xs" color="error" variant="soft" icon="i-lucide-trash-2" :disabled="!selected" @click="onDeleteClip">Delete clip</UButton>
+        <UButton size="xs" color="error" variant="ghost" icon="i-lucide-trash-2" :disabled="!selected" @click="onDeleteClip">Delete clip</UButton>
         <UButton size="xs" color="neutral" variant="ghost" icon="i-lucide-rotate-ccw" :disabled="!edit.clipsChanged.value" @click="edit.resetClips()"
           >Reset clips</UButton
         >
@@ -104,14 +86,15 @@
         </UFormField>
       </div>
       <p v-else class="text-xs text-gray-500 dark:text-gray-400">Select a clip on the strip to edit it.</p>
-    </section>
+    </EditorSection>
 
     <!-- ── Range ───────────────────────────────────────────────────────── -->
-    <section :class="SECTION">
-      <div class="flex items-center justify-between">
-        <h3 :class="HEADING">Range</h3>
-        <span class="text-xs tabular-nums text-gray-700 dark:text-gray-300">{{ formatTimecode(s.range[0]) }} – {{ formatTimecode(s.range[1]) }}</span>
-      </div>
+    <EditorSection
+      v-model:open="open.range"
+      title="Range"
+      :changed="changed.range"
+      :hint="`${formatTimecode(s.range[0])} – ${formatTimecode(s.range[1])}`"
+    >
       <USlider v-model="s.range" :min="0" :max="Math.max(durationMs, 1)" :step="10" :min-steps-between-thumbs="5" aria-label="Range" />
       <div class="flex flex-wrap gap-1">
         <UButton size="xs" color="neutral" variant="ghost" @click="s.range = [Math.min(Math.round(currentMs), s.range[1] - 50), s.range[1]]"
@@ -121,7 +104,7 @@
           >End at playhead</UButton
         >
         <UButton size="xs" color="neutral" variant="soft" icon="i-lucide-volume-x" :disabled="!rangeValid" @click="onMuteRange">Mute range</UButton>
-        <UButton size="xs" color="error" variant="soft" icon="i-lucide-eraser" :disabled="!rangeValid" @click="onDeleteRange">Delete range</UButton>
+        <UButton size="xs" color="error" variant="ghost" icon="i-lucide-eraser" :disabled="!rangeValid" @click="confirmDeleteRange = true">Delete range</UButton>
       </div>
       <ul v-if="s.mutes.length" class="flex flex-wrap gap-1">
         <li v-for="(m, i) in s.mutes" :key="i">
@@ -134,24 +117,11 @@
           </UBadge>
         </li>
       </ul>
-    </section>
+    </EditorSection>
 
     <!-- ── Level ───────────────────────────────────────────────────────── -->
-    <section :class="SECTION">
-      <h3 :class="HEADING">Level</h3>
-      <div class="flex items-center gap-3">
-        <span class="w-16 text-xs text-gray-500">Volume</span>
-        <USlider
-          :model-value="Math.round(s.volume * 100)"
-          :min="0"
-          :max="400"
-          :step="5"
-          class="flex-1"
-          aria-label="Volume"
-          @update:model-value="(v) => (s.volume = Number(v) / 100)"
-        />
-        <span class="w-12 text-right text-xs tabular-nums">{{ Math.round(s.volume * 100) }}%</span>
-      </div>
+    <EditorSection v-model:open="open.level" title="Level" :changed="changed.level" :hint="`Volume ${Math.round(s.volume * 100)}%`">
+      <SliderRow label="Volume" :model-value="Math.round(s.volume * 100)" :min="0" :max="400" :step="5" :default-value="100" unit="%" @update:model-value="(v) => (s.volume = v / 100)" />
       <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
         <USwitch :model-value="s.volume === 0" label="Mute everything" @update:model-value="(v) => (s.volume = v ? 0 : 1)" />
         <USwitch v-model="s.normalize" label="Normalize loudness" />
@@ -172,11 +142,10 @@
           />
         </UFormField>
       </div>
-    </section>
+    </EditorSection>
 
     <!-- ── Clean-up ────────────────────────────────────────────────────── -->
-    <section :class="SECTION">
-      <h3 :class="HEADING">Clean-up</h3>
+    <EditorSection v-model:open="open.cleanup" title="Clean-up" :changed="changed.cleanup">
       <div class="flex flex-wrap items-center gap-1">
         <span class="w-28 text-xs text-gray-500">Noise reduction</span>
         <UButton
@@ -191,30 +160,26 @@
         </UButton>
       </div>
       <USwitch v-model="s.enhanceVoice" label="Enhance voice" description="Cuts rumble and hiss, brings speech forward, evens out the level." />
-    </section>
+    </EditorSection>
 
     <!-- ── Music ───────────────────────────────────────────────────────── -->
-    <section :class="SECTION">
-      <h3 :class="HEADING">Background music</h3>
+    <EditorSection v-model:open="open.music" title="Background music" :changed="changed.music">
       <template v-if="s.music">
         <div class="flex items-center gap-2 rounded-md bg-gray-50 dark:bg-gray-800 px-2 py-1.5">
           <UIcon name="i-lucide-music" class="w-4 h-4 text-primary-500 shrink-0" />
           <span class="truncate flex-1" :title="s.music.name">{{ s.music.name }}</span>
           <UButton size="xs" color="neutral" variant="ghost" icon="i-lucide-x" aria-label="Remove background music" @click="s.music = null" />
         </div>
-        <div class="flex items-center gap-3">
-          <span class="w-16 text-xs text-gray-500">Volume</span>
-          <USlider
-            :model-value="Math.round(s.music.volume * 100)"
-            :min="0"
-            :max="200"
-            :step="5"
-            class="flex-1"
-            aria-label="Music volume"
-            @update:model-value="(v) => s.music && (s.music.volume = Number(v) / 100)"
-          />
-          <span class="w-12 text-right text-xs tabular-nums">{{ Math.round(s.music.volume * 100) }}%</span>
-        </div>
+        <SliderRow
+          label="Volume"
+          :model-value="Math.round(s.music.volume * 100)"
+          :min="0"
+          :max="200"
+          :step="5"
+          :default-value="30"
+          unit="%"
+          @update:model-value="(v) => s.music && (s.music.volume = v / 100)"
+        />
         <div class="flex flex-wrap items-end gap-x-4 gap-y-2">
           <UFormField label="Starts at (s)" class="w-28">
             <UInput
@@ -237,42 +202,29 @@
         :progress="uploading === 'music' ? uploadProgress : null"
         @pick="(f) => onUpload(f, 'music')"
       />
-    </section>
+    </EditorSection>
 
     <!-- ── Speed & pitch ───────────────────────────────────────────────── -->
-    <section :class="SECTION">
-      <h3 :class="HEADING">Speed &amp; pitch</h3>
-      <div class="flex items-center gap-3">
-        <span class="w-16 text-xs text-gray-500">Speed</span>
-        <USlider v-model="s.speed" :min="0.5" :max="2" :step="0.05" class="flex-1" aria-label="Speed" />
-        <span class="w-12 text-right text-xs tabular-nums">{{ +s.speed.toFixed(2) }}×</span>
-      </div>
+    <EditorSection v-model:open="open.speed" title="Speed & pitch" :changed="changed.speed" :hint="`${+s.speed.toFixed(2)}×`">
+      <SliderRow v-model="s.speed" label="Speed" :min="0.5" :max="2" :step="0.05" :default-value="1" unit="×" />
       <p v-if="s.speed !== 1" class="text-xs text-gray-500 dark:text-gray-400">
         The picture speeds up too, so they stay in sync — the video becomes {{ formatTimecode(durationMs / s.speed) }} long.
       </p>
-      <div class="flex items-center gap-3">
-        <span class="w-16 text-xs text-gray-500">Pitch</span>
-        <USlider v-model="s.pitchSemitones" :min="-12" :max="12" :step="1" class="flex-1" aria-label="Pitch" />
-        <span class="w-12 text-right text-xs tabular-nums">{{ s.pitchSemitones > 0 ? '+' : '' }}{{ s.pitchSemitones }} st</span>
-      </div>
-    </section>
+      <SliderRow v-model="s.pitchSemitones" label="Pitch" :min="-12" :max="12" :step="1" :default-value="0" unit="st" />
+    </EditorSection>
 
     <!-- ── Channels ────────────────────────────────────────────────────── -->
-    <section :class="SECTION">
-      <h3 :class="HEADING">Channels</h3>
-      <div class="flex items-center gap-3">
-        <span class="w-16 text-xs text-gray-500">Balance</span>
-        <USlider
-          :model-value="Math.round(s.balance * 100)"
-          :min="-100"
-          :max="100"
-          :step="5"
-          class="flex-1"
-          aria-label="Balance"
-          @update:model-value="(v) => (s.balance = Number(v) / 100)"
-        />
-        <span class="w-12 text-right text-xs tabular-nums">{{ balanceLabel }}</span>
-      </div>
+    <EditorSection v-model:open="open.channels" title="Channels" :changed="changed.channels">
+      <SliderRow
+        label="Balance"
+        :model-value="Math.round(s.balance * 100)"
+        :min="-100"
+        :max="100"
+        :step="5"
+        :default-value="0"
+        @update:model-value="(v) => (s.balance = v / 100)"
+      />
+      <p class="text-xs text-gray-500 dark:text-gray-400 -mt-1">{{ balanceLabel }} — negative is left, positive is right.</p>
       <div class="flex flex-wrap items-center gap-1">
         <span class="w-16 text-xs text-gray-500">Output</span>
         <UButton
@@ -286,21 +238,44 @@
           {{ c.label }}
         </UButton>
       </div>
-    </section>
+    </EditorSection>
+
+    <!-- ── Extract (a separate export, not part of the edit) ───────────── -->
+    <EditorSection v-model:open="open.extract" title="Extract audio" hint="save the sound as a file">
+      <div class="flex flex-wrap items-center gap-2">
+        <span class="text-xs text-gray-500 dark:text-gray-400">Extract as</span>
+        <UButton
+          v-for="f in ['MP3', 'WAV'] as const"
+          :key="f"
+          size="xs"
+          color="neutral"
+          variant="soft"
+          icon="i-lucide-file-audio"
+          :disabled="!canWrite || busy"
+          :loading="extracting === f"
+          @click="onExtract(f)"
+        >
+          {{ f }}
+        </UButton>
+      </div>
+    </EditorSection>
 
     <!-- ── Render ──────────────────────────────────────────────────────── -->
     <section :class="SECTION">
+      <p class="text-sm text-gray-700 dark:text-gray-300" data-testid="audio-summary">{{ summary }}</p>
       <p class="text-xs text-gray-500 dark:text-gray-400">
         The preview plays the volume (up to 100%) and muted ranges; everything else is heard in the result, which you can check before replacing the original.
       </p>
-      <p class="text-xs text-error-500 min-h-4">{{ edit.error.value }}</p>
+      <p class="text-xs min-h-4" :class="edit.error.value ? 'text-error-500' : 'text-gray-500 dark:text-gray-400'">
+        {{ edit.error.value || (edit.changed.value ? '' : 'Change something above to make an audio edit.') }}
+      </p>
       <div class="flex gap-2">
         <UButton
           v-if="canWrite"
           class="flex-1 justify-center"
           icon="i-lucide-audio-lines"
           :loading="starting"
-          :disabled="!!edit.error.value || busy || !!uploading"
+          :disabled="!!edit.error.value || !edit.changed.value || busy || !!uploading"
           @click="onRender"
         >
           Render audio
@@ -312,6 +287,15 @@
         </UTooltip>
       </div>
     </section>
+
+    <ConfirmModal
+      v-model="confirmDeleteRange"
+      title="Delete this range"
+      :description="`Cut ${formatTimecode(s.range[0])} – ${formatTimecode(s.range[1])} out of the sound? The clips after it move up to close the gap. Ctrl/⌘+Z brings it back.`"
+      confirm-label="Delete range"
+      color="error"
+      @confirm="onConfirmDeleteRange"
+    />
   </div>
 </template>
 
@@ -329,7 +313,6 @@ const props = defineProps<{ edit: AudioEdit; videoId: number; durationMs: number
 const emit = defineEmits<{ queued: [] }>()
 
 const SECTION = 'space-y-2 border-t border-gray-100 dark:border-gray-800 pt-3'
-const HEADING = 'text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400'
 const DENOISE: { label: string; value: Denoise }[] = [
   { label: 'Off', value: 'OFF' },
   { label: 'Light', value: 'LIGHT' },
@@ -403,10 +386,63 @@ const rangeValid = computed(() => s.range[1] - s.range[0] >= MIN_CLIP_MS)
 function onMuteRange() {
   s.mutes = addMute(s.mutes, { startMs: s.range[0], endMs: s.range[1] })
 }
-function onDeleteRange() {
+const confirmDeleteRange = ref(false)
+function onConfirmDeleteRange() {
+  confirmDeleteRange.value = false
   s.clips = deleteRange(s.clips, { startMs: s.range[0], endMs: s.range[1] })
   if (!s.clips.some((c) => c.id === s.selectedId)) s.selectedId = null
 }
+
+// ── Groups: open state, and which hold changes ───────────────────────────────
+// What differs from the defaults (see useAudioEdit) — shown as a dot on the
+// group heading, and used to open a group that has something in it.
+const changed = computed(() => ({
+  sound: s.source !== 'ORIGINAL',
+  clips: props.edit.clipsChanged.value,
+  range: s.mutes.length > 0,
+  level: s.volume !== 1 || s.normalize || s.fadeInMs > 0 || s.fadeOutMs > 0,
+  cleanup: s.denoise !== 'OFF' || s.enhanceVoice,
+  music: !!s.music,
+  speed: s.speed !== 1 || s.pitchSemitones !== 0,
+  channels: s.balance !== 0 || s.channels !== 'KEEP'
+}))
+const open = reactive({
+  sound: true,
+  clips: true,
+  range: true,
+  level: changed.value.level,
+  cleanup: changed.value.cleanup,
+  music: changed.value.music,
+  speed: changed.value.speed,
+  channels: changed.value.channels,
+  extract: false
+})
+// Undo, a restored draft or a new file can fill a folded group: show it.
+for (const key of ['level', 'cleanup', 'music', 'speed', 'channels'] as const) {
+  watch(
+    () => changed.value[key],
+    (isChanged) => isChanged && (open[key] = true)
+  )
+}
+
+// One line on what "Render audio" will do.
+const summary = computed(() => {
+  const parts: string[] = []
+  if (s.source === 'UPLOAD') parts.push('replacement sound')
+  if (props.edit.clipsChanged.value) parts.push('clips rearranged')
+  if (s.mutes.length) parts.push(`${s.mutes.length} muted range${s.mutes.length === 1 ? '' : 's'}`)
+  if (s.volume !== 1) parts.push(`volume ${Math.round(s.volume * 100)}%`)
+  if (s.normalize) parts.push('normalized')
+  if (s.fadeInMs > 0 || s.fadeOutMs > 0) parts.push('fades')
+  if (s.denoise !== 'OFF') parts.push(`noise reduction ${s.denoise.toLowerCase()}`)
+  if (s.enhanceVoice) parts.push('enhanced voice')
+  if (s.music) parts.push('background music')
+  if (s.speed !== 1) parts.push(`speed ${+s.speed.toFixed(2)}×`)
+  if (s.pitchSemitones !== 0) parts.push(`pitch ${s.pitchSemitones > 0 ? '+' : ''}${s.pitchSemitones} st`)
+  if (s.balance !== 0) parts.push(`balance ${balanceLabel.value.toLowerCase()}`)
+  if (s.channels !== 'KEEP') parts.push(s.channels.toLowerCase())
+  return parts.length ? `Audio edit: ${parts.join(' · ')}` : 'No audio changes yet'
+})
 
 // ── Uploads ──────────────────────────────────────────────────────────────────
 const uploading = ref<'replacement' | 'music' | null>(null)

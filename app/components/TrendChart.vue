@@ -81,6 +81,15 @@
             </div>
           </div>
 
+          <!-- Average reference line -->
+          <div
+            v-if="average > 0 && items.length > 2"
+            class="absolute inset-x-0 border-t border-dashed border-gray-400/60 dark:border-gray-500/60 pointer-events-none"
+            :style="{ bottom: `${(average / top) * 100}%` }"
+          >
+            <span class="absolute right-0 -top-4 text-[10px] text-gray-400 bg-(--ui-bg)/80 px-1 rounded">avg {{ format(Math.round(average)) }}</span>
+          </div>
+
           <!-- Line crosshair + marker -->
           <template v-if="variant === 'line' && hover !== null && items[hover]">
             <div class="absolute top-0 bottom-0 w-px bg-gray-300 dark:bg-gray-600 pointer-events-none" :style="{ left: `${xPct(hover)}%` }" />
@@ -98,6 +107,7 @@
           >
             <p class="font-medium text-gray-900 dark:text-white">{{ items[hover]!.tooltip ?? items[hover]!.label }}</p>
             <p class="text-gray-600 dark:text-gray-300 tabular-nums">{{ format(items[hover]!.value) }} {{ unit }}</p>
+            <p v-if="hoverChange" class="tabular-nums text-gray-400">{{ hoverChange }} vs previous</p>
           </div>
         </div>
 
@@ -157,6 +167,15 @@ const hover = ref<number | null>(null)
 
 const top = computed(() => props.niceTop(Math.max(0, ...props.items.map((i) => i.value))))
 const ticks = computed(() => [top.value, top.value / 2, 0])
+const average = computed(() => (props.items.length ? props.items.reduce((sum, i) => sum + i.value, 0) / props.items.length : 0))
+
+const hoverChange = computed(() => {
+  const i = hover.value
+  if (i === null || i < 1) return ''
+  const diff = props.items[i]!.value - props.items[i - 1]!.value
+  if (diff === 0) return 'No change'
+  return `${diff > 0 ? '+' : '−'}${props.format(Math.abs(diff))}`
+})
 
 function xPct(i: number) {
   const n = props.items.length

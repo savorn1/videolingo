@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { estimateFps, formatTimecode, loopedTime, snapFps, stepFrameTime } from './transport'
+import { estimateFps, formatTimecode, loopedTime, parseTimecode, snapFps, stepFrameTime } from './transport'
 
 describe('snapFps', () => {
   it('snaps near-standard measurements', () => {
@@ -59,5 +59,34 @@ describe('formatTimecode', () => {
     expect(formatTimecode(0)).toBe('0:00.00')
     expect(formatTimecode(83_450)).toBe('1:23.45')
     expect(formatTimecode(3_723_450)).toBe('1:02:03.45')
+  })
+})
+
+describe('parseTimecode', () => {
+  it('reads plain seconds, with or without a fraction', () => {
+    expect(parseTimecode('83')).toBe(83_000)
+    expect(parseTimecode('83.5')).toBe(83_500)
+    expect(parseTimecode('0')).toBe(0)
+  })
+  it('reads minutes:seconds and hours:minutes:seconds', () => {
+    expect(parseTimecode('1:23')).toBe(83_000)
+    expect(parseTimecode('1:23.45')).toBe(83_450)
+    expect(parseTimecode('1:02:03.45')).toBe(3_723_450)
+  })
+  it('ignores surrounding spaces', () => {
+    expect(parseTimecode('  1:23  ')).toBe(83_000)
+  })
+  it('accepts seconds past 59 and adds them up', () => {
+    expect(parseTimecode('1:75')).toBe(135_000)
+  })
+  it('gives null for anything that is not a time', () => {
+    for (const text of ['', ' ', 'abc', '1:', ':30', '-5', '1:2:3:4', '1..5', '.5', '1:23s', '1,5']) {
+      expect(parseTimecode(text), text).toBeNull()
+    }
+  })
+  it('reverses formatTimecode', () => {
+    for (const ms of [0, 10, 990, 83_450, 3_723_450]) {
+      expect(parseTimecode(formatTimecode(ms))).toBe(ms)
+    }
   })
 })

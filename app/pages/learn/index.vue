@@ -16,6 +16,8 @@
       </template>
     </UAlert>
 
+    <StudyProgressCard />
+
     <ContinueWatching />
 
     <!-- Collections -->

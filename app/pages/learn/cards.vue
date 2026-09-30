@@ -6,6 +6,19 @@
       </template>
     </PageHeader>
 
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+      <KpiTile label="Total cards" icon="i-lucide-layers" :value="formatCount(stats?.total)" color="primary" :loading="!stats" />
+      <KpiTile
+        label="Due now"
+        icon="i-lucide-brain"
+        :value="formatCount(stats?.due)"
+        :sublabel="stats && !stats.due ? 'All caught up' : ''"
+        color="warning"
+        :loading="!stats"
+      />
+      <KpiTile label="Reviewed this session" icon="i-lucide-circle-check" :value="formatCount(reviewed)" color="success" />
+    </div>
+
     <UTabs v-model="tab" :items="tabItems" :content="false" class="mb-4" />
 
     <!-- ── Review ─────────────────────────────────────────────────────────── -->
@@ -26,10 +39,20 @@
         </template>
       </EmptyState>
       <div v-else class="max-w-xl mx-auto space-y-4">
-        <p class="text-center text-sm text-gray-500">{{ queue.length }} left in this session</p>
-        <UCard :ui="{ body: 'p-6 sm:p-8' }">
-          <div class="text-center space-y-4 min-h-40 flex flex-col justify-center">
+        <div>
+          <div class="flex items-center justify-between text-xs text-gray-500 mb-1.5">
+            <span>{{ reviewed }} reviewed</span>
+            <span>{{ queue.length }} left in this session</span>
+          </div>
+          <div class="h-1.5 rounded-full bg-gray-100 dark:bg-gray-800 overflow-hidden" role="progressbar" :aria-valuenow="progress" aria-valuemin="0" aria-valuemax="100">
+            <div class="h-full rounded-full bg-primary-500 dark:bg-primary-400 transition-[width] duration-300 motion-reduce:transition-none" :style="{ width: `${progress}%` }" />
+          </div>
+        </div>
+        <UCard :ui="{ body: 'p-6 sm:p-8' }" class="cursor-pointer" @click="!revealed && (revealed = true)">
+          <div class="text-center space-y-4 min-h-48 flex flex-col justify-center">
+            <UBadge class="self-center" color="neutral" variant="subtle" size="sm">{{ sourceLabel(current.source) }}</UBadge>
             <p class="text-2xl font-semibold text-gray-900 dark:text-white whitespace-pre-line">{{ current.front }}</p>
+            <p v-if="!revealed" class="text-xs text-gray-400">Click the card or press space to reveal</p>
             <template v-if="revealed">
               <USeparator />
               <p class="text-lg text-gray-800 dark:text-gray-200 whitespace-pre-line">{{ current.back }}</p>
@@ -72,29 +95,76 @@
     <!-- ── All cards ──────────────────────────────────────────────────────── -->
     <template v-else>
       <UCard class="mb-4">
-        <UInput v-model="search" placeholder="Search cards" icon="i-lucide-search" class="w-64" />
+        <div class="flex flex-wrap items-center gap-3">
+          <UInput v-model="search" placeholder="Search cards" icon="i-lucide-search" class="w-full sm:w-64" />
+          <div class="flex flex-wrap gap-1.5" role="group" aria-label="Filter cards">
+            <UButton
+              v-for="f in LIST_FILTERS"
+              :key="f.value"
+              size="xs"
+              :color="listFilter === f.value ? 'primary' : 'neutral'"
+              :variant="listFilter === f.value ? 'soft' : 'ghost'"
+              :icon="f.icon"
+              :aria-pressed="listFilter === f.value"
+              @click="listFilter = f.value"
+            >
+              {{ f.label }}<span v-if="listCounts[f.value] !== null" class="tabular-nums opacity-70"> {{ listCounts[f.value] }}</span>
+            </UButton>
+          </div>
+        </div>
       </UCard>
       <UCard :ui="{ body: 'p-0 sm:p-0' }">
         <EmptyState
-          v-if="!cards.length && !listLoading"
+          v-if="!shownCards.length && !listLoading"
           icon="i-lucide-layers"
           title="No cards"
-          :description="search ? 'Nothing matches that search.' : 'Save words from a video’s transcript to start.'"
+          :description="
+            search
+              ? 'Nothing matches that search.'
+              : listFilter !== 'all'
+                ? 'No loaded cards match this filter.'
+                : 'Save words from a video’s transcript to start.'
+          "
           class="py-10"
         />
         <ul v-else class="divide-y divide-gray-100 dark:divide-gray-800">
-          <li v-for="c in cards" :key="c.id" class="flex items-start gap-3 px-4 py-3">
-            <div class="min-w-0 flex-1">
-              <p class="font-medium text-gray-900 dark:text-white">{{ c.front }}</p>
-              <p class="text-sm text-gray-600 dark:text-gray-300">{{ c.back }}</p>
-              <p class="text-xs text-gray-500 mt-0.5">
-                {{ c.source === 'KEY_POINT' ? 'Key point' : c.source === 'WORD' ? 'Word' : 'Card' }}
-                · {{ new Date(c.dueAt) <= new Date() ? 'due now' : `next ${formatRelativeTime(c.dueAt)}` }}
-                <template v-if="c.lapses"> · forgotten {{ c.lapses }}×</template>
-              </p>
+          <li v-for="c in shownCards" :key="c.id" class="group flex items-start gap-3 px-4 py-3.5 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+            <div class="shrink-0 mt-0.5 rounded-lg p-2" :class="isDue(c) ? 'bg-warning-50 text-warning-600 dark:bg-warning-950 dark:text-warning-400' : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'">
+              <UIcon :name="sourceIcon(c.source)" class="w-4 h-4 block" />
             </div>
-            <UButton size="xs" color="neutral" variant="ghost" icon="i-lucide-pencil" aria-label="Edit card" @click="openForm(c)" />
-            <UButton size="xs" color="error" variant="ghost" icon="i-lucide-trash-2" aria-label="Delete card" @click="onDelete(c)" />
+            <div class="min-w-0 flex-1">
+              <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
+                <p class="font-medium text-gray-900 dark:text-white break-words">{{ c.front }}</p>
+                <UBadge color="neutral" variant="subtle" size="sm">{{ sourceLabel(c.source) }}</UBadge>
+              </div>
+              <p class="text-sm text-gray-600 dark:text-gray-300 mt-0.5 whitespace-pre-line break-words">{{ c.back }}</p>
+              <p v-if="c.context" class="text-xs italic text-gray-500 mt-1 line-clamp-2 border-l-2 border-gray-200 dark:border-gray-700 pl-2">“{{ c.context }}”</p>
+              <div class="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-xs">
+                <span
+                  class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-medium"
+                  :class="isDue(c) ? 'bg-warning-50 text-warning-700 dark:bg-warning-950 dark:text-warning-400' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'"
+                >
+                  <UIcon :name="isDue(c) ? 'i-lucide-alarm-clock' : 'i-lucide-calendar-clock'" class="w-3 h-3" />
+                  {{ isDue(c) ? 'Due now' : `Next ${formatRelativeTime(c.dueAt)}` }}
+                </span>
+                <span v-if="c.lapses" class="inline-flex items-center gap-1 text-error-600 dark:text-error-400" title="Times you forgot this card">
+                  <UIcon name="i-lucide-rotate-ccw" class="w-3 h-3" />
+                  Forgotten {{ c.lapses }}×
+                </span>
+                <NuxtLink
+                  v-if="c.videoId"
+                  :to="`/learn/watch/${c.videoId}${c.atMs ? `?t=${c.atMs}` : ''}`"
+                  class="inline-flex items-center gap-1 text-primary-600 dark:text-primary-400 hover:underline"
+                >
+                  <UIcon name="i-lucide-play" class="w-3 h-3" />
+                  See in video
+                </NuxtLink>
+              </div>
+            </div>
+            <div class="flex shrink-0 sm:opacity-0 sm:group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+              <UButton size="xs" color="neutral" variant="ghost" icon="i-lucide-pencil" aria-label="Edit card" @click="openForm(c)" />
+              <UButton size="xs" color="error" variant="ghost" icon="i-lucide-trash-2" aria-label="Delete card" @click="confirmDelete = c" />
+            </div>
           </li>
         </ul>
         <div v-if="total > cards.length" class="p-3 text-center">
@@ -102,6 +172,16 @@
         </div>
       </UCard>
     </template>
+
+    <ConfirmModal
+      :model-value="!!confirmDelete"
+      title="Delete card"
+      :description="`Delete “${confirmDelete?.front ?? ''}”? Its review history is lost.`"
+      confirm-label="Delete"
+      color="error"
+      @update:model-value="(v) => !v && (confirmDelete = null)"
+      @confirm="onConfirmDelete"
+    />
 
     <UModal v-model:open="showForm" :title="editing ? 'Edit card' : 'New card'" :ui="{ content: 'sm:max-w-md' }">
       <template #body>
@@ -129,6 +209,7 @@ import type { CardGrade, StudyCard } from '~/composables/useStudy'
 
 const { due, review, stats: getStats, cards: listCards, create, update, remove } = useStudy()
 const toast = useToast()
+const { record: recordActivity } = useStudyActivity()
 
 const stats = ref<{ total: number; due: number } | null>(null)
 const tab = ref<'review' | 'all'>('review')
@@ -154,6 +235,20 @@ const revealed = ref(false)
 const reviewLoading = ref(true)
 const reviewed = ref(0)
 const grading = ref<CardGrade | null>(null)
+// Reviewed cards out of everything seen this session (forgotten cards re-queue, so it can dip).
+const progress = computed(() => {
+  const totalSeen = reviewed.value + queue.value.length
+  return totalSeen ? Math.round((reviewed.value / totalSeen) * 100) : 0
+})
+function isDue(c: StudyCard) {
+  return new Date(c.dueAt) <= new Date()
+}
+function sourceIcon(source: string | null | undefined) {
+  return source === 'KEY_POINT' ? 'i-lucide-lightbulb' : source === 'WORD' ? 'i-lucide-type' : 'i-lucide-square-pen'
+}
+function sourceLabel(source: string | null | undefined) {
+  return source === 'KEY_POINT' ? 'Key point' : source === 'WORD' ? 'Word' : 'Card'
+}
 
 async function loadDue() {
   reviewLoading.value = true
@@ -176,6 +271,7 @@ async function grade(g: CardGrade) {
     // Forgotten cards come back in this same session.
     if (g === 'AGAIN') queue.value.push(next)
     reviewed.value++
+    recordActivity({ cards: 1 })
     revealed.value = false
     refreshStats()
   } catch (err) {
@@ -199,6 +295,23 @@ const total = ref(0)
 const listPage = ref(1)
 const listLoading = ref(false)
 const search = ref('')
+
+// Quick filters over the cards already loaded (the server search still applies first).
+type ListFilter = 'all' | 'due' | 'forgotten'
+const LIST_FILTERS: { value: ListFilter; label: string; icon: string }[] = [
+  { value: 'all', label: 'All', icon: 'i-lucide-layers' },
+  { value: 'due', label: 'Due', icon: 'i-lucide-alarm-clock' },
+  { value: 'forgotten', label: 'Forgotten', icon: 'i-lucide-rotate-ccw' }
+]
+const listFilter = ref<ListFilter>('all')
+const shownCards = computed(() =>
+  listFilter.value === 'due' ? cards.value.filter(isDue) : listFilter.value === 'forgotten' ? cards.value.filter((c) => c.lapses > 0) : cards.value
+)
+const listCounts = computed<Record<ListFilter, number | null>>(() => ({
+  all: cards.value.length,
+  due: cards.value.filter(isDue).length,
+  forgotten: cards.value.filter((c) => c.lapses > 0).length
+}))
 
 async function loadCards(reset = true) {
   listLoading.value = true
@@ -246,6 +359,12 @@ async function onSave() {
   } finally {
     saving.value = false
   }
+}
+const confirmDelete = ref<StudyCard | null>(null)
+async function onConfirmDelete() {
+  const c = confirmDelete.value
+  confirmDelete.value = null
+  if (c) await onDelete(c)
 }
 async function onDelete(c: StudyCard) {
   try {

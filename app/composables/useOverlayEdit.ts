@@ -4,6 +4,7 @@
 // again (OverlayRules) and draws text with the server's fonts.
 
 import type { OverlayLayer } from '~/composables/useVideoEdits'
+import { moveItem } from '#shared/utils/reorder'
 
 export interface EditorLayer extends OverlayLayer {
   id: string
@@ -162,6 +163,13 @@ export function useOverlayEdit(durationMs: Ref<number>) {
     state.layers = list
   }
 
+  /** Puts a layer at `index` in the stack (drag and drop); later layers are on top. */
+  function moveTo(id: string, index: number) {
+    const from = state.layers.findIndex((l) => l.id === id)
+    if (from < 0) return
+    state.layers = moveItem(state.layers, from, index)
+  }
+
   function reset() {
     state.layers = []
     state.selectedId = null
@@ -181,7 +189,7 @@ export function useOverlayEdit(durationMs: Ref<number>) {
     return null
   })
 
-  return { state, selected, addText, addImage, addTextWatermark, addTemplate, remove, duplicate, reorder, reset, request, error }
+  return { state, selected, addText, addImage, addTextWatermark, addTemplate, remove, duplicate, reorder, moveTo, reset, request, error }
 }
 
 export type OverlayEdit = ReturnType<typeof useOverlayEdit>

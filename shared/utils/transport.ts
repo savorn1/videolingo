@@ -51,6 +51,17 @@ export function loopedTime(seconds: number, [start, end]: [number, number]): num
   return null
 }
 
+/**
+ * Typed time → milliseconds: "83", "83.5", "1:23", "1:23.45", "1:02:03". Null when it isn't a time.
+ * The reverse of formatTimecode, for fields people type into.
+ */
+export function parseTimecode(text: string): number | null {
+  const parts = text.trim().split(':')
+  if (parts.length < 1 || parts.length > 3 || parts.some((p) => !/^\d+(\.\d+)?$/.test(p))) return null
+  const seconds = parts.reduce((total, p) => total * 60 + Number(p), 0)
+  return Math.round(seconds * 1000)
+}
+
 /** 83_450 → "1:23.45"; an hour or more → "1:02:03.45". */
 export function formatTimecode(ms: number): string {
   const total = Math.max(0, Math.floor(ms / 10))

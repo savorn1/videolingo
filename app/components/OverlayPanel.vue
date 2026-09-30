@@ -1,7 +1,7 @@
 <template>
   <div class="space-y-4 text-sm">
     <!-- ── Add ─────────────────────────────────────────────────────────── -->
-    <section class="flex flex-wrap items-center gap-1">
+    <section v-if="s.layers.length" class="flex flex-wrap items-center gap-1">
       <UButton size="xs" color="neutral" variant="soft" icon="i-lucide-type" @click="edit.addText(currentMs)">Add text</UButton>
       <UploadButton
         label="Add image"
@@ -92,19 +92,45 @@
       <h3 :class="HEADING">Layers <span class="normal-case font-normal">— later ones are drawn on top</span></h3>
       <ul
         v-if="s.layers.length"
+        ref="layerList"
         class="divide-y divide-gray-100 dark:divide-gray-800 rounded-md border border-gray-200 dark:border-gray-800"
         data-testid="overlay-list"
       >
         <li
           v-for="(l, i) in s.layers"
           :key="l.id"
-          class="flex items-center gap-2 px-2 py-1.5 cursor-pointer"
-          :class="l.id === s.selectedId ? 'bg-primary-50 dark:bg-primary-950/40' : 'hover:bg-gray-50 dark:hover:bg-gray-800/60'"
-          @click="s.selectedId = l.id"
+          :data-layer-id="l.id"
+          draggable="true"
+          class="flex items-center gap-2 px-2 py-1.5"
+          :class="[
+            l.id === s.selectedId ? 'bg-primary-50 dark:bg-primary-950/40' : 'hover:bg-gray-50 dark:hover:bg-gray-800/60',
+            dragId === l.id ? 'opacity-40' : '',
+            dropLine(i) === 'before' ? 'shadow-[inset_0_2px_0_0_var(--ui-primary)]' : dropLine(i) === 'after' ? 'shadow-[inset_0_-2px_0_0_var(--ui-primary)]' : ''
+          ]"
+          @dragstart="onDragStart($event, l.id)"
+          @dragover="onDragOver($event, i)"
+          @drop.prevent="onDrop"
+          @dragend="clearDrag"
         >
-          <UIcon :name="l.kind === 'TEXT' ? 'i-lucide-type' : 'i-lucide-image'" class="w-4 h-4 text-primary-500 shrink-0" />
-          <span class="flex-1 truncate">{{ l.kind === 'TEXT' ? l.text || '(empty)' : l.imageName }}</span>
-          <span class="text-xs tabular-nums text-gray-500">{{ formatTimecode(l.startMs) }}–{{ l.endMs == null ? 'end' : formatTimecode(l.endMs) }}</span>
+          <UIcon name="i-lucide-grip-vertical" class="w-4 h-4 shrink-0 cursor-grab text-gray-300 dark:text-gray-600" aria-hidden="true" title="Drag to reorder" />
+          <button
+            type="button"
+            class="flex flex-1 min-w-0 flex-col gap-1 text-left rounded"
+            :aria-pressed="l.id === s.selectedId"
+            @click="s.selectedId = l.id"
+          >
+            <span class="flex w-full min-w-0 items-center gap-2">
+              <UIcon :name="l.kind === 'TEXT' ? 'i-lucide-type' : 'i-lucide-image'" class="w-4 h-4 text-primary-500 shrink-0" />
+              <span class="flex-1 truncate">{{ l.kind === 'TEXT' ? l.text || '(empty)' : l.imageName }}</span>
+              <span class="text-xs tabular-nums text-gray-500 shrink-0"
+                >{{ formatTimecode(l.startMs) }}–{{ l.endMs == null ? 'end' : formatTimecode(l.endMs) }}</span
+              >
+            </span>
+            <!-- When it is on screen, against the whole video -->
+            <span v-if="durationMs" class="relative block h-1 w-full rounded-full bg-gray-100 dark:bg-gray-800" aria-hidden="true">
+              <span class="absolute inset-y-0 rounded-full bg-primary-400 dark:bg-primary-500" :style="layerBar(l)" />
+            </span>
+          </button>
           <UButton
             size="xs"
             color="neutral"
@@ -127,13 +153,33 @@
           <UButton size="xs" color="error" variant="ghost" icon="i-lucide-trash-2" aria-label="Delete layer" @click.stop="edit.remove(l.id)" />
         </li>
       </ul>
-      <p v-else class="text-xs text-gray-500 dark:text-gray-400">No layers yet — add text, an image, or a watermark.</p>
+      <div v-else class="rounded-lg border border-dashed border-gray-300 dark:border-gray-700 p-4 text-center space-y-3" data-testid="overlay-empty">
+        <UIcon name="i-lucide-layers" class="mx-auto h-7 w-7 text-gray-300 dark:text-gray-600" />
+        <p class="text-xs text-gray-500 dark:text-gray-400">No layers yet. Add text or an image, or start from a template above.</p>
+        <div class="flex flex-wrap items-center justify-center gap-2">
+          <UButton size="sm" icon="i-lucide-type" @click="edit.addText(currentMs)">Add text</UButton>
+          <UploadButton
+            label="Add image"
+            icon="i-lucide-image-plus"
+            accept="image/png,image/jpeg,image/webp"
+            :progress="uploading === 'image' ? uploadProgress : null"
+            @pick="(f) => onUpload(f, false)"
+          />
+          <UButton size="sm" color="neutral" variant="soft" icon="i-lucide-copyright" @click="edit.addTextWatermark()">Text watermark</UButton>
+          <UploadButton
+            label="Logo watermark"
+            icon="i-lucide-stamp"
+            accept="image/png,image/jpeg,image/webp"
+            :progress="uploading === 'watermark' ? uploadProgress : null"
+            @pick="(f) => onUpload(f, true)"
+          />
+        </div>
+      </div>
     </section>
 
     <!-- ── Selected layer ──────────────────────────────────────────────── -->
     <template v-if="layer">
-      <section v-if="layer.kind === 'TEXT'" :class="SECTION" data-testid="text-fields">
-        <h3 :class="HEADING">Text</h3>
+      <EditorSection v-if="layer.kind === 'TEXT'" v-model:open="open.content" title="Text" :hint="layer.text || '(empty)'" data-testid="text-fields">
         <UTextarea
           :model-value="layer.text ?? ''"
           :rows="2"
@@ -159,11 +205,7 @@
             <USelect v-model="layer.weight" :items="LAYER_WEIGHTS" class="w-full" size="sm" aria-label="Weight" />
           </UFormField>
         </div>
-        <div class="flex items-center gap-3">
-          <span class="w-16 text-xs text-gray-500">Size</span>
-          <USlider v-model="layer.sizePct" :min="1" :max="30" :step="0.5" class="flex-1" aria-label="Font size" />
-          <span class="w-12 text-right text-xs tabular-nums">{{ layer.sizePct }}%</span>
-        </div>
+        <SliderRow v-model="layer.sizePct" label="Size" :min="1" :max="30" :step="0.5" :default-value="6" unit="%" />
         <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
           <label class="flex items-center gap-2 text-xs text-gray-500">
             Colour
@@ -181,6 +223,18 @@
               @change="(e: Event) => setHex('color', (e.target as HTMLInputElement).value)"
             />
           </label>
+          <div class="flex items-center gap-1" role="group" aria-label="Quick text colours">
+            <button
+              v-for="c in SWATCHES"
+              :key="c"
+              type="button"
+              class="h-5 w-5 rounded-full border border-gray-300 dark:border-gray-600 focus-visible:outline-2 focus-visible:outline-primary-500"
+              :class="layer.color?.toLowerCase() === c ? 'ring-2 ring-primary-500 ring-offset-1 dark:ring-offset-gray-900' : ''"
+              :style="{ backgroundColor: c }"
+              :aria-label="`Text colour ${c}`"
+              @click="layer && (layer.color = c)"
+            />
+          </div>
           <USwitch :model-value="!!layer.background" label="Background" @update:model-value="(v) => layer && (layer.background = v ? '#000000' : null)" />
           <template v-if="layer.background">
             <input
@@ -198,19 +252,17 @@
             />
           </template>
         </div>
-        <div v-if="layer.background" class="flex items-center gap-3">
-          <span class="w-16 text-xs text-gray-500">Box</span>
-          <USlider
-            :model-value="Math.round(layer.backgroundOpacity * 100)"
-            :min="0"
-            :max="100"
-            :step="5"
-            class="flex-1"
-            aria-label="Background opacity"
-            @update:model-value="(v) => layer && (layer.backgroundOpacity = Number(v) / 100)"
-          />
-          <span class="w-12 text-right text-xs tabular-nums">{{ Math.round(layer.backgroundOpacity * 100) }}%</span>
-        </div>
+        <SliderRow
+          v-if="layer.background"
+          label="Box"
+          :model-value="Math.round(layer.backgroundOpacity * 100)"
+          :min="0"
+          :max="100"
+          :step="5"
+          :default-value="55"
+          unit="%"
+          @update:model-value="(v) => layer && (layer.backgroundOpacity = v / 100)"
+        />
         <div class="flex items-center gap-1">
           <span class="w-16 text-xs text-gray-500">Align</span>
           <UButton
@@ -224,23 +276,17 @@
             @click="layer.align = a.value"
           />
         </div>
-      </section>
+      </EditorSection>
 
-      <section v-else :class="SECTION">
-        <h3 :class="HEADING">Image</h3>
+      <EditorSection v-else v-model:open="open.content" title="Image" :hint="layer.imageName ?? undefined">
         <div class="flex items-center gap-2">
           <img v-if="layer.imageUrl" :src="layer.imageUrl" alt="" class="h-10 w-10 rounded object-contain bg-gray-100 dark:bg-gray-800" />
           <span class="flex-1 truncate">{{ layer.imageName }}</span>
         </div>
-        <div class="flex items-center gap-3">
-          <span class="w-16 text-xs text-gray-500">Width</span>
-          <USlider v-model="layer.widthPct" :min="1" :max="100" :step="1" class="flex-1" aria-label="Image width" />
-          <span class="w-12 text-right text-xs tabular-nums">{{ layer.widthPct }}%</span>
-        </div>
-      </section>
+        <SliderRow v-model="layer.widthPct" label="Width" :min="1" :max="100" :step="1" :default-value="20" unit="%" />
+      </EditorSection>
 
-      <section :class="SECTION">
-        <h3 :class="HEADING">Position &amp; look</h3>
+      <EditorSection v-model:open="open.position" title="Position & look" :hint="`Opacity ${Math.round(layer.opacity * 100)}%`">
         <div class="flex items-start gap-3">
           <div class="grid grid-cols-3 gap-1" role="group" aria-label="Position presets">
             <button
@@ -284,23 +330,23 @@
           </div>
         </div>
         <p class="text-xs text-gray-500 dark:text-gray-400">Or drag it on the video.</p>
-        <div class="flex items-center gap-3">
-          <span class="w-16 text-xs text-gray-500">Opacity</span>
-          <USlider
-            :model-value="Math.round(layer.opacity * 100)"
-            :min="5"
-            :max="100"
-            :step="5"
-            class="flex-1"
-            aria-label="Opacity"
-            @update:model-value="(v) => layer && (layer.opacity = Number(v) / 100)"
-          />
-          <span class="w-12 text-right text-xs tabular-nums">{{ Math.round(layer.opacity * 100) }}%</span>
-        </div>
-      </section>
+        <SliderRow
+          label="Opacity"
+          :model-value="Math.round(layer.opacity * 100)"
+          :min="5"
+          :max="100"
+          :step="5"
+          :default-value="100"
+          unit="%"
+          @update:model-value="(v) => layer && (layer.opacity = v / 100)"
+        />
+      </EditorSection>
 
-      <section :class="SECTION">
-        <h3 :class="HEADING">Timing</h3>
+      <EditorSection
+        v-model:open="open.timing"
+        title="Timing"
+        :hint="`${formatTimecode(layer.startMs)} – ${layer.endMs == null ? 'end' : formatTimecode(layer.endMs)}`"
+      >
         <div class="grid grid-cols-2 gap-2">
           <UFormField label="Starts (s)">
             <UInput
@@ -346,7 +392,7 @@
         <UFormField label="Animation">
           <USelect v-model="layer.animation" :items="LAYER_ANIMATIONS" class="w-full" size="sm" aria-label="Animation" />
         </UFormField>
-      </section>
+      </EditorSection>
     </template>
 
     <!-- ── Render ──────────────────────────────────────────────────────── -->
@@ -367,10 +413,19 @@
           Render layers
         </UButton>
         <UTooltip text="Undoable — Ctrl/⌘+Z brings the layers back">
-          <UButton class="ml-2" color="neutral" variant="ghost" icon="i-lucide-rotate-ccw" :disabled="!s.layers.length" @click="edit.reset()">Clear</UButton>
+          <UButton class="ml-2" color="neutral" variant="ghost" icon="i-lucide-rotate-ccw" :disabled="!s.layers.length" @click="confirmClear = true">Clear</UButton>
         </UTooltip>
       </div>
     </section>
+
+    <ConfirmModal
+      v-model="confirmClear"
+      title="Remove all layers"
+      :description="`Remove all ${s.layers.length} layer${s.layers.length === 1 ? '' : 's'}? Ctrl/⌘+Z brings them back.`"
+      confirm-label="Remove all"
+      color="error"
+      @confirm="onConfirmClear"
+    />
 
     <ConfirmModal
       :model-value="confirmDeleteTemplate !== null"
@@ -392,6 +447,7 @@
 import { LAYER_ANIMATIONS, LAYER_SPOTS, LAYER_WEIGHTS, type OverlayEdit } from '~/composables/useOverlayEdit'
 import { uploadToStorage } from '~/composables/useVideos'
 import { formatTimecode } from '#shared/utils/transport'
+import { dropIndex } from '#shared/utils/reorder'
 import { useOverlayTemplates, type OverlayTemplate } from '~/composables/useOverlayTemplates'
 
 const props = defineProps<{ edit: OverlayEdit; videoId: number; durationMs: number; currentMs: number; canWrite: boolean; busy: boolean }>()
@@ -405,6 +461,72 @@ const ALIGNS = [
   { value: 'RIGHT', icon: 'i-lucide-align-right' }
 ] as const
 const SPOT_NAMES = ['top left', 'top centre', 'top right', 'middle left', 'centre', 'middle right', 'bottom left', 'bottom centre', 'bottom right']
+
+// Which groups of the selected layer are unfolded; timing is rarely touched, so it starts folded.
+const open = reactive({ content: true, position: true, timing: false })
+const SWATCHES = ['#ffffff', '#000000', '#ffd60a', '#ff453a', '#30d158', '#0a84ff']
+
+// A layer picked on the video may be far down a long list: bring its row into view.
+// ("nearest" leaves the page alone when the row is already visible, e.g. after a click on it.)
+const layerList = useTemplateRef<HTMLElement>('layerList')
+watch(
+  () => s.selectedId,
+  async (id) => {
+    if (!id) return
+    await nextTick()
+    layerList.value?.querySelector(`[data-layer-id="${CSS.escape(id)}"]`)?.scrollIntoView({ block: 'nearest' })
+  }
+)
+
+// ── Drag to reorder ──────────────────────────────────────────────────────────
+// Native drag and drop; the arrow buttons on each row do the same from the keyboard.
+const dragId = ref<string | null>(null)
+const overIndex = ref<number | null>(null)
+const overHalf = ref<'before' | 'after'>('before')
+
+function onDragStart(event: DragEvent, id: string) {
+  dragId.value = id
+  if (event.dataTransfer) {
+    event.dataTransfer.effectAllowed = 'move'
+    event.dataTransfer.setData('text/plain', id) // Firefox won't start a drag without data
+  }
+}
+function onDragOver(event: DragEvent, index: number) {
+  if (!dragId.value) return
+  event.preventDefault() // marks the row as a drop target
+  const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()
+  overIndex.value = index
+  overHalf.value = event.clientY < rect.top + rect.height / 2 ? 'before' : 'after'
+}
+function clearDrag() {
+  dragId.value = null
+  overIndex.value = null
+}
+function onDrop() {
+  const from = s.layers.findIndex((l) => l.id === dragId.value)
+  if (dragId.value && from >= 0 && overIndex.value !== null) props.edit.moveTo(dragId.value, dropIndex(from, overIndex.value, overHalf.value))
+  clearDrag()
+}
+/** Where to draw the drop line on row `i`: only when dropping there would actually move the layer. */
+function dropLine(i: number): 'before' | 'after' | null {
+  if (!dragId.value || overIndex.value !== i) return null
+  const from = s.layers.findIndex((l) => l.id === dragId.value)
+  return dropIndex(from, i, overHalf.value) === from ? null : overHalf.value
+}
+
+const confirmClear = ref(false)
+function onConfirmClear() {
+  confirmClear.value = false
+  props.edit.reset()
+}
+
+/** The layer's on-screen span as a position within the whole video. */
+function layerBar(l: { startMs: number; endMs: number | null }) {
+  const total = props.durationMs || 1
+  const start = Math.min(100, Math.max(0, (l.startMs / total) * 100))
+  const end = Math.min(100, Math.max(start, ((l.endMs ?? total) / total) * 100))
+  return { left: `${start}%`, width: `${Math.max(end - start, 1)}%` }
+}
 
 const toast = useToast()
 const { startOverlay, fonts } = useVideoEdits()

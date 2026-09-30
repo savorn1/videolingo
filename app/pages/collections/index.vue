@@ -9,6 +9,8 @@
       </template>
     </PageHeader>
 
+    <SummaryTiles :tiles="summaryTiles" @select="onSelectTile" />
+
     <UCard v-if="selectMode" class="mb-4" :ui="{ body: 'flex flex-wrap items-center gap-3 py-3' }">
       <UCheckbox
         :model-value="rows.length > 0 && selected.size === rows.length"
@@ -125,7 +127,11 @@
       />
     </div>
 
-    <CollectionFormModal v-model="showForm" :collection="editing" @saved="(c) => (editing ? load() : navigateTo(`/collections/${c.id}`))" />
+    <CollectionFormModal
+      v-model="showForm"
+      :collection="editing"
+      @saved="(c) => (editing ? (load(), loadTileCounts()) : navigateTo(`/collections/${c.id}`))"
+    />
 
     <ConfirmModal
       :model-value="confirmDelete !== null"
@@ -143,6 +149,7 @@
 <script setup lang="ts">
 import type { DropdownMenuItem } from '@nuxt/ui'
 import { COLLECTION_VISIBILITIES, type Collection, type CollectionVisibility } from '~/composables/useCollections'
+import type { SummaryTile } from '~/components/SummaryTiles.vue'
 
 definePageMeta({ middleware: 'admin' })
 
@@ -220,12 +227,46 @@ function clearFilters() {
 
 onMounted(async () => {
   load()
+  loadTileCounts()
   try {
     users.value = (await listUsers({ size: 500, sortBy: 'username', sortOrder: 'asc' })).data
   } catch {
     users.value = []
   }
 })
+
+// ── Summary tiles ────────────────────────────────────────────────────────────
+// Global counts (ignoring the other filters) — same "how's the library doing"
+// glance as the other list pages, scoped by the one filter (visibility) worth
+// summarizing here.
+const tileCounts = ref<{ total: number | null; public: number | null; unlisted: number | null; private: number | null }>({
+  total: null,
+  public: null,
+  unlisted: null,
+  private: null
+})
+async function loadTileCounts() {
+  tileCounts.value = { total: null, public: null, unlisted: null, private: null }
+  const count = async (visibility?: CollectionVisibility) => {
+    try {
+      return (await list({ visibility, page: 1, size: 1 })).metadata.totalCount
+    } catch {
+      return null
+    }
+  }
+  const [total, pub, unlisted, priv] = await Promise.all([count(), count('PUBLIC'), count('UNLISTED'), count('PRIVATE')])
+  tileCounts.value = { total, public: pub, unlisted, private: priv }
+}
+const summaryTiles = computed<SummaryTile[]>(() => [
+  { key: 'all', label: 'Collections', count: tileCounts.value.total, icon: 'i-lucide-library', active: filter.visibility === undefined, color: 'primary' },
+  { key: 'PUBLIC', label: 'Public', count: tileCounts.value.public, icon: 'i-lucide-globe', active: filter.visibility === 'PUBLIC', color: 'success' },
+  { key: 'UNLISTED', label: 'Unlisted', count: tileCounts.value.unlisted, icon: 'i-lucide-link', active: filter.visibility === 'UNLISTED', color: 'info' },
+  { key: 'PRIVATE', label: 'Private', count: tileCounts.value.private, icon: 'i-lucide-lock', active: filter.visibility === 'PRIVATE', color: 'neutral' }
+])
+function onSelectTile(key: string) {
+  const next = key === 'all' ? undefined : (key as CollectionVisibility)
+  filter.visibility = filter.visibility === next ? undefined : next
+}
 
 // ── Actions ────────────────────────────────────────────────────────────────
 const showForm = ref(false)
@@ -257,6 +298,7 @@ async function onDuplicate(c: Collection) {
     const copy = await duplicate(c.id)
     toast.add({ title: `Duplicated as “${copy.title}”`, color: 'success' })
     await load()
+    loadTileCounts()
   } catch (err) {
     toast.add({ title: 'Could not duplicate collection', description: apiErrorMessage(err), color: 'error' })
   }
@@ -281,6 +323,7 @@ const selectedCollections = computed(() => rows.value.filter((c) => selected.has
 async function onBulkDone() {
   selected.clear()
   await load()
+  loadTileCounts()
 }
 watch(rows, () => {
   const ids = new Set(rows.value.map((c) => c.id))
@@ -296,6 +339,7 @@ async function onDelete(c: Collection) {
     toast.add({ title: `“${c.title}” deleted`, color: 'success' })
     confirmDelete.value = null
     await load()
+    loadTileCounts()
   } catch (err) {
     toast.add({ title: 'Could not delete collection', description: apiErrorMessage(err), color: 'error' })
   } finally {

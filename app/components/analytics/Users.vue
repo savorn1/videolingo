@@ -18,6 +18,7 @@
         :delta="data && describeDelta(data.newUsers.current, data.newUsers.previous)"
         :compared-to="comparedTo"
         :previous-text="data ? formatCount(data.newUsers.previous) : ''"
+        :trend="newUsers.items.map((i) => i.value)"
         color="success"
         :loading="!data"
       />
@@ -29,6 +30,7 @@
         :compared-to="comparedTo"
         :previous-text="data ? formatCount(data.activeViewers.previous) : ''"
         sublabel="Signed-in accounts that watched something"
+        :trend="active.items.map((i) => i.value)"
         color="info"
         :loading="!data"
       />
@@ -71,7 +73,13 @@
       </UCard>
       <UCard class="lg:col-span-2">
         <template #header><h3 class="font-semibold text-gray-900 dark:text-white">Top viewers</h3></template>
-        <p v-if="data && !data.topViewers.length" class="text-sm text-gray-500">Nobody signed in watched anything in this period.</p>
+        <div v-if="!data" class="space-y-2">
+          <USkeleton v-for="n in 5" :key="n" class="h-8" />
+        </div>
+        <div v-else-if="!data.topViewers.length" class="flex flex-col items-center gap-2 py-8 text-center text-sm text-gray-500">
+          <UIcon name="i-lucide-users-round" class="w-8 h-8 text-gray-300 dark:text-gray-600" />
+          Nobody signed in watched anything in this period.
+        </div>
         <table v-else class="w-full text-sm">
           <thead class="text-xs text-gray-500 text-left">
             <tr>
@@ -82,8 +90,8 @@
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
-            <tr v-for="u in data?.topViewers ?? []" :key="u.userId">
-              <td class="py-1.5">
+            <tr v-for="u in data?.topViewers ?? []" :key="u.userId" class="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+              <td class="py-2">
                 <NuxtLink :to="`/users/${u.userId}`" class="hover:underline"><UserChip :name="u.username" /></NuxtLink>
               </td>
               <td class="py-1.5 text-right tabular-nums">{{ formatCount(u.views) }}</td>

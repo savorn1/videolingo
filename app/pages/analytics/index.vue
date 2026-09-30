@@ -1,27 +1,32 @@
 <template>
   <div>
-    <PageHeader title="Analytics" description="How the platform is used — people, content, viewing, translation, storage and AI.">
-      <template #actions>
-        <USelect v-model="rangeKey" :items="RANGE_PRESETS" class="w-44" aria-label="Date range" />
-      </template>
-    </PageHeader>
+    <PageHeader title="Analytics" description="How the platform is used — people, content, viewing, translation, storage and AI." />
 
-    <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
-      <UTabs v-model="tab" :items="tabItems" :content="false" class="w-full lg:w-auto overflow-x-auto" />
-      <p class="text-sm text-gray-500">
-        {{ formatDate(range.from) }} – {{ formatDate(range.to) }}
-        <span class="text-gray-400">· compared with the {{ days }} days before</span>
-      </p>
+    <!-- Sticky toolbar: section tabs on the left, period on the right -->
+    <div
+      class="sticky top-0 z-20 -mx-1 px-1 py-2 mb-4 bg-(--ui-bg)/90 backdrop-blur border-b border-gray-100 dark:border-gray-800 flex flex-wrap items-center justify-between gap-x-4 gap-y-2"
+    >
+      <UTabs v-model="tab" :items="tabItems" :content="false" size="sm" class="w-full lg:w-auto overflow-x-auto" />
+      <div class="flex items-center gap-3 w-full lg:w-auto justify-between lg:justify-end">
+        <p class="text-xs text-gray-500 leading-tight">
+          <span class="font-medium text-gray-700 dark:text-gray-300">{{ formatDate(range.from) }} – {{ formatDate(range.to) }}</span>
+          <br />
+          <span class="text-gray-400">vs the {{ days }} days before</span>
+        </p>
+        <USelect v-model="rangeKey" :items="RANGE_PRESETS" icon="i-lucide-calendar" class="w-44" aria-label="Date range" />
+      </div>
     </div>
 
     <!-- Each tab loads its own data, only when shown -->
-    <AnalyticsUsers v-if="tab === 'users'" :range="range" :compared-to="comparedTo" />
-    <AnalyticsVideos v-else-if="tab === 'videos'" :range="range" :compared-to="comparedTo" />
-    <AnalyticsWatch v-else-if="tab === 'watch'" :range="range" :compared-to="comparedTo" />
-    <AnalyticsTranslations v-else-if="tab === 'translations'" :range="range" :compared-to="comparedTo" />
-    <AnalyticsLanguages v-else-if="tab === 'languages'" :range="range" :compared-to="comparedTo" />
-    <AnalyticsStorage v-else-if="tab === 'storage'" :range="range" :compared-to="comparedTo" />
-    <AnalyticsAi v-else :range="range" :compared-to="comparedTo" />
+    <Transition name="tab-fade" mode="out-in">
+      <AnalyticsUsers v-if="tab === 'users'" key="users" :range="range" :compared-to="comparedTo" />
+      <AnalyticsVideos v-else-if="tab === 'videos'" key="videos" :range="range" :compared-to="comparedTo" />
+      <AnalyticsWatch v-else-if="tab === 'watch'" key="watch" :range="range" :compared-to="comparedTo" />
+      <AnalyticsTranslations v-else-if="tab === 'translations'" key="translations" :range="range" :compared-to="comparedTo" />
+      <AnalyticsLanguages v-else-if="tab === 'languages'" key="languages" :range="range" :compared-to="comparedTo" />
+      <AnalyticsStorage v-else-if="tab === 'storage'" key="storage" :range="range" :compared-to="comparedTo" />
+      <AnalyticsAi v-else key="ai" :range="range" :compared-to="comparedTo" />
+    </Transition>
   </div>
 </template>
 
@@ -63,3 +68,23 @@ watch([tab, rangeKey], ([t, r]) => {
   router.replace({ query: { ...route.query, tab: t === 'users' ? undefined : t, range: r === '30d' ? undefined : r } })
 })
 </script>
+
+<style scoped>
+.tab-fade-enter-active,
+.tab-fade-leave-active {
+  transition:
+    opacity 0.15s ease,
+    transform 0.15s ease;
+}
+.tab-fade-enter-from,
+.tab-fade-leave-to {
+  opacity: 0;
+  transform: translateY(4px);
+}
+@media (prefers-reduced-motion: reduce) {
+  .tab-fade-enter-active,
+  .tab-fade-leave-active {
+    transition: none;
+  }
+}
+</style>
