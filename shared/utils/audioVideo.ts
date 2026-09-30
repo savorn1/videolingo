@@ -15,6 +15,16 @@ export type VideoResolution = (typeof VIDEO_RESOLUTIONS)[number]['value']
 export const DEFAULT_RESOLUTION: VideoResolution = '720p'
 export const DEFAULT_BACKGROUND = '#111827'
 
+export const WAVEFORM_STYLES = [
+  { value: 'NONE', label: 'None', hint: 'Just the picture' },
+  { value: 'WAVES', label: 'Waveform', hint: 'A moving line' },
+  { value: 'BARS', label: 'Bars', hint: 'Moving frequency bars' }
+] as const
+export type WaveformStyle = (typeof WAVEFORM_STYLES)[number]['value']
+
+/** Most files made into videos in one go. */
+export const MAX_BATCH = 20
+
 export const BACKGROUND_SWATCHES = ['#111827', '#000000', '#ffffff', '#1e3a8a', '#065f46', '#7c2d12', '#581c87'] as const
 
 interface FileLike {
@@ -55,4 +65,44 @@ export function isHexColor(value: string): boolean {
 export function normalizeHexColor(value: string): string | null {
   const hex = `#${value.trim().replace(/^#/, '')}`.toLowerCase()
   return isHexColor(hex) ? hex : null
+}
+
+/** A problem with making this many videos at once, or null. */
+export function batchProblem(count: number): string | null {
+  if (count > MAX_BATCH) return `At most ${MAX_BATCH} files at a time`
+  return null
+}
+
+/** Titles made distinct for a batch: a repeat becomes "Lesson (2)", "Lesson (3)". Comparison ignores case. */
+export function uniqueTitles(titles: string[]): string[] {
+  const seen = new Map<string, number>()
+  return titles.map((title) => {
+    const key = title.trim().toLowerCase()
+    const n = (seen.get(key) ?? 0) + 1
+    seen.set(key, n)
+    return n === 1 ? title : `${title.trim()} (${n})`
+  })
+}
+
+/** Which of `sizes` (bytes) should upload next: the first one not yet started, or null. Uploads run one at a time. */
+export function nextToUpload(statuses: ('queued' | 'uploading' | 'ready' | 'error')[]): number | null {
+  if (statuses.includes('uploading')) return null
+  const i = statuses.indexOf('queued')
+  return i === -1 ? null : i
+}
+
+/** Whether a job's parameters (raw JSON) say it is a "video from audio" job. */
+export function isAudioVideoJob(parameters: string | null | undefined): boolean {
+  if (!parameters) return false
+  try {
+    return (JSON.parse(parameters) as { operation?: unknown }).operation === 'AUDIO_TO_VIDEO'
+  } catch {
+    return false
+  }
+}
+
+/** The newest "video from audio" job among a video's jobs (any order), or null. */
+export function findAudioVideoJob<T extends { id: number; parameters: string | null }>(jobs: T[]): T | null {
+  const mine = jobs.filter((j) => isAudioVideoJob(j.parameters))
+  return mine.length ? mine.reduce((a, b) => (b.id > a.id ? b : a)) : null
 }

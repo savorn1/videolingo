@@ -280,6 +280,16 @@ export interface AudioToVideoPayload {
   /** "#rrggbb". */
   background?: string
   resolution?: string
+  /** NONE, WAVES or BARS: a moving waveform along the bottom. */
+  waveform?: string
+  waveColor?: string
+  /** Write text on the background (no cover picture). */
+  titleCard?: boolean
+  cardText?: string
+  normalize?: boolean
+  denoise?: boolean
+  /** Transcribe the finished video (needs a language). */
+  transcribe?: boolean
   title: string
   description?: string
   language?: string

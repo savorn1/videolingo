@@ -64,6 +64,8 @@
         description="Learners can't watch it until it's enabled again."
       />
 
+      <AudioVideoProgress :video-id="video.id" @finished="load" />
+
       <div class="grid grid-cols-1 xl:grid-cols-3 gap-4 mb-4">
         <!-- View Video -->
         <UCard class="xl:col-span-2 self-start xl:sticky xl:top-4" :ui="{ body: 'p-0 sm:p-0' }">

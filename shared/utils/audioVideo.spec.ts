@@ -1,5 +1,16 @@
 import { describe, expect, it } from 'vitest'
-import { audioFileProblem, coverFileProblem, isHexColor, normalizeHexColor } from './audioVideo'
+import {
+  audioFileProblem,
+  batchProblem,
+  coverFileProblem,
+  findAudioVideoJob,
+  isAudioVideoJob,
+  isHexColor,
+  MAX_BATCH,
+  nextToUpload,
+  normalizeHexColor,
+  uniqueTitles
+} from './audioVideo'
 
 const file = (name: string, type = '', size = 1000) => ({ name, type, size })
 
@@ -46,5 +57,62 @@ describe('colours', () => {
     expect(normalizeHexColor('#fff')).toBeNull()
     expect(normalizeHexColor('red')).toBeNull()
     expect(normalizeHexColor('')).toBeNull()
+  })
+})
+
+describe('batchProblem', () => {
+  it('allows up to the limit', () => {
+    expect(batchProblem(1)).toBeNull()
+    expect(batchProblem(MAX_BATCH)).toBeNull()
+    expect(batchProblem(MAX_BATCH + 1)).toMatch(String(MAX_BATCH))
+  })
+})
+
+describe('uniqueTitles', () => {
+  it('leaves distinct titles alone', () => {
+    expect(uniqueTitles(['One', 'Two'])).toEqual(['One', 'Two'])
+  })
+  it('numbers repeats, ignoring case', () => {
+    expect(uniqueTitles(['Lesson', 'lesson', 'Lesson', 'Other'])).toEqual(['Lesson', 'lesson (2)', 'Lesson (3)', 'Other'])
+  })
+  it('handles an empty list', () => {
+    expect(uniqueTitles([])).toEqual([])
+  })
+})
+
+describe('nextToUpload', () => {
+  it('picks the first queued file', () => {
+    expect(nextToUpload(['ready', 'queued', 'queued'])).toBe(1)
+  })
+  it('waits while one is uploading', () => {
+    expect(nextToUpload(['uploading', 'queued'])).toBeNull()
+  })
+  it('is null when nothing is waiting', () => {
+    expect(nextToUpload([])).toBeNull()
+    expect(nextToUpload(['ready', 'error'])).toBeNull()
+  })
+})
+
+describe('isAudioVideoJob', () => {
+  it('reads the operation from the job parameters', () => {
+    expect(isAudioVideoJob('{"operation":"AUDIO_TO_VIDEO","audioKey":"x"}')).toBe(true)
+    expect(isAudioVideoJob('{"operation":"TRIM"}')).toBe(false)
+  })
+  it('is false for nothing or junk', () => {
+    expect(isAudioVideoJob(null)).toBe(false)
+    expect(isAudioVideoJob('')).toBe(false)
+    expect(isAudioVideoJob('not json')).toBe(false)
+    expect(isAudioVideoJob('null')).toBe(false)
+  })
+})
+
+describe('findAudioVideoJob', () => {
+  const job = (id: number, operation: string) => ({ id, parameters: JSON.stringify({ operation }) })
+  it('finds the newest audio-to-video job whatever the order', () => {
+    expect(findAudioVideoJob([job(3, 'AUDIO_TO_VIDEO'), job(9, 'TRIM'), job(5, 'AUDIO_TO_VIDEO')])?.id).toBe(5)
+  })
+  it('is null when there is none', () => {
+    expect(findAudioVideoJob([job(1, 'TRIM')])).toBeNull()
+    expect(findAudioVideoJob([])).toBeNull()
   })
 })
