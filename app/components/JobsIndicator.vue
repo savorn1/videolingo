@@ -9,45 +9,11 @@
 
 <script setup lang="ts">
 // Shows in the header while background jobs are running or waiting, and opens the
-// jobs list. Looks every few seconds while something is going on, seldom otherwise,
-// and not at all while the tab is hidden.
-import { activeJobs, jobsLabel, nextPollDelay, type JobCounts } from '#shared/utils/jobsIndicator'
+// jobs list. The numbers come from useJobActivity, which looks every few seconds
+// while something is going on and seldom otherwise.
+import { activeJobs, jobsLabel } from '#shared/utils/jobsIndicator'
 
-const { can } = useAuth()
-const { summary } = useProcessingJobs()
-const allowed = computed(() => can('processing-jobs', 'READ'))
-
-const raw = ref<JobCounts | null>(null)
+const { counts: raw, allowed } = useJobActivity()
 const counts = computed(() => activeJobs(raw.value))
 const label = computed(() => jobsLabel(raw.value))
-
-let timer: ReturnType<typeof setTimeout> | undefined
-async function look() {
-  clearTimeout(timer)
-  if (!allowed.value) return
-  try {
-    raw.value = await summary()
-  } catch {
-    // Not worth an error: the indicator just stays as it was.
-  }
-  schedule()
-}
-function schedule() {
-  clearTimeout(timer)
-  const delay = nextPollDelay(counts.value.total, document.visibilityState === 'hidden')
-  if (delay !== null) timer = setTimeout(look, delay)
-}
-function onVisibility() {
-  if (document.visibilityState === 'visible') look()
-  else clearTimeout(timer)
-}
-
-onMounted(() => {
-  look()
-  document.addEventListener('visibilitychange', onVisibility)
-})
-onBeforeUnmount(() => {
-  clearTimeout(timer)
-  document.removeEventListener('visibilitychange', onVisibility)
-})
 </script>

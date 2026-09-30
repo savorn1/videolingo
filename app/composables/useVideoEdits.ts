@@ -162,8 +162,10 @@ export function useVideoEdits() {
     return (await api<ApiEnvelope<Waveform>>(`${base(videoId)}/waveform?${query}`)).data
   }
 
-  async function promote(videoId: number, clipId: number) {
-    return (await api<ApiEnvelope<PromoteResult>>(`${base(videoId)}/${clipId}/promote`, { method: 'POST' })).data
+  /** Applies a result. With `asNew`, a trim / audio / overlay result becomes a separate video instead of replacing the original. */
+  async function promote(videoId: number, clipId: number, options: { asNew?: boolean; title?: string } = {}) {
+    const body = options.asNew ? { asNew: true, title: options.title?.trim() || undefined } : undefined
+    return (await api<ApiEnvelope<PromoteResult>>(`${base(videoId)}/${clipId}/promote`, { method: 'POST', body })).data
   }
 
   async function remove(videoId: number, clipId: number) {

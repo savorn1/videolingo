@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { findSplitTarget, MAX_SEGMENTS, MIN_TRIM_MS, splitRowAt, uncoveredMs, validateCrop, validateScale, validateSegments, validateTrim, withTrimEdge } from './videoEdit'
+import { findSplitTarget, MAX_VIDEO_TITLE, replacesOriginal, suggestedNewTitle, MAX_SEGMENTS, MIN_TRIM_MS, splitRowAt, uncoveredMs, validateCrop, validateScale, validateSegments, validateTrim, withTrimEdge } from './videoEdit'
 
 describe('validateTrim', () => {
   it('accepts a valid range', () => {
@@ -148,5 +148,36 @@ describe('uncoveredMs', () => {
   })
   it('is zero while the duration is unknown', () => {
     expect(uncoveredMs([{ startMsSeconds: 0, endMsSeconds: 5 }], 0)).toBe(0)
+  })
+})
+
+describe('replacesOriginal', () => {
+  it('is true for the edits that swap the video file itself', () => {
+    expect(replacesOriginal('TRIM')).toBe(true)
+    expect(replacesOriginal('AUDIO')).toBe(true)
+    expect(replacesOriginal('OVERLAY')).toBe(true)
+  })
+  it('is false for split segments and extracted audio', () => {
+    expect(replacesOriginal('SPLIT')).toBe(false)
+    expect(replacesOriginal('EXTRACT')).toBe(false)
+  })
+})
+
+describe('suggestedNewTitle', () => {
+  it('says what was done to the original', () => {
+    expect(suggestedNewTitle('Lesson', 'TRIM')).toBe('Lesson (trimmed)')
+    expect(suggestedNewTitle('Lesson', 'AUDIO')).toBe('Lesson (edited audio)')
+    expect(suggestedNewTitle('Lesson', 'OVERLAY')).toBe('Lesson (with text & overlays)')
+    expect(suggestedNewTitle('Lesson', 'SPLIT', 2)).toBe('Lesson — Part 3')
+    expect(suggestedNewTitle('Lesson', 'SPLIT')).toBe('Lesson — Part 1')
+  })
+  it('copes with a missing title', () => {
+    expect(suggestedNewTitle(null, 'TRIM')).toBe('Video (trimmed)')
+    expect(suggestedNewTitle('  ', 'TRIM')).toBe('Video (trimmed)')
+  })
+  it('shortens the original, not the suffix, to stay within the limit', () => {
+    const title = suggestedNewTitle('x'.repeat(300), 'TRIM')
+    expect(title).toHaveLength(MAX_VIDEO_TITLE)
+    expect(title.endsWith('… (trimmed)')).toBe(true)
   })
 })

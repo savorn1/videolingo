@@ -109,6 +109,17 @@
             </div>
             <div class="min-w-0">
               <p class="font-semibold text-gray-900 dark:text-white truncate" :title="row.title">{{ row.title }}</p>
+              <UBadge
+                v-if="making.get(row.id)"
+                color="info"
+                variant="subtle"
+                size="sm"
+                icon="i-lucide-loader"
+                class="mt-0.5 [&_svg]:animate-spin motion-reduce:[&_svg]:animate-none"
+                :title="'Its file is still being made; it stays hidden until you enable it'"
+              >
+                {{ making.get(row.id)!.label }}
+              </UBadge>
               <p v-if="row.description" class="text-xs text-gray-500 dark:text-gray-400 truncate">{{ row.description }}</p>
               <div v-if="row.categories.length || row.tags.length" class="flex flex-wrap gap-1 mt-1">
                 <CategoryBadge v-for="c in row.categories" :key="c.id" :name="c.name" :color="c.color" :enabled="c.enabled" />
@@ -242,6 +253,14 @@ definePageMeta({ middleware: 'admin' })
 const { list, updateStatus, remove, restore, archive, unarchive, duplicate, purge, purgeTrash } = useVideos()
 // Rows ticked for bulk actions (VideoBulkActions).
 const selected = ref<Video[]>([])
+
+// Videos still being made get a live badge; when one finishes the list is refreshed so it shows its real thumbnail and length.
+const { making } = useMakingVideos({
+  onFinished: () => {
+    load()
+    loadTileCounts()
+  }
+})
 
 // Joining the selected videos into one; the dialog is where the order is set.
 const showMerge = ref(false)

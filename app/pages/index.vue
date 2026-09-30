@@ -3,6 +3,7 @@
     <PageHeader :title="greeting" :description="hasAnyAccess ? 'Here’s what’s happening across VideoLingo in the last 30 days.' : undefined">
       <template v-if="canWriteVideos || canReadAnalytics" #actions>
         <UButton v-if="canReadAnalytics" color="neutral" variant="soft" icon="i-lucide-chart-no-axes-combined" to="/analytics">Analytics</UButton>
+        <UButton v-if="canWriteVideos" color="neutral" variant="soft" icon="i-lucide-audio-lines" to="/videos/from-audio">From audio</UButton>
         <UButton v-if="canWriteVideos" icon="i-lucide-plus" to="/videos/new">Add video</UButton>
       </template>
     </PageHeader>
@@ -109,7 +110,18 @@
                       {{ [v.language ? languageLabel(v.language) : null, formatDuration(v.durationSeconds), v.ownerUsername].filter(Boolean).join(' · ') }}
                     </p>
                   </div>
-                  <UBadge v-if="!v.enabled" color="warning" variant="subtle" size="sm">Disabled</UBadge>
+                  <UBadge
+                    v-if="making.get(v.id)"
+                    color="info"
+                    variant="subtle"
+                    size="sm"
+                    icon="i-lucide-loader"
+                    class="[&_svg]:animate-spin motion-reduce:[&_svg]:animate-none"
+                    title="Its file is still being made; it stays hidden until you enable it"
+                  >
+                    {{ making.get(v.id)!.label }}
+                  </UBadge>
+                  <UBadge v-else-if="!v.enabled" color="warning" variant="subtle" size="sm">Disabled</UBadge>
                   <span class="text-xs text-gray-400 shrink-0 hidden sm:inline" :title="formatDateTime(v.createdAt)">{{
                     formatRelativeTime(v.createdAt)
                   }}</span>
@@ -203,7 +215,6 @@
 // Home page: last-30-day headline numbers, what needs fixing, what's
 // running, and the newest videos. Each section only loads — and only shows —
 // when the signed-in account may read that module.
-import type { ProcessingJob } from '~/composables/useProcessingJobs'
 import type { UserAnalytics, VideoAnalytics, WatchAnalytics } from '~/composables/useAnalytics'
 import type { Video } from '~/composables/useVideos'
 
@@ -262,23 +273,34 @@ async function loadRecent() {
 // ── Jobs & attention ───────────────────────────────────────────────────────
 const { list: listJobs } = useProcessingJobs()
 const { list: listSubtitles } = useSubtitles()
-const runningJobs = ref<ProcessingJob[]>([])
+// The five newest running jobs, kept up to date by the shared job activity.
+const runningJobs = computed(() => liveRunning.value.slice(0, 5))
 const failedJobs = ref(0)
 const subtitlesWithIssues = ref(0)
 const attentionLoading = ref(false)
 const attentionChecked = ref(false)
 
+const loadFailedCount = () => listJobs({ status: 'FAILED', size: 1 }).then((r) => (failedJobs.value = r.metadata.totalCount))
+
 async function loadAttention() {
   attentionLoading.value = true
   // Each count is independent — one failing (or not permitted) shouldn't hide the rest.
   await Promise.allSettled([
-    canReadJobs.value && listJobs({ status: 'FAILED', size: 1 }).then((r) => (failedJobs.value = r.metadata.totalCount)),
-    canReadJobs.value && listJobs({ status: 'RUNNING', size: 5, sortBy: 'id', sortOrder: 'desc' }).then((r) => (runningJobs.value = r.data)),
+    canReadJobs.value && loadFailedCount(),
     canReadSubtitles.value && listSubtitles({ hasIssues: true, size: 1 }).then((r) => (subtitlesWithIssues.value = r.metadata.totalCount))
   ])
   attentionLoading.value = false
   attentionChecked.value = true
 }
+
+// Videos still being made get a live badge in the recent list; when one finishes the list is refreshed.
+// "Processing now" and the badges read the same shared answer as the header; when a job ends, the failed count is checked too, since it may have failed.
+const { making, running: liveRunning } = useJobActivity({
+  onVideosFinished: () => loadRecent(),
+  onJobsEnded: () => {
+    if (canReadJobs.value) loadFailedCount().catch(() => {})
+  }
+})
 
 const attention = computed(() => {
   const items: { label: string; count: number; icon: string; to: string; tone: string }[] = []

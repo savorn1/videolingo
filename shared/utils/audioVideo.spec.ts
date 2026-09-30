@@ -6,11 +6,16 @@ import {
   findAudioVideoJob,
   findMakingJob,
   isAudioVideoJob,
+  finishedMaking,
   isHexColor,
+  makingLabel,
   makingOperation,
   MAX_BATCH,
   nextToUpload,
   normalizeHexColor,
+  DEFAULT_LOOK,
+  sanitizeLook,
+  submitBlocker,
   uniqueTitles
 } from './audioVideo'
 
@@ -139,5 +144,65 @@ describe('makingOperation / findMakingJob', () => {
   it('is null when there is none', () => {
     expect(findMakingJob([job(1, 'TRIM')])).toBeNull()
     expect(findMakingJob([])).toBeNull()
+  })
+})
+
+describe('sanitizeLook', () => {
+  it('keeps valid settings', () => {
+    const look = { background: '#1e3a8a', resolution: '1080p', waveform: 'BARS', waveAuto: false, waveColor: '#ff0000', normalize: true, denoise: true }
+    expect(sanitizeLook(look)).toEqual(look)
+  })
+  it('falls back to the defaults for anything missing or wrong', () => {
+    expect(sanitizeLook(null)).toEqual(DEFAULT_LOOK)
+    expect(sanitizeLook('x')).toEqual(DEFAULT_LOOK)
+    expect(sanitizeLook({})).toEqual(DEFAULT_LOOK)
+    expect(sanitizeLook({ background: 'red', resolution: '4k', waveform: 'SPIRAL', waveAuto: 'yes', normalize: 1 })).toEqual(DEFAULT_LOOK)
+  })
+  it('fixes what can be fixed and keeps the rest', () => {
+    expect(sanitizeLook({ background: '1E3A8A', resolution: '480p' })).toMatchObject({ background: '#1e3a8a', resolution: '480p', waveform: 'NONE' })
+  })
+})
+
+describe('submitBlocker', () => {
+  const ok = { files: 2, uploading: 0, untitled: 0, slideError: null }
+  it('is null when everything is ready', () => {
+    expect(submitBlocker(ok)).toBeNull()
+  })
+  it('names the first thing to fix', () => {
+    expect(submitBlocker({ ...ok, files: 0 })).toMatch(/Add an audio/)
+    expect(submitBlocker({ ...ok, uploading: 1 })).toBe('Uploading 1 file…')
+    expect(submitBlocker({ ...ok, uploading: 3 })).toBe('Uploading 3 files…')
+    expect(submitBlocker({ ...ok, untitled: 1 })).toBe('Give the video a title')
+    expect(submitBlocker({ ...ok, untitled: 2 })).toBe('Give every video a title')
+    expect(submitBlocker({ ...ok, slideError: 'Picture 2 must start later' })).toBe('Picture 2 must start later')
+  })
+  it('puts uploads before titles before pictures', () => {
+    expect(submitBlocker({ files: 2, uploading: 1, untitled: 1, slideError: 'x' })).toMatch(/Uploading/)
+    expect(submitBlocker({ files: 2, uploading: 0, untitled: 1, slideError: 'x' })).toMatch(/title/)
+  })
+})
+
+describe('makingLabel', () => {
+  it('says what is being made and how far along', () => {
+    expect(makingLabel('MERGE', 'RUNNING', 40, null)).toBe('Joining videos · 40%')
+    expect(makingLabel('AUDIO_TO_VIDEO', 'RUNNING', 7.6, null)).toBe('Making from audio · 8%')
+  })
+  it('says where a waiting one is in the queue', () => {
+    expect(makingLabel('MERGE', 'QUEUED', 0, 3)).toBe('Joining videos · #3 in queue')
+    expect(makingLabel('AUDIO_TO_VIDEO', 'QUEUED', 0, null)).toBe('Making from audio · waiting')
+  })
+  it('keeps the percentage in range', () => {
+    expect(makingLabel('MERGE', 'RUNNING', -5, null)).toBe('Joining videos · 0%')
+    expect(makingLabel('MERGE', 'RUNNING', 140, null)).toBe('Joining videos · 100%')
+  })
+})
+
+describe('finishedMaking', () => {
+  it('lists the videos that were being made and are not now', () => {
+    expect(finishedMaking([1, 2, 3], new Set([2]))).toEqual([1, 3])
+  })
+  it('is empty when nothing finished', () => {
+    expect(finishedMaking([1], new Set([1, 5]))).toEqual([])
+    expect(finishedMaking([], new Set([1]))).toEqual([])
   })
 })

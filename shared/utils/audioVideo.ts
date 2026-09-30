@@ -129,3 +129,61 @@ export function findMakingJob<T extends { id: number; parameters: string | null 
   }
   return best
 }
+
+/** The "look" settings worth remembering between visits to the page. */
+export interface SavedLook {
+  background: string
+  resolution: VideoResolution
+  waveform: WaveformStyle
+  waveAuto: boolean
+  waveColor: string
+  normalize: boolean
+  denoise: boolean
+}
+
+export const DEFAULT_LOOK: SavedLook = {
+  background: DEFAULT_BACKGROUND,
+  resolution: DEFAULT_RESOLUTION,
+  waveform: 'NONE',
+  waveAuto: true,
+  waveColor: '#ffffff',
+  normalize: false,
+  denoise: false
+}
+
+/** Settings read back from storage, made safe: anything missing or not valid falls back to the default. */
+export function sanitizeLook(raw: unknown): SavedLook {
+  const r = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>
+  const str = (v: unknown) => (typeof v === 'string' ? v : '')
+  return {
+    background: normalizeHexColor(str(r.background)) ?? DEFAULT_LOOK.background,
+    resolution: VIDEO_RESOLUTIONS.find((x) => x.value === r.resolution)?.value ?? DEFAULT_LOOK.resolution,
+    waveform: WAVEFORM_STYLES.find((x) => x.value === r.waveform)?.value ?? DEFAULT_LOOK.waveform,
+    waveAuto: typeof r.waveAuto === 'boolean' ? r.waveAuto : DEFAULT_LOOK.waveAuto,
+    waveColor: normalizeHexColor(str(r.waveColor)) ?? DEFAULT_LOOK.waveColor,
+    normalize: typeof r.normalize === 'boolean' ? r.normalize : DEFAULT_LOOK.normalize,
+    denoise: typeof r.denoise === 'boolean' ? r.denoise : DEFAULT_LOOK.denoise
+  }
+}
+
+/** What is stopping "Make the video" (in the order to fix it), or null when it can go ahead. */
+export function submitBlocker(state: { files: number; uploading: number; untitled: number; slideError: string | null }): string | null {
+  if (state.files === 0) return 'Add an audio file to begin'
+  if (state.uploading > 0) return `Uploading ${state.uploading} file${state.uploading === 1 ? '' : 's'}…`
+  if (state.untitled > 0) return state.untitled === 1 ? 'Give the video a title' : 'Give every video a title'
+  if (state.slideError) return state.slideError
+  return null
+}
+
+/** What a list row says about a video that is still being made: "Joining videos · 40%", "Making from audio · #2 in queue". */
+export function makingLabel(operation: MakingOperation, status: string, progress: number, queuePosition: number | null): string {
+  const what = operation === 'MERGE' ? 'Joining videos' : 'Making from audio'
+  if (status === 'QUEUED') return queuePosition ? `${what} · #${queuePosition} in queue` : `${what} · waiting`
+  const pct = Math.max(0, Math.min(100, Math.round(progress)))
+  return `${what} · ${pct}%`
+}
+
+/** Video ids that were being made last time and aren't any more: their file has changed, so a list showing them is out of date. */
+export function finishedMaking(before: Iterable<number>, now: Set<number>): number[] {
+  return [...before].filter((id) => !now.has(id))
+}

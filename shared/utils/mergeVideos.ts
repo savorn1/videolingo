@@ -59,3 +59,54 @@ export function defaultMergeTitle(titles: string[]): string {
   const joined = clean.length <= 3 ? clean.join(' + ') : `${clean[0]} + ${clean.length - 1} more`
   return joined.length > 200 ? `${joined.slice(0, 199)}…` : joined
 }
+
+// ── The dialog's timeline ────────────────────────────────────────────────────
+
+/** Where each video will start in the joined one, in seconds; null from the first video of unknown length onwards (nothing after it can be placed). */
+export function mergeStarts(items: Pick<MergeItem, 'durationSeconds'>[]): (number | null)[] {
+  const out: (number | null)[] = []
+  let at: number | null = 0
+  for (const item of items) {
+    out.push(at)
+    at = at !== null && item.durationSeconds && item.durationSeconds > 0 ? at + item.durationSeconds : null
+  }
+  return out
+}
+
+/** Each video's share of the joined length as percentages adding up to 100; one of unknown length counts as an average-sized one. */
+export function mergeShares(items: Pick<MergeItem, 'durationSeconds'>[]): number[] {
+  if (!items.length) return []
+  const known = items.map((i) => (i.durationSeconds && i.durationSeconds > 0 ? i.durationSeconds : 0))
+  const knownOnly = known.filter(Boolean)
+  const average = knownOnly.length ? knownOnly.reduce((a, b) => a + b, 0) / knownOnly.length : 1
+  const weights = known.map((k) => k || average)
+  const total = weights.reduce((a, b) => a + b, 0)
+  return weights.map((w) => (w / total) * 100)
+}
+
+/**
+ * A cautious guess at how long the join takes to render: it is re-encoded, and a laptop
+ * managed about 37 times faster than real time on a plain test video. Real footage,
+ * a slower server and a bigger frame are allowed for.
+ */
+export function estimateMergeSeconds(totalSeconds: number, resolution: string): number {
+  const perSecond = resolution === '1080p' ? 0.3 : resolution === '480p' || resolution === '360p' ? 0.08 : 0.13
+  return Math.round(totalSeconds * perSecond)
+}
+
+/** "under a minute", "about 4 min", "about 1 h 20 min". */
+export function describeEstimate(seconds: number): string {
+  if (seconds < 60) return 'under a minute'
+  const minutes = Math.round(seconds / 60)
+  return minutes >= 60 ? `about ${Math.floor(minutes / 60)} h ${minutes % 60} min` : `about ${minutes} min`
+}
+
+/** The join settings worth remembering between uses of the dialog, made safe: anything not valid falls back to the default. */
+export function sanitizeMergeLook(raw: unknown): { resolution: '360p' | '480p' | '720p' | '1080p'; transition: MergeTransition } {
+  const r = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>
+  const resolutions = ['360p', '480p', '720p', '1080p'] as const
+  return {
+    resolution: resolutions.find((x) => x === r.resolution) ?? '720p',
+    transition: MERGE_TRANSITIONS.find((t) => t.value === r.transition)?.value ?? 'NONE'
+  }
+}

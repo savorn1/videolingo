@@ -52,10 +52,13 @@
         <h2 class="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
           <UIcon name="i-lucide-clapperboard" class="w-4 h-4 text-gray-400" />
           All videos
+          <span v-if="total" class="text-sm font-normal text-gray-500 dark:text-gray-400 tabular-nums">{{ total }}</span>
         </h2>
-        <div class="flex flex-wrap gap-2">
+        <div class="flex flex-wrap items-center gap-2">
           <UInput v-model="search" placeholder="Search videos" icon="i-lucide-search" size="sm" class="w-56" />
           <USelect v-model="filter.language" :items="languageFilterOptions" size="sm" class="w-40" placeholder="Language" />
+          <USelect v-model="sortModel" :items="sortItems" value-key="value" size="sm" class="w-40" aria-label="Sort videos" />
+          <UButton v-if="filtered" size="xs" color="neutral" variant="ghost" icon="i-lucide-x" @click="clearFilters">Clear</UButton>
         </div>
       </div>
 
@@ -67,7 +70,11 @@
         icon="i-lucide-search-x"
         :title="search || filter.language ? 'No videos match' : 'No videos yet'"
         :description="search || filter.language ? 'Try a different search.' : 'Videos will appear here once they are added.'"
-      />
+      >
+        <template v-if="filtered" #action>
+          <UButton icon="i-lucide-x" color="neutral" variant="soft" @click="clearFilters">Clear the search and filter</UButton>
+        </template>
+      </EmptyState>
       <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-4" :class="loading ? 'opacity-60' : ''">
         <VideoCard
           v-for="v in videos"
@@ -101,6 +108,7 @@
 // collections and every video. Open to every signed-in account.
 import type { Collection } from '~/composables/useCollections'
 import type { Video } from '~/composables/useVideos'
+import { DEFAULT_LEARN_SORT, LEARN_SORTS, normalizeSort, sortParams } from '#shared/utils/learnSort'
 import type { WatchProgress } from '~/composables/useWatchProgress'
 
 const { videos: listVideos, collections: listCollections } = useLearn()
@@ -114,10 +122,22 @@ const progress = ref(new Map<number, WatchProgress>())
 const total = ref(0)
 const loading = ref(false)
 const search = ref('')
-const filter = reactive<{ language: string | undefined }>({ language: undefined })
+const filter = reactive<{ language: string | undefined; sort: string | undefined }>({ language: undefined, sort: undefined })
 const page = ref(1)
 const pageSize = ref(12)
 useListQuerySync({ filter, search, page })
+const sortItems = LEARN_SORTS.map((s) => ({ label: s.label, value: s.value }))
+// The sort is kept in the address (?sort=title) only when it isn't the default, so the plain page stays ?-free.
+const sortModel = computed({
+  get: () => normalizeSort(filter.sort),
+  set: (v: string) => (filter.sort = v === DEFAULT_LEARN_SORT ? undefined : v)
+})
+const filtered = computed(() => !!search.value.trim() || !!filter.language || normalizeSort(filter.sort) !== DEFAULT_LEARN_SORT)
+function clearFilters() {
+  search.value = ''
+  filter.language = undefined
+  filter.sort = undefined
+}
 const languageFilterOptions = computed(() => [{ label: 'All languages', value: undefined }, ...languageOptions(filter.language)])
 
 let seq = 0
@@ -130,8 +150,7 @@ async function loadVideos() {
       language: filter.language,
       page: page.value,
       size: pageSize.value,
-      sortBy: 'createdAt',
-      sortOrder: 'desc'
+      ...sortParams(filter.sort)
     })
     if (mine !== seq) return
     videos.value = res.data
@@ -152,7 +171,7 @@ watch(search, () => {
     loadVideos()
   }, 300)
 })
-watch([() => filter.language, pageSize], () => {
+watch([() => filter.language, () => filter.sort, pageSize], () => {
   page.value = 1
   loadVideos()
 })

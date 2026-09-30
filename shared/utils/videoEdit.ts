@@ -96,3 +96,35 @@ export function uncoveredMs(rows: SegmentRow[], durationMs: number): number {
   }
   return Math.max(0, durationMs - covered)
 }
+
+// ── A new video from an edit's result ────────────────────────────────────────
+
+export const MAX_VIDEO_TITLE = 200
+
+export type ClipOperation = 'TRIM' | 'SPLIT' | 'AUDIO' | 'EXTRACT' | 'OVERLAY'
+
+/** Whether applying this result would replace the video's own file (so a separate video is the alternative). */
+export function replacesOriginal(operation: ClipOperation): boolean {
+  return operation === 'TRIM' || operation === 'AUDIO' || operation === 'OVERLAY'
+}
+
+/**
+ * The title suggested for a video made from a result: the original's, with what was done to it.
+ * Mirrors the server's own default (VideoEditService.promotedTitle), so what is shown here is what
+ * is saved when the field is left alone.
+ */
+export function suggestedNewTitle(sourceTitle: string | null | undefined, operation: ClipOperation, segmentIndex?: number | null): string {
+  const suffix =
+    operation === 'SPLIT'
+      ? ` — Part ${(segmentIndex ?? 0) + 1}`
+      : operation === 'TRIM'
+        ? ' (trimmed)'
+        : operation === 'AUDIO'
+          ? ' (edited audio)'
+          : operation === 'OVERLAY'
+            ? ' (with text & overlays)'
+            : ' (audio)'
+  const base = (sourceTitle ?? '').trim() || 'Video'
+  const room = MAX_VIDEO_TITLE - suffix.length
+  return (base.length > room ? `${base.slice(0, Math.max(0, room - 1))}…` : base) + suffix
+}

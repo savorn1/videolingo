@@ -530,14 +530,39 @@
           </template>
           <template v-else>
             <UButton size="xs" color="neutral" variant="soft" icon="i-lucide-play" :to="clip.url" target="_blank">Preview</UButton>
-            <UButton v-if="canWrite" size="xs" :color="replaces(clip) ? 'warning' : 'primary'" @click="confirmPromote = clip">
-              {{ replaces(clip) ? 'Replace original' : 'Add as new video' }}
-            </UButton>
+            <template v-if="canWrite">
+              <!-- A trim, audio or overlay result can be kept as a separate video, leaving the original as it is -->
+              <UButton v-if="replaces(clip)" size="xs" color="primary" variant="soft" icon="i-lucide-copy-plus" @click="openAsNew(clip)">Add as new video</UButton>
+              <UButton size="xs" :color="replaces(clip) ? 'warning' : 'primary'" @click="confirmPromote = clip">
+                {{ replaces(clip) ? 'Replace original' : 'Add as new video' }}
+              </UButton>
+            </template>
           </template>
           <UButton v-if="canWrite" size="xs" color="error" variant="ghost" icon="i-lucide-trash-2" aria-label="Discard clip" @click="confirmDiscardClip = clip" />
         </li>
       </ul>
     </UCard>
+
+    <UModal
+      :open="asNewClip !== null"
+      title="Add as a new video"
+      description="Makes a separate video from this result. Your original video is not changed, and the new one stays hidden until you enable it."
+      @update:open="(v: boolean) => !v && !creatingNew && (asNewClip = null)"
+    >
+      <template #body>
+        <form id="as-new-form" class="space-y-3" @submit.prevent="onCreateNew">
+          <UFormField label="Title" required>
+            <UInput v-model="asNewTitle" maxlength="200" class="w-full" autofocus aria-label="Title of the new video" />
+          </UFormField>
+        </form>
+      </template>
+      <template #footer="{ close }">
+        <div class="flex w-full justify-end gap-2">
+          <UButton color="neutral" variant="ghost" :disabled="creatingNew" @click="close">Cancel</UButton>
+          <UButton type="submit" form="as-new-form" icon="i-lucide-copy-plus" :loading="creatingNew" :disabled="!asNewTitle.trim()">Create video</UButton>
+        </div>
+      </template>
+    </UModal>
 
     <ConfirmModal
       :model-value="confirmPromote !== null"
@@ -594,6 +619,7 @@ import {
   validateCrop,
   validateScale,
   validateSegments,
+  suggestedNewTitle,
   validateTrim,
   withTrimEdge
 } from '#shared/utils/videoEdit'
@@ -1357,6 +1383,31 @@ async function onPromote() {
     toast.add({ title: 'Could not apply the clip', description: apiErrorMessage(err), color: 'error' })
   } finally {
     promoting.value = false
+  }
+}
+
+// ── Keep a result as a separate video ────────────────────────────────────────
+const asNewClip = ref<VideoClip | null>(null)
+const asNewTitle = ref('')
+const creatingNew = ref(false)
+function openAsNew(clip: VideoClip) {
+  asNewTitle.value = suggestedNewTitle(props.video.title, clip.operation, clip.segmentIndex)
+  asNewClip.value = clip
+}
+async function onCreateNew() {
+  const clip = asNewClip.value
+  if (!clip || !asNewTitle.value.trim()) return
+  creatingNew.value = true
+  try {
+    const result = await promote(props.video.id, clip.id, { asNew: true, title: asNewTitle.value })
+    asNewClip.value = null
+    toast.add({ title: 'New video created', description: "It's disabled until you review and enable it.", color: 'success' })
+    if (result.newVideoId) emit('created', result.newVideoId)
+    await load()
+  } catch (err) {
+    toast.add({ title: 'Could not create the video', description: apiErrorMessage(err), color: 'error' })
+  } finally {
+    creatingNew.value = false
   }
 }
 

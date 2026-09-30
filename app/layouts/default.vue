@@ -77,7 +77,7 @@ const { username, role, hasAnyAccess, logout } = useAuth()
 // Settings › General
 const { settings: clientSettings } = useClientSettings()
 const siteName = computed(() => clientSettings.value?.siteName || 'VideoLingo')
-useHead({ title: siteName })
+useHead({ title: siteName, titleTemplate: (title) => tabTitle(title, siteName.value) })
 const route = useRoute()
 
 const profileItems = computed<DropdownMenuItem[][]>(() => [

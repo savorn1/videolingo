@@ -21,7 +21,10 @@
         <UCard>
           <template #header>
             <div class="flex items-center justify-between gap-2">
-              <h2 class="font-semibold text-gray-900 dark:text-white">1. The audio</h2>
+              <h2 class="flex items-center gap-1.5 font-semibold text-gray-900 dark:text-white">
+                1. The audio
+                <UIcon v-if="readyItems.length" name="i-lucide-circle-check" class="h-4 w-4 text-success-500" aria-label="Done" />
+              </h2>
               <span v-if="items.length > 1" class="text-xs text-gray-500 dark:text-gray-400 tabular-nums">
                 {{ items.length }} files, {{ items.length }} videos
               </span>
@@ -319,8 +322,22 @@
 
         <UAlert v-if="saveError" color="error" variant="subtle" icon="i-lucide-triangle-alert" :title="saveError" />
 
-        <div class="flex flex-wrap items-center justify-end gap-2">
-          <p class="mr-auto text-xs text-gray-500 dark:text-gray-400">Videos are created hidden. Review each one, then enable it for learners.</p>
+        <!-- Stays in view while scrolling the long form, and says what is still missing -->
+        <div
+          class="sticky bottom-0 z-10 -mx-1 flex flex-wrap items-center justify-end gap-x-3 gap-y-2 rounded-lg border border-gray-200 bg-white/95 px-3 py-3 shadow-sm backdrop-blur dark:border-gray-800 dark:bg-gray-900/95"
+          data-testid="action-bar"
+        >
+          <div class="mr-auto min-w-0" aria-live="polite">
+            <p v-if="blocker" class="flex items-center gap-1.5 text-sm text-gray-700 dark:text-gray-300">
+              <UIcon :name="uploadingAny ? 'i-lucide-loader' : 'i-lucide-circle-alert'" class="h-4 w-4 shrink-0" :class="uploadingAny ? 'animate-spin motion-reduce:animate-none' : 'text-warning-500'" />
+              {{ blocker }}
+            </p>
+            <p v-else class="flex items-center gap-1.5 text-sm text-gray-700 dark:text-gray-300">
+              <UIcon name="i-lucide-circle-check" class="h-4 w-4 shrink-0 text-success-500" />
+              {{ readySummary }}
+            </p>
+            <p class="text-xs text-gray-500 dark:text-gray-400">Videos are created hidden. Review each one, then enable it for learners.</p>
+          </div>
           <UButton color="neutral" variant="ghost" to="/videos" :disabled="saving">Cancel</UButton>
           <UButton type="submit" icon="i-lucide-clapperboard" :loading="saving" :disabled="!canSubmit">{{ submitLabel }}</UButton>
         </div>
@@ -382,6 +399,8 @@ import {
   MAX_BATCH,
   nextToUpload,
   normalizeHexColor,
+  sanitizeLook,
+  submitBlocker,
   uniqueTitles,
   VIDEO_RESOLUTIONS,
   WAVEFORM_STYLES,
@@ -495,9 +514,15 @@ const previewMax = computed(() => readyItems.value[0]?.durationSeconds ?? 0)
 const shownIndex = computed(() => slideIndexAt(slideStarts.value, previewSeconds.value * 1000))
 const shownSlide = computed(() => slides.value[shownIndex.value] ?? null)
 const uploadingAny = computed(() => picUploading.value || items.value.some((i) => i.status === 'queued' || i.status === 'uploading'))
-const canSubmit = computed(
-  () => readyItems.value.length > 0 && !uploadingAny.value && !saving.value && !slideError.value && readyItems.value.every((i) => i.title.trim())
+const blocker = computed(() =>
+  submitBlocker({
+    files: items.value.filter((i) => i.status !== 'error').length,
+    uploading: items.value.filter((i) => i.status === 'queued' || i.status === 'uploading').length + (picUploading.value ? 1 : 0),
+    untitled: readyItems.value.filter((i) => !i.title.trim()).length,
+    slideError: slideError.value
+  })
 )
+const canSubmit = computed(() => !blocker.value && !saving.value && readyItems.value.length > 0)
 const submitLabel = computed(() => {
   if (uploadingAny.value) return 'Waiting for the uploads…'
   const n = readyItems.value.length
@@ -505,6 +530,47 @@ const submitLabel = computed(() => {
 })
 
 const selectedSize = computed(() => VIDEO_RESOLUTIONS.find((r) => r.value === resolution.value)?.size ?? '')
+const readySummary = computed(() => {
+  const n = readyItems.value.length
+  const parts = [`${n} video${n === 1 ? '' : 's'}`, totalLength.value, selectedSize.value]
+  if (waveform.value !== 'NONE') parts.push(waveform.value === 'BARS' ? 'bars' : 'waveform')
+  if (slides.value.length > 1) parts.push(`${slides.value.length} pictures`)
+  return `Ready: ${parts.filter((p) => p && p !== '—').join(' · ')}`
+})
+
+// ── Remember the look between visits ─────────────────────────────────────────
+// Background, size, waveform and sound options are usually the same for a whole series, so they are
+// kept with the user's other synced preferences and put back next time.
+const { load: loadPrefs, appValue, setApp } = useLearnerPrefs()
+const LOOK_KEY = 'audioVideoLook'
+let lookRestored = false
+onMounted(async () => {
+  await loadPrefs()
+  const saved = appValue<unknown>(LOOK_KEY, null)
+  if (saved) {
+    const look = sanitizeLook(saved)
+    setBackground(look.background)
+    resolution.value = look.resolution
+    waveform.value = look.waveform
+    waveAuto.value = look.waveAuto
+    waveColor.value = look.waveColor
+    normalize.value = look.normalize
+    denoise.value = look.denoise
+  }
+  lookRestored = true
+})
+watch([background, resolution, waveform, waveAuto, waveColor, normalize, denoise], () => {
+  if (!lookRestored) return // still the defaults; don't overwrite what was saved
+  setApp(LOOK_KEY, {
+    background: background.value,
+    resolution: resolution.value,
+    waveform: waveform.value,
+    waveAuto: waveAuto.value,
+    waveColor: waveColor.value,
+    normalize: normalize.value,
+    denoise: denoise.value
+  })
+})
 const totalLength = computed(() => {
   const total = readyItems.value.reduce((sum, i) => sum + (i.durationSeconds ?? 0), 0)
   return total ? formatDuration(total) : '—'

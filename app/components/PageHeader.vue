@@ -21,6 +21,9 @@ const props = defineProps<{
   crumbs?: BreadcrumbItem[]
 }>()
 
+// Every page has one of these, so this is where the browser tab gets its name (the layout adds the site name).
+useHead({ title: () => props.title })
+
 // Hands the trail to the layout rather than drawing a second breadcrumb here.
 const pageCrumbs = usePageCrumbs()
 const path = useRoute().path
