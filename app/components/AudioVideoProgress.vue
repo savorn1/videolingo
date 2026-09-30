@@ -5,7 +5,7 @@
     :color="active ? 'info' : 'error'"
     variant="subtle"
     :icon="active ? 'i-lucide-loader' : 'i-lucide-triangle-alert'"
-    :title="active ? 'Making the video from the audio' : 'The video could not be made'"
+    :title="active ? (job.operation === 'MERGE' ? 'Joining the videos' : 'Making the video from the audio') : 'The video could not be made'"
     :description="active ? undefined : (job.errorMessage ?? 'Something went wrong.')"
     data-testid="audio-video-progress"
   >
@@ -20,10 +20,10 @@
 </template>
 
 <script setup lang="ts">
-// On a video that is being made from audio: shows the job's progress, and tells
+// On a video that is being made (from audio, or by joining others): shows the job's progress, and tells
 // the page when it has finished so the page can load the finished video. Shows
 // nothing for any other video, or once the job is done.
-import { findAudioVideoJob } from '#shared/utils/audioVideo'
+import { findMakingJob } from '#shared/utils/audioVideo'
 import { isActiveJobStatus } from '#shared/utils/processingJobs'
 import type { ProcessingJob } from '~/composables/useProcessingJobs'
 
@@ -31,14 +31,14 @@ const props = defineProps<{ videoId: number }>()
 const emit = defineEmits<{ finished: [] }>()
 
 const { overview } = useVideoEdits()
-const job = ref<ProcessingJob | null>(null)
+const job = ref<(ProcessingJob & { operation: 'AUDIO_TO_VIDEO' | 'MERGE' }) | null>(null)
 const active = computed(() => !!job.value && isActiveJobStatus(job.value.status))
 
 let timer: ReturnType<typeof setInterval> | undefined
 async function refresh() {
   try {
     const before = job.value
-    job.value = findAudioVideoJob((await overview(props.videoId)).jobs)
+    job.value = findMakingJob((await overview(props.videoId)).jobs)
     // It was running a moment ago and isn't now: the video's file has changed.
     if (before && isActiveJobStatus(before.status) && job.value && !isActiveJobStatus(job.value.status)) emit('finished')
   } catch {

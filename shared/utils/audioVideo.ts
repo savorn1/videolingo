@@ -106,3 +106,26 @@ export function findAudioVideoJob<T extends { id: number; parameters: string | n
   const mine = jobs.filter((j) => isAudioVideoJob(j.parameters))
   return mine.length ? mine.reduce((a, b) => (b.id > a.id ? b : a)) : null
 }
+
+export type MakingOperation = 'AUDIO_TO_VIDEO' | 'MERGE'
+
+/** Which "making a new video" operation a job's parameters (raw JSON) describe, or null for any other job. */
+export function makingOperation(parameters: string | null | undefined): MakingOperation | null {
+  if (!parameters) return null
+  try {
+    const operation = (JSON.parse(parameters) as { operation?: unknown } | null)?.operation
+    return operation === 'AUDIO_TO_VIDEO' || operation === 'MERGE' ? operation : null
+  } catch {
+    return null
+  }
+}
+
+/** The newest job that is making this video (from audio, or by joining others), or null. */
+export function findMakingJob<T extends { id: number; parameters: string | null }>(jobs: T[]): (T & { operation: MakingOperation }) | null {
+  let best: (T & { operation: MakingOperation }) | null = null
+  for (const job of jobs) {
+    const operation = makingOperation(job.parameters)
+    if (operation && (!best || job.id > best.id)) best = { ...job, operation }
+  }
+  return best
+}

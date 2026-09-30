@@ -23,7 +23,7 @@
         </div>
 
         <div class="flex items-center gap-2">
-          <UButton size="sm" :icon="playing ? 'i-lucide-pause' : 'i-lucide-play'" @click="togglePlay" />
+          <UButton size="sm" :icon="playing ? 'i-lucide-pause' : 'i-lucide-play'" :aria-label="playing ? 'Pause' : 'Play'" @click="togglePlay" />
           <USlider
             :model-value="[Math.round(timeMs)]"
             :min="0"

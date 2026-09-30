@@ -4,8 +4,10 @@ import {
   batchProblem,
   coverFileProblem,
   findAudioVideoJob,
+  findMakingJob,
   isAudioVideoJob,
   isHexColor,
+  makingOperation,
   MAX_BATCH,
   nextToUpload,
   normalizeHexColor,
@@ -114,5 +116,28 @@ describe('findAudioVideoJob', () => {
   it('is null when there is none', () => {
     expect(findAudioVideoJob([job(1, 'TRIM')])).toBeNull()
     expect(findAudioVideoJob([])).toBeNull()
+  })
+})
+
+describe('makingOperation / findMakingJob', () => {
+  const job = (id: number, operation: string) => ({ id, parameters: JSON.stringify({ operation }) })
+  it('knows both ways of making a video', () => {
+    expect(makingOperation('{"operation":"AUDIO_TO_VIDEO"}')).toBe('AUDIO_TO_VIDEO')
+    expect(makingOperation('{"operation":"MERGE"}')).toBe('MERGE')
+  })
+  it('ignores other jobs and junk', () => {
+    expect(makingOperation('{"operation":"TRIM"}')).toBeNull()
+    expect(makingOperation('nope')).toBeNull()
+    expect(makingOperation(null)).toBeNull()
+    expect(makingOperation('null')).toBeNull()
+  })
+  it('finds the newest, whichever kind, and says which kind it is', () => {
+    const found = findMakingJob([job(2, 'AUDIO_TO_VIDEO'), job(7, 'TRIM'), job(4, 'MERGE')])
+    expect(found?.id).toBe(4)
+    expect(found?.operation).toBe('MERGE')
+  })
+  it('is null when there is none', () => {
+    expect(findMakingJob([job(1, 'TRIM')])).toBeNull()
+    expect(findMakingJob([])).toBeNull()
   })
 })

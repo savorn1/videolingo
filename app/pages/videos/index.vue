@@ -79,6 +79,17 @@
         @select="(row: Video) => navigateTo(`/videos/${row.id}`)"
       >
         <template #bulk-actions="{ selected: picked, clear }">
+          <UButton
+            v-if="!filter.deleted && picked.length >= 2"
+            size="xs"
+            color="neutral"
+            variant="soft"
+            icon="i-lucide-combine"
+            title="Make one new video from the selected videos"
+            @click="openMerge(picked)"
+          >
+            Join into one video
+          </UButton>
           <VideoBulkActions
             :videos="picked"
             :trash="filter.deleted"
@@ -175,6 +186,8 @@
       "
     />
 
+    <MergeVideosModal v-model="showMerge" :items="mergeItems" />
+
     <ConfirmModal
       :model-value="confirmDelete !== null"
       title="Move to trash"
@@ -221,6 +234,7 @@
 <script setup lang="ts">
 import type { ColumnDef, RowAction } from '#shared/types'
 import type { Video } from '~/composables/useVideos'
+import type { MergeItem } from '#shared/utils/mergeVideos'
 import type { SummaryTile } from '~/components/SummaryTiles.vue'
 
 definePageMeta({ middleware: 'admin' })
@@ -228,6 +242,20 @@ definePageMeta({ middleware: 'admin' })
 const { list, updateStatus, remove, restore, archive, unarchive, duplicate, purge, purgeTrash } = useVideos()
 // Rows ticked for bulk actions (VideoBulkActions).
 const selected = ref<Video[]>([])
+
+// Joining the selected videos into one; the dialog is where the order is set.
+const showMerge = ref(false)
+const mergeItems = ref<MergeItem[]>([])
+function openMerge(picked: Video[]) {
+  mergeItems.value = picked.map((v) => ({
+    id: v.id,
+    title: v.title,
+    durationSeconds: v.durationSeconds,
+    thumbnailUrl: v.thumbnailUrl,
+    blocked: blockedReason(v)
+  }))
+  showMerge.value = true
+}
 const { list: listUsers } = useUsers()
 const { list: listTags } = useTags()
 const toast = useToast()

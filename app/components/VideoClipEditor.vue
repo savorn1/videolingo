@@ -534,7 +534,7 @@
               {{ replaces(clip) ? 'Replace original' : 'Add as new video' }}
             </UButton>
           </template>
-          <UButton v-if="canWrite" size="xs" color="error" variant="ghost" icon="i-lucide-trash-2" aria-label="Discard clip" @click="onDiscard(clip)" />
+          <UButton v-if="canWrite" size="xs" color="error" variant="ghost" icon="i-lucide-trash-2" aria-label="Discard clip" @click="confirmDiscardClip = clip" />
         </li>
       </ul>
     </UCard>
@@ -552,6 +552,16 @@
       :loading="promoting"
       @update:model-value="(v: boolean) => !v && !promoting && (confirmPromote = null)"
       @confirm="onPromote"
+    />
+
+    <ConfirmModal
+      :model-value="confirmDiscardClip !== null"
+      title="Discard this result"
+      :description="`Discard “${confirmDiscardClip ? clipTitle(confirmDiscardClip) : ''}”? The rendered file is deleted, and it can't be replaced or added as a video afterwards. Your original video is not affected.`"
+      confirm-label="Discard"
+      color="error"
+      @update:model-value="(v: boolean) => !v && (confirmDiscardClip = null)"
+      @confirm="onConfirmDiscardClip"
     />
 
     <ConfirmModal
@@ -1350,6 +1360,12 @@ async function onPromote() {
   }
 }
 
+const confirmDiscardClip = ref<VideoClip | null>(null)
+async function onConfirmDiscardClip() {
+  const clip = confirmDiscardClip.value
+  confirmDiscardClip.value = null
+  if (clip) await onDiscard(clip)
+}
 async function onDiscard(clip: VideoClip) {
   try {
     await remove(props.video.id, clip.id)

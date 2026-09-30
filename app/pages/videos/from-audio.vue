@@ -87,32 +87,84 @@
             <h2 class="font-semibold text-gray-900 dark:text-white">2. The look</h2>
           </template>
           <div class="space-y-5">
-            <!-- Picture -->
-            <div class="space-y-2">
-              <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Cover picture <span class="font-normal text-gray-500">(optional, shared by all)</span></p>
-              <div v-if="cover" class="flex items-center gap-3 rounded-lg bg-gray-50 px-3 py-2 dark:bg-gray-800/60">
-                <img :src="cover.previewUrl" alt="" class="h-10 w-10 shrink-0 rounded object-cover" />
-                <p class="min-w-0 flex-1 truncate text-sm text-gray-900 dark:text-white" :title="cover.name">{{ cover.name }}</p>
-                <UButton size="xs" color="neutral" variant="ghost" icon="i-lucide-x" aria-label="Remove the cover picture" :disabled="saving" @click="clearCover" />
+            <!-- Pictures: one, or a slideshow with the time each one appears -->
+            <div class="space-y-3">
+              <div class="flex flex-wrap items-baseline justify-between gap-2">
+                <p class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Pictures <span class="font-normal text-gray-500">(optional, shared by all the videos)</span>
+                </p>
+                <UButton
+                  v-if="slides.length > 1"
+                  size="xs"
+                  color="neutral"
+                  variant="ghost"
+                  icon="i-lucide-align-horizontal-distribute-center"
+                  :disabled="!spreadStarts"
+                  :title="spreadStarts ? `Spread over ${formatDuration(shortestSeconds ?? 0)}, the shortest recording` : 'Add the audio first, and make sure it is long enough'"
+                  @click="spread"
+                >
+                  Spread evenly
+                </UButton>
               </div>
-              <UploadButton
-                v-else
-                label="Add a cover picture"
-                icon="i-lucide-image-plus"
-                accept="image/png,image/jpeg,image/webp"
-                :progress="coverUploading ? coverProgress : null"
-                @pick="onPickCover"
-              />
+
+              <ol v-if="slides.length" class="divide-y divide-gray-100 rounded-lg border border-gray-200 dark:divide-gray-800 dark:border-gray-800">
+                <li v-for="(sl, i) in slides" :key="sl.id" class="flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2">
+                  <img :src="sl.previewUrl" alt="" class="h-10 w-14 shrink-0 rounded object-cover" />
+                  <p class="min-w-0 flex-1 basis-28 truncate text-sm text-gray-900 dark:text-white" :title="sl.name">{{ sl.name }}</p>
+                  <div class="flex items-center gap-1.5">
+                    <label :for="`slide-start-${sl.id}`" class="text-xs text-gray-500 dark:text-gray-400">{{ i === 0 ? 'From' : 'Starts at' }}</label>
+                    <UInput
+                      :id="`slide-start-${sl.id}`"
+                      :model-value="formatTimecode(sl.startMs)"
+                      size="sm"
+                      class="w-28"
+                      :disabled="i === 0"
+                      :ui="{ base: 'tabular-nums' }"
+                      @change="(e: Event) => typeStart(sl.id, e)"
+                    />
+                  </div>
+                  <div class="flex items-center">
+                    <UButton size="xs" color="neutral" variant="ghost" icon="i-lucide-arrow-up" :aria-label="`Move ${sl.name} up`" :disabled="i === 0" @click="movePicture(i, -1)" />
+                    <UButton
+                      size="xs"
+                      color="neutral"
+                      variant="ghost"
+                      icon="i-lucide-arrow-down"
+                      :aria-label="`Move ${sl.name} down`"
+                      :disabled="i === slides.length - 1"
+                      @click="movePicture(i, 1)"
+                    />
+                    <UButton size="xs" color="neutral" variant="ghost" icon="i-lucide-x" :aria-label="`Remove ${sl.name}`" :disabled="saving" @click="removeSlide(sl.id)" />
+                  </div>
+                </li>
+              </ol>
+
+              <div class="flex flex-wrap items-center gap-2">
+                <UButton size="xs" color="neutral" variant="soft" icon="i-lucide-image-plus" :loading="picUploading" :disabled="slides.length >= MAX_SLIDES" @click="picInput?.click()">
+                  {{ picUploading ? `Uploading ${Math.round(picProgress * 100)}%` : slides.length ? 'Add more pictures' : 'Add pictures' }}
+                </UButton>
+                <input ref="picInput" type="file" multiple class="hidden" accept="image/png,image/jpeg,image/webp" aria-label="Choose pictures" @change="onPickPictures" />
+              </div>
               <p v-if="errors.cover" class="text-sm text-error-600 dark:text-error-400" role="alert">{{ errors.cover }}</p>
-              <p class="text-xs text-gray-500 dark:text-gray-400">Fitted inside the frame, not stretched. The first video's thumbnail is this picture.</p>
+              <p v-if="slideError" class="text-sm text-error-600 dark:text-error-400" role="alert">{{ slideError }}</p>
+              <p v-else-if="beyond" class="text-sm text-warning-700 dark:text-warning-400">
+                {{ beyond }} picture{{ beyond === 1 ? '' : 's' }} start after the shortest recording ends and will be skipped for it.
+              </p>
+              <p class="text-xs text-gray-500 dark:text-gray-400">
+                {{
+                  slides.length > 1
+                    ? 'Each picture stays until the next one starts. The times are the same for every video; the first picture is the thumbnail.'
+                    : 'Fitted inside the frame, not stretched. Add more than one to change the picture over time. The first picture is the thumbnail.'
+                }}
+              </p>
             </div>
 
             <!-- Title card -->
             <USwitch
               v-model="titleCard"
-              :disabled="!!cover"
+              :disabled="slides.length > 0"
               label="Write the title on the picture"
-              :description="cover ? 'Not used with a cover picture.' : 'Each video shows its own title, centred on the background.'"
+              :description="slides.length ? 'Not used when there are pictures.' : 'Each video shows its own title, centred on the background.'"
             />
 
             <!-- Background -->
@@ -278,7 +330,7 @@
       <aside class="lg:col-span-2 lg:sticky lg:top-4 space-y-2" aria-label="Preview">
         <p class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Preview</p>
         <div class="relative aspect-video w-full overflow-hidden rounded-lg border border-gray-200 dark:border-gray-800" :style="{ backgroundColor: background }">
-          <img v-if="cover" :src="cover.previewUrl" alt="Cover picture" class="absolute inset-0 h-full w-full object-contain" />
+          <img v-if="shownSlide" :src="shownSlide.previewUrl" alt="Picture shown at this time" class="absolute inset-0 h-full w-full object-contain" />
           <p
             v-else-if="titleCard"
             class="absolute inset-x-[10%] top-1/2 -translate-y-1/2 text-center text-lg font-bold leading-tight sm:text-xl"
@@ -296,6 +348,10 @@
             </template>
             <polyline v-else :points="WAVE_POINTS" fill="none" :stroke="waveDrawColor" stroke-width="0.8" vector-effect="non-scaling-stroke" />
           </svg>
+        </div>
+        <div v-if="slides.length > 1 && previewMax > 0" class="space-y-1">
+          <USlider v-model="previewSeconds" :min="0" :max="previewMax" :step="1" aria-label="Preview time" />
+          <p class="text-xs tabular-nums text-gray-500 dark:text-gray-400">Showing what appears at {{ formatDuration(previewSeconds) }} (picture {{ shownIndex + 1 }} of {{ slides.length }})</p>
         </div>
         <dl class="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-gray-500 dark:text-gray-400">
           <dt>Size</dt>
@@ -333,6 +389,8 @@ import {
   type WaveformStyle
 } from '#shared/utils/audioVideo'
 import { uploadToStorage } from '~/composables/useVideos'
+import { formatTimecode, parseTimecode } from '#shared/utils/transport'
+import { MAX_SLIDES, nextSlideStart, slideIndexAt, slideProblem, slidesBeyond, spreadEvenly, swapContents } from '#shared/utils/slides'
 
 definePageMeta({ middleware: 'admin' })
 
@@ -349,10 +407,13 @@ interface Item {
   durationSeconds: number | null
   title: string
 }
-interface Picked {
+interface Slide {
+  id: number
   key: string
   name: string
   previewUrl: string
+  /** When this picture appears, in ms; the first is always 0. */
+  startMs: number
 }
 
 const videos = useVideos()
@@ -364,9 +425,11 @@ const maxCategories = computed(() => clientSettings.value?.maxCategoriesPerVideo
 const requireCategory = computed(() => clientSettings.value?.requireCategory ?? false)
 
 const items = ref<Item[]>([])
-const cover = ref<Picked | null>(null)
-const coverUploading = ref(false)
-const coverProgress = ref(0)
+const slides = ref<Slide[]>([])
+const picUploading = ref(false)
+const picProgress = ref(0)
+const picInput = useTemplateRef<HTMLInputElement>('picInput')
+const previewSeconds = ref(0)
 const background = ref<string>(DEFAULT_BACKGROUND)
 const backgroundText = ref<string>(DEFAULT_BACKGROUND)
 const resolution = ref<VideoResolution>(DEFAULT_RESOLUTION)
@@ -408,14 +471,33 @@ onMounted(async () => {
 watch(language, (l) => {
   if (!l) transcribe.value = false
 })
-// The title goes on the picture only when there is no cover to show.
-watch(cover, (c) => {
-  if (c) titleCard.value = false
-})
+// The title goes on the picture only when there are no pictures to show.
+watch(
+  () => slides.value.length,
+  (n) => {
+    if (n) titleCard.value = false
+  }
+)
 
 const readyItems = computed(() => items.value.filter((i) => i.status === 'ready'))
-const uploadingAny = computed(() => coverUploading.value || items.value.some((i) => i.status === 'queued' || i.status === 'uploading'))
-const canSubmit = computed(() => readyItems.value.length > 0 && !uploadingAny.value && !saving.value && readyItems.value.every((i) => i.title.trim()))
+
+// ── The pictures: times, checks and the preview ──────────────────────────────
+const slideStarts = computed(() => slides.value.map((sl) => sl.startMs))
+const slideError = computed(() => slideProblem(slideStarts.value))
+/** The shortest recording, which the pictures' times are judged against. */
+const shortestSeconds = computed(() => {
+  const known = readyItems.value.map((i) => i.durationSeconds).filter((d): d is number => !!d)
+  return known.length ? Math.min(...known) : null
+})
+const beyond = computed(() => slidesBeyond(slideStarts.value, shortestSeconds.value))
+const spreadStarts = computed(() => (shortestSeconds.value ? spreadEvenly(slides.value.length, shortestSeconds.value) : null))
+const previewMax = computed(() => readyItems.value[0]?.durationSeconds ?? 0)
+const shownIndex = computed(() => slideIndexAt(slideStarts.value, previewSeconds.value * 1000))
+const shownSlide = computed(() => slides.value[shownIndex.value] ?? null)
+const uploadingAny = computed(() => picUploading.value || items.value.some((i) => i.status === 'queued' || i.status === 'uploading'))
+const canSubmit = computed(
+  () => readyItems.value.length > 0 && !uploadingAny.value && !saving.value && !slideError.value && readyItems.value.every((i) => i.title.trim())
+)
 const submitLabel = computed(() => {
   if (uploadingAny.value) return 'Waiting for the uploads…'
   const n = readyItems.value.length
@@ -557,33 +639,74 @@ function removeItem(id: number) {
   items.value.splice(i, 1)
 }
 
-// ── The cover ────────────────────────────────────────────────────────────────
-async function onPickCover(file: File) {
+// ── The pictures ─────────────────────────────────────────────────────────────
+let nextSlideId = 1
+async function onPickPictures(event: Event) {
+  const input = event.target as HTMLInputElement
+  const files = Array.from(input.files ?? [])
+  input.value = ''
   errors.value.cover = ''
-  const problem = coverFileProblem(file)
-  if (problem) {
-    errors.value.cover = problem
-    return
-  }
-  coverUploading.value = true
-  coverProgress.value = 0
+  const room = MAX_SLIDES - slides.value.length
+  if (files.length > room) errors.value.cover = `At most ${MAX_SLIDES} pictures; the first ${room} were used`
+  const rejected: string[] = []
+  picUploading.value = true
   try {
-    const ticket = await videos.requestUpload('OVERLAY', file)
-    await uploadToStorage(ticket, file, (f) => (coverProgress.value = f))
-    cover.value = { key: ticket.key, name: file.name, previewUrl: URL.createObjectURL(file) }
-  } catch (err) {
-    errors.value.cover = `Could not upload the picture: ${apiErrorMessage(err)}`
+    // One at a time, in the order chosen, so each gets the next time slot.
+    for (const file of files.slice(0, Math.max(0, room))) {
+      const problem = coverFileProblem(file)
+      if (problem) {
+        rejected.push(`${file.name}: ${problem}`)
+        continue
+      }
+      picProgress.value = 0
+      try {
+        const ticket = await videos.requestUpload('OVERLAY', file)
+        await uploadToStorage(ticket, file, (f) => (picProgress.value = f))
+        slides.value.push({
+          id: nextSlideId++,
+          key: ticket.key,
+          name: file.name,
+          previewUrl: URL.createObjectURL(file),
+          startMs: nextSlideStart(slideStarts.value, shortestSeconds.value)
+        })
+      } catch (err) {
+        rejected.push(`${file.name}: could not upload (${apiErrorMessage(err)})`)
+      }
+    }
   } finally {
-    coverUploading.value = false
+    picUploading.value = false
   }
+  if (rejected.length) errors.value.cover = [errors.value.cover, ...rejected].filter(Boolean).join(' · ')
 }
-function clearCover() {
-  if (cover.value) URL.revokeObjectURL(cover.value.previewUrl)
-  cover.value = null
+
+/** Typed times ("1:23", "1:23.5"); a value that isn't a time puts the old one back. */
+function typeStart(id: number, event: Event) {
+  const slide = slides.value.find((sl) => sl.id === id)
+  const input = event.target as HTMLInputElement
+  if (!slide) return
+  const ms = parseTimecode(input.value)
+  if (ms === null) toast.add({ title: 'Not a time', description: 'Type it like 1:23 or 1:23.5.', color: 'warning' })
+  else slide.startMs = ms
+  input.value = formatTimecode(slide.startMs)
+}
+function movePicture(index: number, by: -1 | 1) {
+  slides.value = swapContents(slides.value, index, index + by)
+}
+function removeSlide(id: number) {
+  const i = slides.value.findIndex((sl) => sl.id === id)
+  if (i === -1) return
+  URL.revokeObjectURL(slides.value[i]!.previewUrl)
+  const rest = slides.value.filter((sl) => sl.id !== id)
+  // Every other picture keeps its own time. If the first one went, the next one becomes the first, which starts at 0:00.
+  slides.value = rest.map((sl, n) => (n === 0 ? { ...sl, startMs: 0 } : sl))
+}
+function spread() {
+  const starts = spreadStarts.value
+  if (starts) slides.value = slides.value.map((sl, i) => ({ ...sl, startMs: starts[i]! }))
 }
 onBeforeUnmount(() => {
   items.value.forEach((i) => URL.revokeObjectURL(i.previewUrl))
-  clearCover()
+  slides.value.forEach((sl) => URL.revokeObjectURL(sl.previewUrl))
 })
 
 // ── Submit ───────────────────────────────────────────────────────────────────
@@ -610,12 +733,13 @@ async function onSubmit() {
       try {
         const result = await videos.createFromAudio({
           audioKey: chosen[i]!.key,
-          coverKey: cover.value?.key,
+          coverKey: slides.value.length === 1 ? slides.value[0]!.key : undefined,
+          slides: slides.value.length > 1 ? slides.value.map((sl) => ({ key: sl.key, startMs: sl.startMs })) : undefined,
           background: background.value,
           resolution: resolution.value,
           waveform: waveform.value,
           waveColor: waveform.value !== 'NONE' && !waveAuto.value ? waveColor.value : undefined,
-          titleCard: titleCard.value && !cover.value ? true : undefined,
+          titleCard: titleCard.value && !slides.value.length ? true : undefined,
           normalize: normalize.value || undefined,
           denoise: denoise.value || undefined,
           transcribe: transcribe.value || undefined,
@@ -663,5 +787,5 @@ async function onSubmit() {
   await navigateTo(made.length === 1 ? `/videos/${made[0]!.id}` : '/videos')
 }
 
-useUnsavedChangesGuard(() => !submitted.value && (items.value.length > 0 || coverUploading.value))
+useUnsavedChangesGuard(() => !submitted.value && (items.value.length > 0 || slides.value.length > 0 || picUploading.value))
 </script>

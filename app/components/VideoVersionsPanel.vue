@@ -40,7 +40,7 @@
           <UButton size="xs" color="neutral" variant="soft" icon="i-lucide-play" @click="previewing = v">Preview</UButton>
           <UButton v-if="currentUrl" size="xs" color="neutral" variant="soft" icon="i-lucide-columns-2" @click="comparing = v">Compare</UButton>
           <UButton v-if="canWrite" size="xs" color="primary" :loading="restoring === v.id" @click="confirmRestore = v">Restore</UButton>
-          <UButton v-if="canWrite" size="xs" color="error" variant="ghost" icon="i-lucide-trash-2" aria-label="Discard version" @click="onDiscard(v)" />
+          <UButton v-if="canWrite" size="xs" color="error" variant="ghost" icon="i-lucide-trash-2" aria-label="Discard version" @click="confirmDiscard = v" />
         </div>
       </li>
     </ul>
@@ -54,6 +54,16 @@
       @restore="(v) => ((previewing = null), (confirmRestore = v))"
     />
     <VersionCompareModal :version="comparing" :current-url="currentUrl ?? ''" :current-label="currentLabel" @close="comparing = null" />
+
+    <ConfirmModal
+      :model-value="confirmDiscard !== null"
+      title="Discard this version"
+      :description="`Delete “${confirmDiscard?.note ?? 'this prior version'}” and its file? It can't be restored afterwards. The video's current file is not affected.`"
+      confirm-label="Discard"
+      color="error"
+      @update:model-value="(v: boolean) => !v && (confirmDiscard = null)"
+      @confirm="onConfirmDiscard"
+    />
 
     <ConfirmModal
       :model-value="confirmRestore !== null"
@@ -113,6 +123,13 @@ async function onRestore(v: VideoVersion) {
   } finally {
     restoring.value = null
   }
+}
+
+const confirmDiscard = ref<VideoVersion | null>(null)
+async function onConfirmDiscard() {
+  const v = confirmDiscard.value
+  confirmDiscard.value = null
+  if (v) await onDiscard(v)
 }
 
 async function onDiscard(v: VideoVersion) {

@@ -44,6 +44,7 @@
           <template #right>
             <UDashboardSearchButton />
             <WhatsNewButton />
+            <JobsIndicator />
             <InboxBell />
             <UColorModeButton />
             <UDropdownMenu :items="profileItems" :content="{ align: 'end' }" :ui="{ content: 'w-56' }">

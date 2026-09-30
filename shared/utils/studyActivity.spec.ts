@@ -2,6 +2,10 @@ import { describe, expect, it } from 'vitest'
 import {
   ACTIVE_MIN_SECONDS,
   addActivity,
+  fromCompact,
+  mergeLogs,
+  sameLog,
+  toCompact,
   CARD_SECONDS,
   currentStreak,
   dateKey,
@@ -136,5 +140,48 @@ describe('parseLog', () => {
   it('drops bad days and clamps negatives', () => {
     const raw = JSON.stringify({ '2026-05-10': { watchSeconds: -5, cards: 2 }, tomorrow: { watchSeconds: 1, cards: 1 }, '2026-05-11': { watchSeconds: 'x', cards: 1 } })
     expect(parseLog(raw)).toEqual({ '2026-05-10': { watchSeconds: 0, cards: 2 } })
+  })
+})
+
+describe('compact form', () => {
+  it('round-trips a log, in whole seconds', () => {
+    const log: ActivityLog = { '2026-05-10': day(75.4, 3), '2026-05-11': day(0, 1) }
+    expect(toCompact(log)).toEqual({ '2026-05-10': [75, 3], '2026-05-11': [0, 1] })
+    expect(fromCompact(toCompact(log))).toEqual({ '2026-05-10': day(75, 3), '2026-05-11': day(0, 1) })
+  })
+  it('drops what is not the expected shape', () => {
+    expect(fromCompact(null)).toEqual({})
+    expect(fromCompact([1, 2])).toEqual({})
+    expect(fromCompact('x')).toEqual({})
+    expect(fromCompact({ today: [1, 1], '2026-05-10': [1], '2026-05-11': ['a', 1], '2026-05-12': [-5, 2] })).toEqual({ '2026-05-12': day(0, 2) })
+  })
+})
+
+describe('mergeLogs', () => {
+  it('keeps days from both sides', () => {
+    expect(mergeLogs({ '2026-05-10': day(60) }, { '2026-05-11': day(30, 1) })).toEqual({ '2026-05-10': day(60), '2026-05-11': day(30, 1) })
+  })
+  it('takes the larger figure for a day in both, not the sum', () => {
+    expect(mergeLogs({ '2026-05-10': day(60, 5) }, { '2026-05-10': day(90, 2) })).toEqual({ '2026-05-10': day(90, 5) })
+  })
+  it('does not change its inputs, and merging twice changes nothing', () => {
+    const a: ActivityLog = { '2026-05-10': day(60) }
+    const b: ActivityLog = { '2026-05-10': day(90) }
+    const once = mergeLogs(a, b)
+    expect(a['2026-05-10']).toEqual(day(60))
+    expect(mergeLogs(once, b)).toEqual(once)
+  })
+  it('can rebuild a streak from two devices that each saw part of it', () => {
+    const merged = mergeLogs({ '2026-05-09': day(120), '2026-05-10': day(120) }, { '2026-05-08': day(120), '2026-05-10': day(120) })
+    expect(currentStreak(merged, '2026-05-10')).toBe(3)
+  })
+})
+
+describe('sameLog', () => {
+  it('compares the figures', () => {
+    expect(sameLog({ '2026-05-10': day(60.2, 1) }, { '2026-05-10': day(60, 1) })).toBe(true)
+    expect(sameLog({ '2026-05-10': day(60) }, { '2026-05-10': day(61) })).toBe(false)
+    expect(sameLog({ '2026-05-10': day(60) }, {})).toBe(false)
+    expect(sameLog({}, {})).toBe(true)
   })
 })

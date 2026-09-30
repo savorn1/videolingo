@@ -31,6 +31,11 @@ export interface LearnerPrefs {
   glossaryHighlight: boolean
   /** Timing correction per video id, in ms (positive = text shows later). */
   offsets: Record<string, number>
+  /**
+   * Small data other features keep in the same synced document (study activity, saved presets…), one
+   * key each. The whole document is capped at 32 KB on the server, so only small things belong here.
+   */
+  app?: Record<string, unknown>
 }
 
 export const DEFAULT_CAPTION_STYLE: CaptionStyle = { size: 'm', background: 70, font: 'sans', position: 'bottom', secondary: 'above' }
@@ -46,13 +51,30 @@ const DEFAULTS: LearnerPrefs = {
 const MAX_OFFSETS = 200
 const SAVE_DELAY_MS = 800
 
+// Shared by everything that uses the document: one read, and saving only once that read worked.
+let inflight: Promise<void> | null = null
+
 export function useLearnerPrefs() {
   const prefs = useState<LearnerPrefs>('learner-prefs', () => structuredClone(DEFAULTS))
   const loaded = useState('learner-prefs-loaded', () => false)
+  /** The document was read from the server; until then nothing is written back, so defaults can't replace what is saved. */
+  const readOk = useState('learner-prefs-read-ok', () => false)
+  /** Whose document is in memory; when another account signs in during the same session, it starts over. */
+  const owner = useState<string | null>('learner-prefs-owner', () => null)
+  const { username } = useAuth()
   const api = useApi()
 
-  async function load() {
-    if (loaded.value || !import.meta.client) return
+  function checkOwner() {
+    const now = username.value ?? ''
+    if (owner.value === now) return
+    owner.value = now
+    inflight = null
+    loaded.value = false
+    readOk.value = false
+    prefs.value = structuredClone(DEFAULTS)
+  }
+
+  async function fetchPrefs() {
     loaded.value = true
     try {
       const saved = (await api<ApiEnvelope<Partial<LearnerPrefs>>>('/api/me/preferences')).data ?? {}
@@ -60,17 +82,31 @@ export function useLearnerPrefs() {
         ...DEFAULTS,
         ...saved,
         captionStyle: { ...DEFAULT_CAPTION_STYLE, ...(saved.captionStyle ?? {}) },
-        offsets: { ...(saved.offsets ?? {}) }
+        offsets: { ...(saved.offsets ?? {}) },
+        app: { ...(saved.app ?? {}) }
       }
+      readOk.value = true
     } catch {
       // Defaults it is — viewing works without saved preferences.
     }
   }
 
+  /** Reads the document once per session; every caller gets the same promise, so they can wait for it. */
+  function load(): Promise<void> {
+    if (!import.meta.client) return Promise.resolve()
+    checkOwner()
+    if (!inflight) inflight = fetchPrefs()
+    return inflight
+  }
+
   let timer: ReturnType<typeof setTimeout> | undefined
   function save() {
     clearTimeout(timer)
-    timer = setTimeout(() => {
+    const savingFor = username.value ?? ''
+    timer = setTimeout(async () => {
+      await load()
+      // Not if the account changed in the meantime, or the document was never read.
+      if (!readOk.value || (username.value ?? '') !== savingFor) return
       api('/api/me/preferences', { method: 'PUT', body: prefs.value }).catch(() => {})
     }, SAVE_DELAY_MS)
   }
@@ -98,5 +134,15 @@ export function useLearnerPrefs() {
     update({ offsets })
   }
 
-  return { prefs, load, update, setStyle, offsetFor, setOffset }
+  /** A value another feature keeps in the synced document, or `fallback` when it has none yet. */
+  function appValue<T>(key: string, fallback: T): T {
+    const value = prefs.value.app?.[key]
+    return value === undefined ? fallback : (value as T)
+  }
+
+  function setApp(key: string, value: unknown) {
+    update({ app: { ...(prefs.value.app ?? {}), [key]: value } })
+  }
+
+  return { prefs, load, update, setStyle, offsetFor, setOffset, appValue, setApp }
 }

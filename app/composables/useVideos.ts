@@ -200,6 +200,11 @@ export function useVideos() {
     return (await api<ApiEnvelope<Video>>('/api/admin/videos', { method: 'POST', body: payload })).data
   }
 
+  /** Joins stored videos into one new (hidden) video, in the order given. Queues a job. */
+  async function mergeVideos(payload: MergeVideosPayload) {
+    return (await api<ApiEnvelope<{ video: Video; job: ProcessingJob }>>('/api/admin/videos/merge', { method: 'POST', body: payload })).data
+  }
+
   /** A video made from an uploaded sound (a still picture plus the audio). Queues a job; the video stays disabled until reviewed. */
   async function createFromAudio(payload: AudioToVideoPayload) {
     return (await api<ApiEnvelope<{ video: Video; job: ProcessingJob }>>('/api/admin/videos/from-audio', { method: 'POST', body: payload })).data
@@ -224,7 +229,8 @@ export function useVideos() {
     detectLanguage,
     requestUpload,
     create,
-    createFromAudio
+    createFromAudio,
+    mergeVideos
   }
 }
 
@@ -272,11 +278,25 @@ export interface UploadTicket {
   contentType: string
 }
 
+export interface MergeVideosPayload {
+  /** In the order they should play. */
+  videoIds: number[]
+  title: string
+  description?: string
+  resolution?: string
+  /** NONE or FADE. */
+  transition?: string
+  language?: string
+  categoryIds?: number[]
+}
+
 export interface AudioToVideoPayload {
   /** From an upload ticket of kind AUDIO. */
   audioKey: string
   /** From an upload ticket of kind OVERLAY. */
   coverKey?: string
+  /** A slideshow: pictures (upload keys) with the time each appears; the first at 0. Use instead of coverKey. */
+  slides?: { key: string; startMs: number }[]
   /** "#rrggbb". */
   background?: string
   resolution?: string

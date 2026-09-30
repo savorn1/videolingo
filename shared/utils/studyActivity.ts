@@ -111,3 +111,53 @@ export function parseLog(raw: string | null): ActivityLog {
     return {}
   }
 }
+
+// ── Keeping the log in step across devices ───────────────────────────────────
+
+/** The log as stored on the server: `{ "2026-05-10": [watchSeconds, cards] }`, whole seconds, to stay small. */
+export type CompactLog = Record<string, [number, number]>
+
+export function toCompact(log: ActivityLog): CompactLog {
+  const out: CompactLog = {}
+  for (const [key, day] of Object.entries(log)) out[key] = [Math.round(day.watchSeconds), Math.round(day.cards)]
+  return out
+}
+
+/** Reads a compact log defensively; anything that isn't the expected shape is dropped. */
+export function fromCompact(raw: unknown): ActivityLog {
+  const log: ActivityLog = {}
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return log
+  for (const [key, v] of Object.entries(raw as Record<string, unknown>)) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(key) || !Array.isArray(v) || v.length < 2) continue
+    const [watchSeconds, cards] = v
+    if (typeof watchSeconds === 'number' && typeof cards === 'number' && Number.isFinite(watchSeconds) && Number.isFinite(cards)) {
+      log[key] = { watchSeconds: Math.max(0, watchSeconds), cards: Math.max(0, cards) }
+    }
+  }
+  return log
+}
+
+/**
+ * Two copies of the same person's log (from two devices, or the browser and the server) made into one.
+ * A day present in both takes the larger figure for each count: the devices' logs overlap after they
+ * have synced, so adding them up would count the same viewing twice.
+ */
+export function mergeLogs(a: ActivityLog, b: ActivityLog): ActivityLog {
+  const out: ActivityLog = { ...a }
+  for (const [key, day] of Object.entries(b)) {
+    const other = out[key]
+    out[key] = other ? { watchSeconds: Math.max(other.watchSeconds, day.watchSeconds), cards: Math.max(other.cards, day.cards) } : { ...day }
+  }
+  return out
+}
+
+/** Whether two logs hold the same figures (to know if a merge changed anything). */
+export function sameLog(a: ActivityLog, b: ActivityLog): boolean {
+  const keys = new Set([...Object.keys(a), ...Object.keys(b)])
+  for (const key of keys) {
+    const x = a[key]
+    const y = b[key]
+    if (!x || !y || Math.round(x.watchSeconds) !== Math.round(y.watchSeconds) || x.cards !== y.cards) return false
+  }
+  return true
+}

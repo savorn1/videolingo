@@ -14,7 +14,7 @@
     </UButton>
 
     <UDropdownMenu v-if="overflow.length > 0" :items="[overflowItems]" :content="{ align: 'end' }">
-      <UButton size="xs" color="neutral" variant="soft" icon="i-lucide-ellipsis" @click.stop />
+      <UButton size="xs" color="neutral" variant="soft" icon="i-lucide-ellipsis" aria-label="More actions" @click.stop />
     </UDropdownMenu>
   </div>
 </template>

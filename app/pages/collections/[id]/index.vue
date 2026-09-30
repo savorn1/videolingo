@@ -12,6 +12,16 @@
         >
           Shuffle
         </UButton>
+        <UButton
+          v-if="items.filter((i) => !i.deleted).length > 1"
+          color="neutral"
+          variant="soft"
+          icon="i-lucide-combine"
+          title="Make one new video from the videos in this collection, in this order"
+          @click="showMerge = true"
+        >
+          Join into one video
+        </UButton>
         <UButton color="neutral" variant="soft" icon="i-lucide-bar-chart-3" @click="openAnalytics">Analytics</UButton>
         <UButton color="neutral" variant="soft" icon="i-lucide-plus" @click="openAdd">Add videos</UButton>
         <UButton color="neutral" variant="soft" icon="i-lucide-pencil" @click="showForm = true">Edit</UButton>
@@ -185,6 +195,8 @@
       </template>
     </UModal>
 
+    <MergeVideosModal v-model="showMerge" :items="mergeItems" />
+
     <ConfirmModal
       :model-value="confirmRemove !== null"
       title="Remove from collection"
@@ -306,6 +318,14 @@ const unwatchableText = computed(() => {
 // videos" modals already assume this) so search and section grouping can
 // work over the whole list, not just one server page.
 const items = ref<CollectionVideo[]>([])
+// Joining: the collection's videos in its order, leaving out the ones in the trash. Whether one is a
+// link (which can't be joined) isn't known here; the server says so by name.
+const showMerge = ref(false)
+const mergeItems = computed(() =>
+  items.value
+    .filter((i) => !i.deleted)
+    .map((i) => ({ id: i.videoId, title: i.title ?? `Video ${i.videoId}`, durationSeconds: i.durationSeconds, thumbnailUrl: i.thumbnailUrl, blocked: null as string | null }))
+)
 const videosLoading = ref(false)
 const brokenThumbs = reactive(new Set<number>())
 const itemSearch = ref('')
