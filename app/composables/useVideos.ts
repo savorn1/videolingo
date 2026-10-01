@@ -210,6 +210,18 @@ export function useVideos() {
     return (await api<ApiEnvelope<{ video: Video; job: ProcessingJob }>>('/api/admin/videos/from-audio', { method: 'POST', body: payload })).data
   }
 
+  /** A few seconds of a waveform look drawn from the real sound, to judge it before the video is made. Rendered on the spot (a few seconds). */
+  async function previewFromAudio(payload: {
+    audioKey: string
+    background?: string
+    waveform: string
+    waveColor?: string
+    normalize?: boolean
+    denoise?: boolean
+  }) {
+    return (await api<ApiEnvelope<{ url: string; seconds: number }>>('/api/admin/videos/from-audio/preview', { method: 'POST', body: payload })).data
+  }
+
   return {
     list,
     get,
@@ -230,6 +242,7 @@ export function useVideos() {
     requestUpload,
     create,
     createFromAudio,
+    previewFromAudio,
     mergeVideos
   }
 }
@@ -300,7 +313,7 @@ export interface AudioToVideoPayload {
   /** "#rrggbb". */
   background?: string
   resolution?: string
-  /** NONE, WAVES, BARS, SPIKES, DOTS or SPECTRUM: a moving waveform along the bottom. */
+  /** NONE, WAVES, BARS, SPIKES, DOTS, SPECTRUM, PULSE, BLOCKS, FINE or STRIPES: a moving waveform (bottom or middle of the picture). */
   waveform?: string
   waveColor?: string
   /** Write text on the background (no cover picture). */

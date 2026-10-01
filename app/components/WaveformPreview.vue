@@ -1,5 +1,6 @@
 <template>
-  <svg viewBox="0 0 100 25" :preserveAspectRatio="mini ? 'xMidYMid meet' : 'none'" class="wf" :class="{ 'wf-still': still }" aria-hidden="true">
+  <RealWaveform v-if="audio && canDrawFromAudio(kind)" :kind="kind" :color="color" :audio="audio" :mini="mini" :still="still" />
+  <svg v-else viewBox="0 0 100 25" :preserveAspectRatio="mini ? 'xMidYMid meet' : 'none'" class="wf" :class="{ 'wf-still': still }" aria-hidden="true">
     <!-- Bars and spectrum: columns rising and falling from the bottom, each on its own beat -->
     <template v-if="kind === 'BARS'">
       <rect
@@ -78,10 +79,12 @@
 </template>
 
 <script setup lang="ts">
+import { canDrawFromAudio } from '#shared/utils/waveSamples'
+import type { AudioPeaks } from '~/composables/useAudioPeaks'
 // A small moving picture of a waveform style — on the "Video from audio" page both the big
 // preview and the style buttons use it. It is only a sketch of the look (the real one is drawn
 // from the sound by the server); it stands still for people who ask for less motion.
-defineProps<{ kind: string; color: string; mini?: boolean; still?: boolean }>()
+defineProps<{ kind: string; color: string; mini?: boolean; still?: boolean; audio?: AudioPeaks | null }>()
 
 const BARS = [6, 12, 9, 18, 14, 22, 10, 16, 20, 8, 15, 21, 11, 17, 9, 13, 19, 7, 12, 10, 14, 6, 9, 5]
 const SPIKES = Array.from({ length: 50 }, (_, i) => 2 + 9 * Math.abs(Math.sin(i * 0.6) * Math.cos(i * 0.21)) + (i % 5 === 0 ? 3 : 0))

@@ -266,7 +266,7 @@
                 <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Moving waveform</p>
                 <AnimationSpeed v-if="waveform !== 'NONE'" label="Preview speed" />
               </div>
-              <WaveTemplatePicker :current="currentWaveLook" @apply="applyWaveLook" @clear="waveform = 'NONE'" />
+              <WaveTemplatePicker :current="currentWaveLook" :audio="audioPeaks.peaks.value" @apply="applyWaveLook" @clear="waveform = 'NONE'" />
 
               <!-- The templates are the way in; the style and colour can still be changed by hand -->
               <div v-if="waveform !== 'NONE'" class="space-y-2">
@@ -307,6 +307,40 @@
                       class="h-8 w-10 cursor-pointer rounded border border-gray-200 dark:border-gray-700"
                     />
                   </div>
+                </div>
+              </div>
+              <!-- How close the preview is: from the user's own sound, or a sketch; plus a real test render -->
+              <div
+                v-if="waveform !== 'NONE'"
+                class="space-y-2 rounded-lg border border-dashed border-gray-300 p-3 dark:border-gray-700"
+                data-testid="preview-accuracy"
+              >
+                <p class="flex items-start gap-1.5 text-xs text-gray-600 dark:text-gray-300">
+                  <UIcon :name="previewFromAudio ? 'i-lucide-audio-waveform' : 'i-lucide-info'" class="mt-0.5 size-3.5 shrink-0" />
+                  {{ previewNote }}
+                </p>
+                <div class="flex flex-wrap items-center gap-2">
+                  <UButton
+                    size="xs"
+                    color="neutral"
+                    variant="soft"
+                    icon="i-lucide-clapperboard"
+                    :loading="testRendering"
+                    :disabled="!testAudioKey || testRendering"
+                    @click="onTestRender"
+                  >
+                    Test render ({{ TEST_RENDER_SECONDS }} s)
+                  </UButton>
+                  <span v-if="!testAudioKey" class="text-xs text-gray-500 dark:text-gray-400">Add an audio file first.</span>
+                  <span v-else class="text-xs text-gray-500 dark:text-gray-400"
+                    >Made by the server from your real sound, small and without pictures — press play to watch it with the sound.</span
+                  >
+                </div>
+                <div v-if="testRender" class="space-y-1">
+                  <video :key="testRender.url" :src="testRender.url" class="aspect-video w-full max-w-md rounded-md bg-black" controls loop playsinline />
+                  <p v-if="testRenderStale" class="text-xs text-warning-600 dark:text-warning-400">
+                    The look has changed since this test — render again to see it.
+                  </p>
                 </div>
               </div>
               <p class="text-xs text-gray-500 dark:text-gray-400">
@@ -462,6 +496,7 @@
             v-if="waveform !== 'NONE'"
             :kind="waveform"
             :color="waveDrawColor"
+            :audio="audioPeaks.peaks.value"
             class="absolute w-full"
             :class="waveformPlacement(waveform) === 'CENTER' ? 'inset-x-[10%] top-[30%] h-[40%] w-4/5' : 'inset-x-0 bottom-[5%] h-1/4'"
           />
@@ -488,6 +523,8 @@
 </template>
 
 <script setup lang="ts">
+import { canDrawFromAudio } from '#shared/utils/waveSamples'
+import { MAX_PREVIEW_BYTES } from '~/composables/useAudioPeaks'
 import type { WaveLook } from '#shared/utils/waveTemplates'
 import { TAB_ACCENTS } from '#shared/utils/tabAccent'
 
@@ -708,6 +745,60 @@ function applyWaveLook(look: WaveLook) {
   waveColor.value = look.waveColor
   setBackground(look.background)
 }
+// ── How close the preview is ─────────────────────────────────────────────────
+// The moving sketch is drawn from the first seconds of the user's own sound (decoded in the browser) where the
+// style allows; a test render asks the server for a few real seconds. Both are guides — the final video is drawn
+// from the whole sound.
+const TEST_RENDER_SECONDS = 5
+const audioPeaks = useAudioPeaks()
+// Items let go of their File once uploaded, so the first one is kept here (only while it is small enough to read) for the preview.
+const previewFile = ref<File | null>(null)
+const firstFile = computed(() => previewFile.value)
+watch(previewFile, (f) => audioPeaks.load(f))
+watch(
+  () => items.value.length,
+  (n) => {
+    if (n === 0) previewFile.value = null
+  }
+)
+const previewFromAudio = computed(() => !!audioPeaks.peaks.value && canDrawFromAudio(waveform.value))
+const previewNote = computed(() => {
+  if (!firstFile.value && items.value.length) return 'The preview is a generic sketch here. Use the test render to see your own sound.'
+  if (!firstFile.value) return 'Add an audio file and the preview will move with your own sound.'
+  if (audioPeaks.state.value === 'reading') return 'Reading your audio…'
+  if (audioPeaks.state.value === 'unavailable')
+    return 'This file is too large (or not readable here) to draw live — the preview is a generic sketch. Use the test render.'
+  if (!canDrawFromAudio(waveform.value))
+    return `${waveform.value === 'BARS' ? 'Bars' : 'Spectrum'} need a frequency analysis, so the preview is a generic sketch. Use the test render to see it.`
+  return 'Drawn live from the first seconds of your own audio, at the same speed the video will use.'
+})
+const testAudioKey = computed(() => readyItems.value[0]?.key ?? '')
+const testRendering = ref(false)
+const testRender = ref<{ url: string; signature: string } | null>(null)
+const testSignature = () =>
+  JSON.stringify([testAudioKey.value, background.value, waveform.value, waveAuto.value ? null : waveColor.value, normalize.value, denoise.value])
+const testRenderStale = computed(() => !!testRender.value && testRender.value.signature !== testSignature())
+async function onTestRender() {
+  if (!testAudioKey.value || testRendering.value) return
+  testRendering.value = true
+  const signature = testSignature()
+  try {
+    const result = await videos.previewFromAudio({
+      audioKey: testAudioKey.value,
+      background: background.value,
+      waveform: waveform.value,
+      waveColor: waveAuto.value ? undefined : waveColor.value,
+      normalize: normalize.value || undefined,
+      denoise: denoise.value || undefined
+    })
+    testRender.value = { url: result.url, signature }
+  } catch (err) {
+    toast.add({ title: 'Could not make the test render', description: apiErrorMessage(err), color: 'error' })
+  } finally {
+    testRendering.value = false
+  }
+}
+
 const customOpen = ref(false)
 const waveDrawColor = computed(() => (waveAuto.value ? textColor.value : waveColor.value))
 const previewTitle = computed(() => readyItems.value[0]?.title.trim() || items.value[0]?.title.trim() || 'Your title here')
@@ -793,6 +884,7 @@ async function pump() {
   if (!item.file) return
   item.status = 'uploading'
   item.progress = 0
+  if (!previewFile.value && item.file.size <= MAX_PREVIEW_BYTES) previewFile.value = item.file
   try {
     const [seconds, ticket] = await Promise.all([readDuration(item.file), videos.requestUpload('AUDIO', item.file)])
     item.durationSeconds = seconds
@@ -816,6 +908,8 @@ function retryItem(id: number) {
 function removeItem(id: number) {
   const i = items.value.findIndex((x) => x.id === id)
   if (i === -1) return
+  // The preview was drawn from the first file; with it gone, it is only a sketch again.
+  if (i === 0) previewFile.value = null
   URL.revokeObjectURL(items.value[i]!.previewUrl)
   items.value.splice(i, 1)
 }

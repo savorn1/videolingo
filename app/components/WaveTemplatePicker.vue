@@ -71,6 +71,7 @@
                   ? 'inset-x-[8%] top-[22%] h-[56%] w-[84%]'
                   : 'inset-x-1 bottom-[12%] h-1/3 w-[calc(100%-0.5rem)]'
               "
+              :audio="audio"
               :still="hovered !== t.id"
             />
           </span>
@@ -103,10 +104,13 @@
 // now, and says which was picked (`apply`).
 import { waveformPlacement } from '#shared/utils/audioVideo'
 import type { WaveLook } from '#shared/utils/waveTemplates'
+import type { AudioPeaks } from '~/composables/useAudioPeaks'
 
 const props = defineProps<{
   /** What is set on the page now, or null when there is no moving waveform to save. */
   current: WaveLook | null
+  /** The user's own sound, when it could be read: the card under the pointer then moves with it. */
+  audio?: AudioPeaks | null
 }>()
 const emit = defineEmits<{ apply: [look: WaveLook]; clear: [] }>()
 
