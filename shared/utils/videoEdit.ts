@@ -10,6 +10,9 @@ export interface Segment {
 
 export const MAX_SEGMENTS = 20
 
+/** How many of one video's edits the server lets be queued or running at once (VideoEditService.MAX_QUEUED_EDITS_PER_VIDEO); they still run one at a time. */
+export const MAX_QUEUED_EDITS = 3
+
 /** Null = valid; a message otherwise. `durationMs` null = unknown, so only what can be checked without it is. */
 export function validateTrim(startMs: number, endMs: number | null, durationMs: number | null): string | null {
   if (startMs < 0) return "The start can't be before the beginning"
@@ -77,7 +80,133 @@ export function splitRowAt(rows: SegmentRow[], index: number, seconds: number): 
   const row = rows[index]
   if (!row) return rows
   const t = Math.round(seconds * 100) / 100
-  return [...rows.slice(0, index), { startMsSeconds: row.startMsSeconds, endMsSeconds: t }, { startMsSeconds: t, endMsSeconds: row.endMsSeconds }, ...rows.slice(index + 1)]
+  return [
+    ...rows.slice(0, index),
+    { startMsSeconds: row.startMsSeconds, endMsSeconds: t },
+    { startMsSeconds: t, endMsSeconds: row.endMsSeconds },
+    ...rows.slice(index + 1)
+  ]
+}
+
+/** The most equal parts a video can be cut into: each at least MIN_TRIM_MS long, and no more than MAX_SEGMENTS. */
+export function maxEvenParts(durationMs: number): number {
+  if (!durationMs || durationMs <= 0) return 0
+  return Math.max(1, Math.min(MAX_SEGMENTS, Math.floor(durationMs / MIN_TRIM_MS)))
+}
+
+/** `n` equal rows covering the whole video (boundaries rounded to hundredths; the last runs to the end). Empty when `n` isn't possible. */
+export function splitEvenlyRows(durationMs: number, n: number): SegmentRow[] {
+  if (!Number.isInteger(n) || n < 1 || n > maxEvenParts(durationMs)) return []
+  const step = durationMs / 1000 / n
+  const at = (i: number) => Math.round(i * step * 100) / 100
+  return Array.from({ length: n }, (_, i) => ({ startMsSeconds: at(i), endMsSeconds: i === n - 1 ? null : at(i + 1) }))
+}
+
+/** Rows of `stepSeconds` each from the start, the last one taking what is left (a remainder under MIN_TRIM_MS is folded into the one before). Empty when it can't be done. */
+export function splitEveryRows(durationMs: number, stepSeconds: number): SegmentRow[] {
+  if (!(stepSeconds > 0) || !durationMs || stepSeconds * 1000 < MIN_TRIM_MS || stepSeconds * 1000 >= durationMs) return []
+  const count = Math.floor(durationMs / (stepSeconds * 1000)) + (durationMs % (stepSeconds * 1000) >= MIN_TRIM_MS ? 1 : 0)
+  if (count > MAX_SEGMENTS) return []
+  const at = (i: number) => Math.round(i * stepSeconds * 100) / 100
+  return Array.from({ length: count }, (_, i) => ({ startMsSeconds: at(i), endMsSeconds: i === count - 1 ? null : at(i + 1) }))
+}
+
+/** Where the boundary between row `index` and the next one sits, if they touch (so it can be dragged); otherwise null. */
+export function boundaryAfter(rows: SegmentRow[], index: number): number | null {
+  const a = rows[index]
+  const b = rows[index + 1]
+  return a && b && a.endMsSeconds != null && a.endMsSeconds === b.startMsSeconds ? a.endMsSeconds : null
+}
+
+/** Moves the shared boundary between row `index` and the next, keeping both at least MIN_TRIM_MS long. Returns a new list. */
+export function moveBoundary(rows: SegmentRow[], index: number, seconds: number, durationMs: number): SegmentRow[] {
+  if (boundaryAfter(rows, index) === null) return rows
+  const a = rows[index]!
+  const b = rows[index + 1]!
+  const min = MIN_TRIM_MS / 1000
+  const lo = a.startMsSeconds + min
+  const hi = (b.endMsSeconds ?? durationMs / 1000) - min
+  if (hi < lo) return rows
+  const t = Math.round(Math.min(hi, Math.max(lo, seconds)) * 100) / 100
+  return rows.map((r, i) => (i === index ? { ...r, endMsSeconds: t } : i === index + 1 ? { ...r, startMsSeconds: t } : r))
+}
+
+/** The largest `aspect`-shaped box that fits the frame, centred on (cx, cy) — the frame's centre by default. Whole pixels; empty (all zeros) when the frame size is unknown. */
+export function centeredCrop(aspect: number, frameW: number, frameH: number, cx = frameW / 2, cy = frameH / 2): { x: number; y: number; w: number; h: number } {
+  if (!(aspect > 0) || !frameW || !frameH) return { x: 0, y: 0, w: 0, h: 0 }
+  let w = frameW
+  let h = w / aspect
+  if (h > frameH) {
+    h = frameH
+    w = h * aspect
+  }
+  const x = Math.min(Math.max(cx - w / 2, 0), frameW - w)
+  const y = Math.min(Math.max(cy - h / 2, 0), frameH - h)
+  return { x: Math.round(x), y: Math.round(y), w: Math.round(w), h: Math.round(h) }
+}
+
+// ── Turning and flipping ─────────────────────────────────────────────────────
+// Mirrors VideoEditRules (backend): quarter turns clockwise, then flips. The crop is
+// still drawn on the picture as it is now; the turn and flips apply after the crop,
+// and a resize is the size of the finished picture.
+
+export type Rotation = 0 | 90 | 180 | 270
+export interface Orientation {
+  rotate: Rotation
+  flipH: boolean
+  flipV: boolean
+}
+
+export const NO_ORIENTATION: Orientation = { rotate: 0, flipH: false, flipV: false }
+
+export function hasOrientation(o: Orientation): boolean {
+  return o.rotate !== 0 || o.flipH || o.flipV
+}
+
+/** A quarter turn clockwise (`1`) or counter-clockwise (`-1`). */
+export function turned(o: Orientation, direction: 1 | -1): Orientation {
+  return { ...o, rotate: ((((o.rotate + direction * 90) % 360) + 360) % 360) as Rotation }
+}
+
+/** Whether the picture's width and height trade places. */
+export function swapsSides(o: Orientation): boolean {
+  return o.rotate === 90 || o.rotate === 270
+}
+
+/** The picture's size after the turn: a quarter turn swaps width and height. */
+export function orientedSize(w: number, h: number, o: Orientation): { w: number; h: number } {
+  return swapsSides(o) ? { w: h, h: w } : { w, h }
+}
+
+/** "Turned 90° clockwise · flipped left–right", or '' when nothing is asked for. */
+export function describeOrientation(o: Orientation): string {
+  const parts: string[] = []
+  if (o.rotate) parts.push(`turned ${o.rotate}° clockwise`)
+  if (o.flipH) parts.push('flipped left–right')
+  if (o.flipV) parts.push('flipped top–bottom')
+  return parts.join(' · ')
+}
+
+/** What to send: only the parts that are set, so an untouched picture adds nothing to the request. */
+export function orientationRequest(o: Orientation): { rotate?: Exclude<Rotation, 0>; flipH?: boolean; flipV?: boolean } {
+  return { ...(o.rotate ? { rotate: o.rotate as Exclude<Rotation, 0> } : {}), ...(o.flipH ? { flipH: true } : {}), ...(o.flipV ? { flipV: true } : {}) }
+}
+
+/** How much of each edge the apps that show vertical video draw their own buttons and captions over (about, as fractions of the picture). */
+export interface SafeInsets {
+  top: number
+  right: number
+  bottom: number
+  left: number
+}
+
+/**
+ * Where to keep text and faces: for tall pictures (Shorts, Reels, TikTok) clear of the title, buttons and caption area those apps
+ * overlay; for anything else, the usual 5 % title-safe margin. A guide, not a rule — the apps differ and change.
+ */
+export function safeInsets(aspect: number): SafeInsets {
+  if (aspect > 0 && aspect < 0.7) return { top: 0.12, right: 0.14, bottom: 0.22, left: 0.05 }
+  return { top: 0.05, right: 0.05, bottom: 0.05, left: 0.05 }
 }
 
 /** Milliseconds of the video that no row covers (gaps, or before the first / after the last). Overlaps count once. */

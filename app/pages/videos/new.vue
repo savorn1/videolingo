@@ -20,10 +20,18 @@
     <div class="grid grid-cols-1 xl:grid-cols-[1fr_26rem] gap-4 items-start">
       <div class="space-y-4 min-w-0">
         <!-- 1. Source -->
-        <UCard>
+        <UCard :class="TAB_ACCENTS.trim.scope" :ui="{ header: TAB_ACCENTS.trim.header }">
           <template #header>
             <div class="flex flex-wrap items-center justify-between gap-3">
-              <h2 class="font-semibold text-gray-900 dark:text-white">1. Where's the video?</h2>
+              <h2 class="flex items-center gap-2 font-semibold text-gray-900 dark:text-white">
+                <span
+                  class="flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold"
+                  :class="TAB_ACCENTS.trim.button"
+                  aria-hidden="true"
+                  >1</span
+                >
+                Where's the video?
+              </h2>
               <UTabs v-model="mode" :items="modeItems" :content="false" size="sm" class="w-full sm:w-80" />
             </div>
           </template>
@@ -109,9 +117,17 @@
         </UCard>
 
         <!-- 2. Details -->
-        <UCard v-if="hasSource">
+        <UCard v-if="hasSource" :class="TAB_ACCENTS.split.scope" :ui="{ header: TAB_ACCENTS.split.header }">
           <template #header>
-            <h2 class="font-semibold text-gray-900 dark:text-white">2. Details</h2>
+            <h2 class="flex items-center gap-2 font-semibold text-gray-900 dark:text-white">
+              <span
+                class="flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold"
+                :class="TAB_ACCENTS.split.button"
+                aria-hidden="true"
+                >2</span
+              >
+              Details
+            </h2>
           </template>
           <form class="space-y-5" novalidate @submit.prevent="onSave">
             <UFormField label="Title" required :error="errors.title" :hint="`${form.title.length}/200`">
@@ -231,9 +247,12 @@
       </div>
 
       <!-- Preview -->
-      <UCard class="xl:sticky xl:top-4" :ui="{ body: 'space-y-3' }">
+      <UCard class="xl:sticky xl:top-4" :class="TAB_ACCENTS.overlay.scope" :ui="{ body: 'space-y-3', header: TAB_ACCENTS.overlay.header }">
         <template #header>
-          <h2 class="font-semibold text-gray-900 dark:text-white">Preview</h2>
+          <h2 class="flex items-center gap-2 font-semibold text-gray-900 dark:text-white">
+            <UIcon name="i-lucide-eye" class="size-4" :class="TAB_ACCENTS.overlay.icon" />
+            Preview
+          </h2>
         </template>
         <VideoPlayer
           v-if="preview"
@@ -289,6 +308,7 @@
 </template>
 
 <script setup lang="ts">
+import { TAB_ACCENTS } from '#shared/utils/tabAccent'
 import type { TabsItem } from '@nuxt/ui'
 import type { InspectedLink, LanguageGuess } from '~/composables/useVideos'
 

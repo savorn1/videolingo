@@ -1,5 +1,32 @@
 import { describe, expect, it } from 'vitest'
-import { findSplitTarget, MAX_VIDEO_TITLE, replacesOriginal, suggestedNewTitle, MAX_SEGMENTS, MIN_TRIM_MS, splitRowAt, uncoveredMs, validateCrop, validateScale, validateSegments, validateTrim, withTrimEdge } from './videoEdit'
+import {
+  findSplitTarget,
+  MAX_VIDEO_TITLE,
+  replacesOriginal,
+  suggestedNewTitle,
+  MAX_SEGMENTS,
+  MIN_TRIM_MS,
+  boundaryAfter,
+  centeredCrop,
+  describeOrientation,
+  hasOrientation,
+  NO_ORIENTATION,
+  orientationRequest,
+  orientedSize,
+  turned,
+  safeInsets,
+  maxEvenParts,
+  moveBoundary,
+  splitEveryRows,
+  splitEvenlyRows,
+  splitRowAt,
+  uncoveredMs,
+  validateCrop,
+  validateScale,
+  validateSegments,
+  validateTrim,
+  withTrimEdge
+} from './videoEdit'
 
 describe('validateTrim', () => {
   it('accepts a valid range', () => {
@@ -100,7 +127,16 @@ describe('findSplitTarget', () => {
     expect(findSplitTarget(rows, 9.95, 30)).toBeNull()
   })
   it('finds nothing in a gap', () => {
-    expect(findSplitTarget([{ startMsSeconds: 0, endMsSeconds: 5 }, { startMsSeconds: 20, endMsSeconds: null }], 10, 30)).toBeNull()
+    expect(
+      findSplitTarget(
+        [
+          { startMsSeconds: 0, endMsSeconds: 5 },
+          { startMsSeconds: 20, endMsSeconds: null }
+        ],
+        10,
+        30
+      )
+    ).toBeNull()
   })
 })
 
@@ -133,14 +169,38 @@ describe('splitRowAt', () => {
 describe('uncoveredMs', () => {
   it('is zero when the rows cover the whole video', () => {
     expect(uncoveredMs([{ startMsSeconds: 0, endMsSeconds: null }], 30_000)).toBe(0)
-    expect(uncoveredMs([{ startMsSeconds: 0, endMsSeconds: 10 }, { startMsSeconds: 10, endMsSeconds: null }], 30_000)).toBe(0)
+    expect(
+      uncoveredMs(
+        [
+          { startMsSeconds: 0, endMsSeconds: 10 },
+          { startMsSeconds: 10, endMsSeconds: null }
+        ],
+        30_000
+      )
+    ).toBe(0)
   })
   it('counts a gap between rows and a start that is not at zero', () => {
-    expect(uncoveredMs([{ startMsSeconds: 0, endMsSeconds: 10 }, { startMsSeconds: 15, endMsSeconds: null }], 30_000)).toBe(5_000)
+    expect(
+      uncoveredMs(
+        [
+          { startMsSeconds: 0, endMsSeconds: 10 },
+          { startMsSeconds: 15, endMsSeconds: null }
+        ],
+        30_000
+      )
+    ).toBe(5_000)
     expect(uncoveredMs([{ startMsSeconds: 4, endMsSeconds: null }], 30_000)).toBe(4_000)
   })
   it('counts an overlap once', () => {
-    expect(uncoveredMs([{ startMsSeconds: 0, endMsSeconds: 20 }, { startMsSeconds: 10, endMsSeconds: 25 }], 30_000)).toBe(5_000)
+    expect(
+      uncoveredMs(
+        [
+          { startMsSeconds: 0, endMsSeconds: 20 },
+          { startMsSeconds: 10, endMsSeconds: 25 }
+        ],
+        30_000
+      )
+    ).toBe(5_000)
   })
   it('ignores rows that run backwards or past the end', () => {
     expect(uncoveredMs([{ startMsSeconds: 20, endMsSeconds: 5 }], 30_000)).toBe(30_000)
@@ -179,5 +239,147 @@ describe('suggestedNewTitle', () => {
     const title = suggestedNewTitle('x'.repeat(300), 'TRIM')
     expect(title).toHaveLength(MAX_VIDEO_TITLE)
     expect(title.endsWith('… (trimmed)')).toBe(true)
+  })
+})
+
+describe('maxEvenParts', () => {
+  it('is 0 for an unknown duration', () => {
+    expect(maxEvenParts(0)).toBe(0)
+  })
+  it('keeps every part at least MIN_TRIM_MS long', () => {
+    expect(maxEvenParts(5 * MIN_TRIM_MS)).toBe(5)
+    expect(maxEvenParts(MIN_TRIM_MS / 2)).toBe(1)
+  })
+  it('is capped at MAX_SEGMENTS', () => {
+    expect(maxEvenParts(10 * 60 * 1000)).toBe(MAX_SEGMENTS)
+  })
+})
+
+describe('splitEvenlyRows', () => {
+  it('cuts into equal rows, the last running to the end', () => {
+    expect(splitEvenlyRows(10000, 4)).toEqual([
+      { startMsSeconds: 0, endMsSeconds: 2.5 },
+      { startMsSeconds: 2.5, endMsSeconds: 5 },
+      { startMsSeconds: 5, endMsSeconds: 7.5 },
+      { startMsSeconds: 7.5, endMsSeconds: null }
+    ])
+  })
+  it('leaves no gaps between rows', () => {
+    const rows = splitEvenlyRows(100000, 7)
+    rows.slice(1).forEach((r, i) => expect(r.startMsSeconds).toBe(rows[i]!.endMsSeconds))
+  })
+  it('returns nothing for impossible counts', () => {
+    expect(splitEvenlyRows(10000, 0)).toEqual([])
+    expect(splitEvenlyRows(10000, 2.5)).toEqual([])
+    expect(splitEvenlyRows(1000, 5)).toEqual([])
+    expect(splitEvenlyRows(10 * 60 * 1000, MAX_SEGMENTS + 1)).toEqual([])
+    expect(splitEvenlyRows(0, 2)).toEqual([])
+  })
+})
+
+describe('splitEveryRows', () => {
+  it('cuts every N seconds, the last row taking the rest', () => {
+    expect(splitEveryRows(25000, 10)).toEqual([
+      { startMsSeconds: 0, endMsSeconds: 10 },
+      { startMsSeconds: 10, endMsSeconds: 20 },
+      { startMsSeconds: 20, endMsSeconds: null }
+    ])
+  })
+  it('folds a too-short remainder into the last row', () => {
+    expect(splitEveryRows(20200, 10)).toHaveLength(2)
+  })
+  it('returns nothing when it cannot work', () => {
+    expect(splitEveryRows(10000, 0)).toEqual([])
+    expect(splitEveryRows(10000, 10)).toEqual([])
+    expect(splitEveryRows(10000, 0.1)).toEqual([])
+    expect(splitEveryRows(10 * 60 * 1000, 1)).toEqual([])
+  })
+})
+
+describe('moveBoundary', () => {
+  const rows = [
+    { startMsSeconds: 0, endMsSeconds: 5 },
+    { startMsSeconds: 5, endMsSeconds: null }
+  ]
+  it('finds touching boundaries only', () => {
+    expect(boundaryAfter(rows, 0)).toBe(5)
+    expect(boundaryAfter(rows, 1)).toBeNull()
+    expect(
+      boundaryAfter(
+        [
+          { startMsSeconds: 0, endMsSeconds: 4 },
+          { startMsSeconds: 5, endMsSeconds: null }
+        ],
+        0
+      )
+    ).toBeNull()
+  })
+  it('moves both sides together', () => {
+    const out = moveBoundary(rows, 0, 7.123, 10000)
+    expect(out[0]!.endMsSeconds).toBe(7.12)
+    expect(out[1]!.startMsSeconds).toBe(7.12)
+  })
+  it('keeps each side at least MIN_TRIM_MS long', () => {
+    expect(moveBoundary(rows, 0, -3, 10000)[0]!.endMsSeconds).toBe(MIN_TRIM_MS / 1000)
+    expect(moveBoundary(rows, 0, 99, 10000)[1]!.startMsSeconds).toBe(10 - MIN_TRIM_MS / 1000)
+  })
+})
+
+describe('centeredCrop', () => {
+  it('fits the largest box of the shape, centred', () => {
+    expect(centeredCrop(9 / 16, 1920, 1080)).toEqual({ x: 656, y: 0, w: 608, h: 1080 })
+    expect(centeredCrop(1, 1920, 1080)).toEqual({ x: 420, y: 0, w: 1080, h: 1080 })
+    expect(centeredCrop(16 / 9, 1080, 1080)).toEqual({ x: 0, y: 236, w: 1080, h: 608 })
+  })
+  it('can be centred elsewhere, kept inside the frame', () => {
+    expect(centeredCrop(1, 1920, 1080, 0, 0)).toEqual({ x: 0, y: 0, w: 1080, h: 1080 })
+  })
+  it('is empty for an unknown frame or shape', () => {
+    expect(centeredCrop(1, 0, 0)).toEqual({ x: 0, y: 0, w: 0, h: 0 })
+    expect(centeredCrop(0, 100, 100)).toEqual({ x: 0, y: 0, w: 0, h: 0 })
+  })
+})
+
+describe('safeInsets', () => {
+  it('keeps clear of the app buttons and captions on tall pictures', () => {
+    const t = safeInsets(9 / 16)
+    expect(t.bottom).toBeGreaterThan(t.top)
+    expect(t.right).toBeGreaterThan(t.left)
+  })
+  it('is an even 5 % margin for wide and square pictures', () => {
+    for (const a of [16 / 9, 1, 4 / 3]) expect(safeInsets(a)).toEqual({ top: 0.05, right: 0.05, bottom: 0.05, left: 0.05 })
+  })
+  it('falls back to the even margin for a nonsense shape', () => {
+    expect(safeInsets(0).top).toBe(0.05)
+    expect(safeInsets(NaN).top).toBe(0.05)
+  })
+})
+
+describe('turning and flipping', () => {
+  const none = NO_ORIENTATION
+  it('knows when nothing is asked for', () => {
+    expect(hasOrientation(none)).toBe(false)
+    expect(hasOrientation({ ...none, flipV: true })).toBe(true)
+    expect(hasOrientation({ ...none, rotate: 90 })).toBe(true)
+  })
+  it('turns in quarter steps, both ways, around 360', () => {
+    expect(turned(none, 1).rotate).toBe(90)
+    expect(turned(none, -1).rotate).toBe(270)
+    expect(turned({ ...none, rotate: 270 }, 1).rotate).toBe(0)
+    expect(turned({ ...none, rotate: 0 }, -1).rotate).toBe(270)
+  })
+  it('swaps width and height on a quarter turn only', () => {
+    expect(orientedSize(1920, 1080, { ...none, rotate: 90 })).toEqual({ w: 1080, h: 1920 })
+    expect(orientedSize(1920, 1080, { ...none, rotate: 270 })).toEqual({ w: 1080, h: 1920 })
+    expect(orientedSize(1920, 1080, { ...none, rotate: 180 })).toEqual({ w: 1920, h: 1080 })
+    expect(orientedSize(1920, 1080, { ...none, flipH: true })).toEqual({ w: 1920, h: 1080 })
+  })
+  it('describes it in words, matching the server', () => {
+    expect(describeOrientation(none)).toBe('')
+    expect(describeOrientation({ rotate: 90, flipH: true, flipV: false })).toBe('turned 90° clockwise · flipped left–right')
+  })
+  it('sends only what is set', () => {
+    expect(orientationRequest(none)).toEqual({})
+    expect(orientationRequest({ rotate: 180, flipH: false, flipV: true })).toEqual({ rotate: 180, flipV: true })
   })
 })

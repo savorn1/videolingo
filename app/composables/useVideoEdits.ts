@@ -125,7 +125,18 @@ export function useVideoEdits() {
     return (await api<ApiEnvelope<EditOverview>>(base(videoId))).data
   }
 
-  async function startTrim(videoId: number, body: { startMs: number; endMs?: number | null; crop?: CropRect | null; scale?: ScaleSize | null }) {
+  async function startTrim(
+    videoId: number,
+    body: {
+      startMs: number
+      endMs?: number | null
+      crop?: CropRect | null
+      scale?: ScaleSize | null
+      rotate?: 90 | 180 | 270
+      flipH?: boolean
+      flipV?: boolean
+    }
+  ) {
     return (await api<ApiEnvelope<ProcessingJob>>(`${base(videoId)}/trim`, { method: 'POST', body })).data
   }
 

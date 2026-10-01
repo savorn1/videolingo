@@ -77,13 +77,75 @@ function base(): Omit<EditorLayer, 'kind' | 'text'> {
 export function useOverlayEdit(durationMs: Ref<number>) {
   const state = reactive({
     layers: [] as EditorLayer[],
-    selectedId: null as string | null
+    selectedId: null as string | null,
+    /** Layers picked along with `selectedId` (shift/ctrl-click); they move, copy and go together. */
+    multi: [] as string[]
   })
 
   const selected = computed(() => state.layers.find((l) => l.id === state.selectedId) ?? null)
 
+  /** The selected layer and every other picked one. */
+  const group = computed(() => state.layers.filter((l) => l.id === state.selectedId || state.multi.includes(l.id)))
+  const isPicked = (id: string) => id === state.selectedId || state.multi.includes(id)
+
+  /** Shift/ctrl-click: adds a layer to the group, or drops it from it. */
+  function toggleMulti(id: string) {
+    if (!state.selectedId) {
+      state.selectedId = id
+      return
+    }
+    if (id === state.selectedId) {
+      // Give the primary role to another picked layer, if there is one.
+      state.selectedId = state.multi.shift() ?? null
+      return
+    }
+    state.multi = state.multi.includes(id) ? state.multi.filter((x) => x !== id) : [...state.multi, id]
+  }
+
+  /** A plain click: just this layer. */
+  function select(id: string | null) {
+    state.selectedId = id
+    state.multi = []
+  }
+
+  function removeGroup() {
+    const ids = new Set(group.value.map((l) => l.id))
+    state.layers = state.layers.filter((l) => !ids.has(l.id))
+    state.selectedId = null
+    state.multi = []
+  }
+
+  function duplicateGroup() {
+    const copies = group.value.map((l) => ({ ...l, id: newId(), x: Math.min(1, l.x + 0.03), y: Math.min(1, l.y + 0.03) }))
+    state.layers.push(...copies)
+    state.selectedId = copies[0]?.id ?? null
+    state.multi = copies.slice(1).map((l) => l.id)
+  }
+
+  /** Lines the group up on the first one's left, centre or right, or top, middle or bottom. */
+  function alignGroup(edge: 'x' | 'y') {
+    const first = state.layers.find((l) => l.id === state.selectedId)
+    if (!first) return
+    for (const l of group.value) l[edge] = first[edge]
+  }
+
+  /** Gives every other text layer in the group the look of the selected one. */
+  function matchStyleInGroup() {
+    const from = state.layers.find((l) => l.id === state.selectedId)
+    if (!from) return 0
+    const { font, weight, sizePct, color, background, backgroundOpacity, align } = from
+    let n = 0
+    for (const l of group.value) {
+      if (l.kind !== 'TEXT' || l.id === from.id) continue
+      Object.assign(l, { font, weight, sizePct, color, background, backgroundOpacity, align })
+      n++
+    }
+    return n
+  }
+
   function add(layer: EditorLayer) {
     state.layers.push(layer)
+    state.multi = []
     state.selectedId = layer.id
     return layer
   }
@@ -127,6 +189,52 @@ export function useOverlayEdit(durationMs: Ref<number>) {
     })
   }
 
+  /** One-click looks for the common cases; all start at the playhead and last 3 s (a title 4 s). */
+  function addPreset(kind: 'TITLE' | 'LOWER_THIRD' | 'CAPTION', atMs: number) {
+    const l = addText(atMs)
+    if (kind === 'TITLE') {
+      Object.assign(l, { text: 'Your title', sizePct: 11, weight: 900, x: 0.5, y: 0.45, background: null, animation: 'FADE' })
+      l.endMs = Math.min(durationMs.value || l.startMs + 4000, l.startMs + 4000)
+    } else if (kind === 'LOWER_THIRD') {
+      Object.assign(l, { text: 'Name\nRole', sizePct: 5, weight: 600, x: 0.2, y: 0.82, align: 'LEFT', backgroundOpacity: 0.7, animation: 'SLIDE_LEFT' })
+    } else {
+      Object.assign(l, { text: 'Caption', sizePct: 5, weight: 600, x: 0.5, y: 0.9, animation: 'NONE' })
+    }
+    return l
+  }
+
+  /** One text layer per subtitle cue (a cue's line breaks are kept); returns how many were added. */
+  function addFromCues(cues: { startMs: number; endMs: number; text: string }[]) {
+    const usable = cues.filter((c) => c.text.trim() && c.endMs > c.startMs)
+    for (const c of usable) {
+      state.layers.push({ ...base(), kind: 'TEXT', text: c.text.trim(), startMs: c.startMs, endMs: c.endMs, y: 0.9, sizePct: 5, weight: 600, animation: 'NONE' })
+    }
+    if (usable.length) state.selectedId = state.layers[state.layers.length - 1]!.id
+    return usable.length
+  }
+
+  /** Gives every text layer the look of `id` (font, size, colours, box, alignment). */
+  function applyStyleToAll(id: string) {
+    const from = state.layers.find((l) => l.id === id)
+    if (!from) return 0
+    const { font, weight, sizePct, color, background, backgroundOpacity, align } = from
+    let n = 0
+    for (const l of state.layers) {
+      if (l.kind !== 'TEXT' || l.id === id) continue
+      Object.assign(l, { font, weight, sizePct, color, background, backgroundOpacity, align })
+      n++
+    }
+    return n
+  }
+
+  /** Pulls a layer's centre in from the frame's edges (a rough title-safe area). */
+  function keepInSafeArea(id: string) {
+    const l = state.layers.find((x) => x.id === id)
+    if (!l) return
+    l.x = Math.min(0.9, Math.max(0.1, l.x))
+    l.y = Math.min(0.92, Math.max(0.08, l.y))
+  }
+
   /** Appends a saved template's layers (new ids, timing clamped to this video's length). */
   function addTemplate(layers: EditorLayer[]) {
     const max = Math.max(0, durationMs.value - 500)
@@ -142,7 +250,8 @@ export function useOverlayEdit(durationMs: Ref<number>) {
 
   function remove(id: string) {
     state.layers = state.layers.filter((l) => l.id !== id)
-    if (state.selectedId === id) state.selectedId = null
+    state.multi = state.multi.filter((x) => x !== id)
+    if (state.selectedId === id) state.selectedId = state.multi.shift() ?? null
   }
 
   function duplicate(id: string) {
@@ -173,6 +282,7 @@ export function useOverlayEdit(durationMs: Ref<number>) {
   function reset() {
     state.layers = []
     state.selectedId = null
+    state.multi = []
   }
 
   const request = computed<OverlayLayer[]>(() => state.layers.map(({ id: _id, imageUrl: _url, imageName: _name, ...layer }) => layer))
@@ -189,7 +299,7 @@ export function useOverlayEdit(durationMs: Ref<number>) {
     return null
   })
 
-  return { state, selected, addText, addImage, addTextWatermark, addTemplate, remove, duplicate, reorder, moveTo, reset, request, error }
+  return { state, selected, group, isPicked, toggleMulti, select, removeGroup, duplicateGroup, alignGroup, matchStyleInGroup, addText, addImage, addTextWatermark, addPreset, addFromCues, applyStyleToAll, keepInSafeArea, addTemplate, remove, duplicate, reorder, moveTo, reset, request, error }
 }
 
 export type OverlayEdit = ReturnType<typeof useOverlayEdit>

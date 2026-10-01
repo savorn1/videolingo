@@ -353,11 +353,21 @@ const relatedItems = computed<DropdownMenuItem[][]>(() => {
 const visibilityMeta = computed(() => VIDEO_VISIBILITIES.find((v) => v.value === video.value?.visibility) ?? VIDEO_VISIBILITIES[0]!)
 
 // Less-common actions, tucked behind "More" so the header stays short.
+// Waits in the editor's Join tab ("Waiting from the video pages") until it is added there.
+const joinQueue = useJoinQueue()
+function onAddToJoin() {
+  const v = video.value
+  if (!v) return
+  if (!joinQueue.value.some((q) => q.id === v.id)) joinQueue.value = [...joinQueue.value, joinClipFrom(v)]
+  toast.add({ title: 'Added to the join list', description: 'Open any video\'s editor › Join to use it.', color: 'success' })
+}
+
 const moreItems = computed<DropdownMenuItem[][]>(() => [
   [
     { label: 'Replace file…', icon: 'i-lucide-replace', onSelect: () => (showReplace.value = true) },
     { label: 'Move…', icon: 'i-lucide-move', onSelect: () => (showMove.value = true) },
     { label: 'Duplicate', icon: 'i-lucide-copy', onSelect: onDuplicate },
+    { label: 'Add to a join', icon: 'i-lucide-film', disabled: !video.value?.storageKey, onSelect: onAddToJoin },
     video.value?.archived
       ? { label: 'Unarchive', icon: 'i-lucide-archive-restore', onSelect: onUnarchive }
       : { label: 'Archive', icon: 'i-lucide-archive', onSelect: onArchive }

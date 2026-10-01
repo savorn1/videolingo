@@ -16,7 +16,8 @@ import {
   DEFAULT_LOOK,
   sanitizeLook,
   submitBlocker,
-  uniqueTitles
+  uniqueTitles,
+  waveformPlacement
 } from './audioVideo'
 
 const file = (name: string, type = '', size = 1000) => ({ name, type, size })
@@ -204,5 +205,15 @@ describe('finishedMaking', () => {
   it('is empty when nothing finished', () => {
     expect(finishedMaking([1], new Set([1, 5]))).toEqual([])
     expect(finishedMaking([], new Set([1]))).toEqual([])
+  })
+})
+
+describe('waveformPlacement', () => {
+  it('puts the mirrored-bar styles in the middle and everything else along the bottom', () => {
+    expect(waveformPlacement('PULSE')).toBe('CENTER')
+    expect(waveformPlacement('BLOCKS')).toBe('CENTER')
+    expect(waveformPlacement('FINE')).toBe('CENTER')
+    expect(waveformPlacement('STRIPES')).toBe('CENTER')
+    for (const s of ['WAVES', 'BARS', 'SPIKES', 'DOTS', 'SPECTRUM', 'NONE']) expect(waveformPlacement(s)).toBe('BOTTOM')
   })
 })

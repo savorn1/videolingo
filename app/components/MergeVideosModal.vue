@@ -1,15 +1,19 @@
 <template>
-  <UModal v-model:open="open" title="Join into one video" description="The videos are joined in this order into a new video. The originals are not changed." :ui="{ content: 'sm:max-w-2xl' }">
+  <UModal
+    v-model:open="open"
+    title="Join into one video"
+    description="The videos are joined in this order into a new video. The originals are not changed."
+    :ui="{ content: 'sm:max-w-2xl' }"
+  >
     <template #body>
-      <form id="merge-form" class="space-y-5" @submit.prevent="onSubmit">
+      <form id="merge-form" class="space-y-5" :class="TAB_ACCENTS.join.scope" @submit.prevent="onSubmit">
         <!-- Order -->
         <section aria-labelledby="merge-order-h" class="space-y-2">
           <div class="flex items-baseline justify-between gap-2">
-            <h3 id="merge-order-h" class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Order</h3>
+            <h3 id="merge-order-h" class="text-xs font-semibold uppercase tracking-wide" :class="TAB_ACCENTS.join.heading">Order</h3>
             <p class="text-xs tabular-nums text-gray-500 dark:text-gray-400">
-              {{ list.length }} video{{ list.length === 1 ? '' : 's' }} · {{ totals.seconds ? formatDuration(totals.seconds) : '—' }}<template v-if="totals.unknown">
-                + {{ totals.unknown }} of unknown length</template
-              >
+              {{ list.length }} video{{ list.length === 1 ? '' : 's' }} · {{ totals.seconds ? formatDuration(totals.seconds) : '—'
+              }}<template v-if="totals.unknown"> + {{ totals.unknown }} of unknown length</template>
             </p>
           </div>
           <!-- The joined video at a glance: each part's share of its length -->
@@ -37,14 +41,23 @@
               :class="[
                 it.blocked ? 'bg-error-50/60 dark:bg-error-950/30' : '',
                 dragId === it.id ? 'opacity-40' : '',
-                dropLine(i) === 'before' ? 'shadow-[inset_0_2px_0_0_var(--ui-primary)]' : dropLine(i) === 'after' ? 'shadow-[inset_0_-2px_0_0_var(--ui-primary)]' : ''
+                dropLine(i) === 'before'
+                  ? 'shadow-[inset_0_2px_0_0_var(--ui-primary)]'
+                  : dropLine(i) === 'after'
+                    ? 'shadow-[inset_0_-2px_0_0_var(--ui-primary)]'
+                    : ''
               ]"
               @dragstart="onDragStart($event, it.id)"
               @dragover="onDragOver($event, i)"
               @drop.prevent="onDrop"
               @dragend="clearDrag"
             >
-              <UIcon name="i-lucide-grip-vertical" class="h-4 w-4 shrink-0 cursor-grab text-gray-300 dark:text-gray-600" aria-hidden="true" title="Drag to reorder" />
+              <UIcon
+                name="i-lucide-grip-vertical"
+                class="h-4 w-4 shrink-0 cursor-grab text-gray-300 dark:text-gray-600"
+                aria-hidden="true"
+                title="Drag to reorder"
+              />
               <span class="flex w-8 shrink-0 items-center justify-end gap-1.5 text-xs tabular-nums text-gray-400">
                 <span class="h-2 w-2 rounded-full" :class="SEGMENT_COLORS[i % SEGMENT_COLORS.length]" aria-hidden="true" />{{ i + 1 }}
               </span>
@@ -55,11 +68,20 @@
                 <p class="truncate text-sm font-medium text-gray-900 dark:text-white" :title="it.title">{{ it.title }}</p>
                 <p v-if="it.blocked" class="text-xs text-error-600 dark:text-error-400">This video {{ it.blocked }}</p>
                 <p v-else class="text-xs tabular-nums text-gray-500 dark:text-gray-400">
-                  {{ it.durationSeconds ? formatDuration(it.durationSeconds) : 'Length unknown' }}<template v-if="starts[i] !== null"> · starts at {{ formatDuration(starts[i]) }}</template>
+                  {{ it.durationSeconds ? formatDuration(it.durationSeconds) : 'Length unknown'
+                  }}<template v-if="starts[i] !== null"> · starts at {{ formatDuration(starts[i]) }}</template>
                 </p>
               </div>
               <div class="flex shrink-0 items-center">
-                <UButton size="xs" color="neutral" variant="ghost" icon="i-lucide-arrow-up" :aria-label="`Move ${it.title} up`" :disabled="i === 0" @click="move(i, -1)" />
+                <UButton
+                  size="xs"
+                  color="neutral"
+                  variant="ghost"
+                  icon="i-lucide-arrow-up"
+                  :aria-label="`Move ${it.title} up`"
+                  :disabled="i === 0"
+                  @click="move(i, -1)"
+                />
                 <UButton
                   size="xs"
                   color="neutral"
@@ -78,7 +100,7 @@
 
         <!-- The new video -->
         <section aria-labelledby="merge-new-h" class="space-y-4">
-          <h3 id="merge-new-h" class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">The new video</h3>
+          <h3 id="merge-new-h" class="text-xs font-semibold uppercase tracking-wide" :class="TAB_ACCENTS.join.heading">The new video</h3>
           <UFormField label="Title" required :error="errors.title">
             <UInput v-model="title" maxlength="200" class="w-full" aria-label="Title" />
           </UFormField>
@@ -86,7 +108,15 @@
             <UTextarea v-model="description" :rows="2" autoresize :maxrows="6" maxlength="10000" class="w-full" />
           </UFormField>
           <UFormField label="Categories" :required="requireCategory" :error="errors.categoryIds" :hint="`Up to ${maxCategories}`">
-            <USelectMenu v-model="categoryIds" :items="categoryItems" value-key="value" multiple placeholder="Choose categories" aria-label="Categories" class="w-full" />
+            <USelectMenu
+              v-model="categoryIds"
+              :items="categoryItems"
+              value-key="value"
+              multiple
+              placeholder="Choose categories"
+              aria-label="Categories"
+              class="w-full"
+            />
           </UFormField>
 
           <div class="space-y-2">
@@ -128,26 +158,30 @@
           </div>
         </section>
 
-        <UAlert
-          color="info"
-          variant="subtle"
-          icon="i-lucide-info"
-          title="What to expect"
-          :description="expectText"
-        />
+        <UAlert color="info" variant="subtle" icon="i-lucide-info" title="What to expect" :description="expectText" />
         <UAlert v-if="saveError" color="error" variant="subtle" icon="i-lucide-triangle-alert" :title="saveError" />
       </form>
     </template>
     <template #footer="{ close }">
       <div class="flex w-full justify-end gap-2">
         <UButton color="neutral" variant="ghost" :disabled="saving" @click="close">Cancel</UButton>
-        <UButton type="submit" form="merge-form" icon="i-lucide-combine" :loading="saving" :disabled="!!problem || !title.trim()">Join {{ list.length }} videos</UButton>
+        <UButton
+          type="submit"
+          form="merge-form"
+          color="neutral"
+          :class="TAB_ACCENTS.join.button"
+          icon="i-lucide-combine"
+          :loading="saving"
+          :disabled="!!problem || !title.trim()"
+          >Join {{ list.length }} videos</UButton
+        >
       </div>
     </template>
   </UModal>
 </template>
 
 <script setup lang="ts">
+import { TAB_ACCENTS } from '#shared/utils/tabAccent'
 // Asks how to join the given videos into one: their order, the new video's title,
 // its size and the joint between videos. Queues the job on the server and goes to
 // the new (hidden) video, which shows the progress.
@@ -193,7 +227,9 @@ const shares = computed(() => mergeShares(list.value))
 // Same colours as the split tab's strip, so a part keeps its colour from the bar to its row.
 const SEGMENT_COLORS = ['bg-primary-500', 'bg-info-500', 'bg-success-500', 'bg-warning-500', 'bg-violet-500', 'bg-rose-500']
 const expectText = computed(() => {
-  const when = totals.value.seconds ? ` A rough guess for this one: ${describeEstimate(estimateMergeSeconds(totals.value.seconds, resolution.value))}, plus any wait behind other jobs.` : ''
+  const when = totals.value.seconds
+    ? ` A rough guess for this one: ${describeEstimate(estimateMergeSeconds(totals.value.seconds, resolution.value))}, plus any wait behind other jobs.`
+    : ''
   return `Joining re-encodes every video, so it takes a while for long ones.${when} The new video is created hidden. Transcripts every video has in the same language are carried over; subtitles are not, and the originals keep theirs.`
 })
 

@@ -24,7 +24,7 @@
       </div>
       <template v-if="s.source === 'UPLOAD'">
         <div v-if="s.replacement" class="flex items-center gap-2 rounded-md bg-gray-50 dark:bg-gray-800 px-2 py-1.5">
-          <UIcon name="i-lucide-file-audio" class="w-4 h-4 text-primary-500 shrink-0" />
+          <UIcon name="i-lucide-file-audio" class="w-4 h-4 shrink-0" :class="TAB_ACCENTS.audio.icon" />
           <span class="truncate flex-1" :title="s.replacement.name">{{ s.replacement.name }}</span>
           <span v-if="s.replacement.durationMs" class="text-xs text-gray-500 tabular-nums">{{ formatTimecode(s.replacement.durationMs) }}</span>
           <UButton size="xs" color="neutral" variant="ghost" icon="i-lucide-x" aria-label="Remove replacement audio" @click="s.replacement = null" />
@@ -89,12 +89,7 @@
     </EditorSection>
 
     <!-- ── Range ───────────────────────────────────────────────────────── -->
-    <EditorSection
-      v-model:open="open.range"
-      title="Range"
-      :changed="changed.range"
-      :hint="`${formatTimecode(s.range[0])} – ${formatTimecode(s.range[1])}`"
-    >
+    <EditorSection v-model:open="open.range" title="Range" :changed="changed.range" :hint="`${formatTimecode(s.range[0])} – ${formatTimecode(s.range[1])}`">
       <USlider v-model="s.range" :min="0" :max="Math.max(durationMs, 1)" :step="10" :min-steps-between-thumbs="5" aria-label="Range" />
       <div class="flex flex-wrap gap-1">
         <UButton size="xs" color="neutral" variant="ghost" @click="s.range = [Math.min(Math.round(currentMs), s.range[1] - 50), s.range[1]]"
@@ -104,7 +99,9 @@
           >End at playhead</UButton
         >
         <UButton size="xs" color="neutral" variant="soft" icon="i-lucide-volume-x" :disabled="!rangeValid" @click="onMuteRange">Mute range</UButton>
-        <UButton size="xs" color="error" variant="ghost" icon="i-lucide-eraser" :disabled="!rangeValid" @click="confirmDeleteRange = true">Delete range</UButton>
+        <UButton size="xs" color="error" variant="ghost" icon="i-lucide-eraser" :disabled="!rangeValid" @click="confirmDeleteRange = true"
+          >Delete range</UButton
+        >
       </div>
       <ul v-if="s.mutes.length" class="flex flex-wrap gap-1">
         <li v-for="(m, i) in s.mutes" :key="i">
@@ -121,7 +118,16 @@
 
     <!-- ── Level ───────────────────────────────────────────────────────── -->
     <EditorSection v-model:open="open.level" title="Level" :changed="changed.level" :hint="`Volume ${Math.round(s.volume * 100)}%`">
-      <SliderRow label="Volume" :model-value="Math.round(s.volume * 100)" :min="0" :max="400" :step="5" :default-value="100" unit="%" @update:model-value="(v) => (s.volume = v / 100)" />
+      <SliderRow
+        label="Volume"
+        :model-value="Math.round(s.volume * 100)"
+        :min="0"
+        :max="400"
+        :step="5"
+        :default-value="100"
+        unit="%"
+        @update:model-value="(v) => (s.volume = v / 100)"
+      />
       <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
         <USwitch :model-value="s.volume === 0" label="Mute everything" @update:model-value="(v) => (s.volume = v ? 0 : 1)" />
         <USwitch v-model="s.normalize" label="Normalize loudness" />
@@ -166,7 +172,7 @@
     <EditorSection v-model:open="open.music" title="Background music" :changed="changed.music">
       <template v-if="s.music">
         <div class="flex items-center gap-2 rounded-md bg-gray-50 dark:bg-gray-800 px-2 py-1.5">
-          <UIcon name="i-lucide-music" class="w-4 h-4 text-primary-500 shrink-0" />
+          <UIcon name="i-lucide-music" class="w-4 h-4 shrink-0" :class="TAB_ACCENTS.audio.icon" />
           <span class="truncate flex-1" :title="s.music.name">{{ s.music.name }}</span>
           <UButton size="xs" color="neutral" variant="ghost" icon="i-lucide-x" aria-label="Remove background music" @click="s.music = null" />
         </div>
@@ -261,24 +267,35 @@
     </EditorSection>
 
     <!-- ── Render ──────────────────────────────────────────────────────── -->
-    <section :class="SECTION">
+    <section :class="ACTION_SECTION">
       <p class="text-sm text-gray-700 dark:text-gray-300" data-testid="audio-summary">{{ summary }}</p>
       <p class="text-xs text-gray-500 dark:text-gray-400">
-        The preview plays the volume (up to 100%) and muted ranges; everything else is heard in the result, which you can check before replacing the original.
+        The preview plays the volume (up to 100%) and muted ranges; everything else is heard in the result.
       </p>
+      <ul class="space-y-1 text-xs text-gray-600 dark:text-gray-300">
+        <li class="flex items-start gap-1.5">
+          <UIcon name="i-lucide-film" class="mt-0.5 size-3.5 shrink-0" :class="TAB_ACCENTS.audio.icon" />The result is your video with this sound, ready to
+          watch.
+        </li>
+        <li class="flex items-start gap-1.5">
+          <UIcon name="i-lucide-shield-check" class="mt-0.5 size-3.5 shrink-0" :class="TAB_ACCENTS.audio.icon" />
+          Nothing changes until you choose: replace the original (kept under Versions) or add it as a new video.
+        </li>
+      </ul>
       <p class="text-xs min-h-4" :class="edit.error.value ? 'text-error-500' : 'text-gray-500 dark:text-gray-400'">
         {{ edit.error.value || (edit.changed.value ? '' : 'Change something above to make an audio edit.') }}
       </p>
       <div class="flex gap-2">
         <UButton
           v-if="canWrite"
-          class="flex-1 justify-center"
-          icon="i-lucide-audio-lines"
+          color="neutral"
+          :class="['flex-1 justify-center', TAB_ACCENTS.audio.button]"
+          icon="i-lucide-clapperboard"
           :loading="starting"
           :disabled="!!edit.error.value || !edit.changed.value || busy || !!uploading"
           @click="onRender"
         >
-          Render audio
+          Render video with this audio
         </UButton>
         <UTooltip text="Undoable — Ctrl/⌘+Z brings the settings back">
           <UButton class="ml-2" color="neutral" variant="ghost" icon="i-lucide-rotate-ccw" :disabled="!edit.changed.value" @click="edit.reset()">
@@ -300,6 +317,7 @@
 </template>
 
 <script setup lang="ts">
+import { TAB_ACCENTS } from '#shared/utils/tabAccent'
 // The Audio tab of the video editor: what to do with the sound. The clips
 // themselves are shown (and dragged) on AudioStrip under the preview; both
 // work on the same useAudioEdit state. Rendering and extracting run as EDIT
@@ -312,7 +330,8 @@ import { formatTimecode } from '#shared/utils/transport'
 const props = defineProps<{ edit: AudioEdit; videoId: number; durationMs: number; currentMs: number; canWrite: boolean; busy: boolean }>()
 const emit = defineEmits<{ queued: [] }>()
 
-const SECTION = 'space-y-2 border-t border-gray-100 dark:border-gray-800 pt-3'
+const SECTION = `space-y-2 border-t pt-3 ${TAB_ACCENTS.audio.divider}`
+const ACTION_SECTION = `sticky bottom-0 z-10 space-y-2 border-t bg-default pb-3 pt-3 ${TAB_ACCENTS.audio.divider}`
 const DENOISE: { label: string; value: Denoise }[] = [
   { label: 'Off', value: 'OFF' },
   { label: 'Light', value: 'LIGHT' },
@@ -425,7 +444,7 @@ for (const key of ['level', 'cleanup', 'music', 'speed', 'channels'] as const) {
   )
 }
 
-// One line on what "Render audio" will do.
+// One line on what rendering will do.
 const summary = computed(() => {
   const parts: string[] = []
   if (s.source === 'UPLOAD') parts.push('replacement sound')
@@ -486,7 +505,11 @@ async function onRender() {
   starting.value = true
   try {
     const job = await startAudio(props.videoId, props.edit.request.value)
-    toast.add({ title: `Audio edit queued — job #${job.id}`, color: 'success' })
+    toast.add({
+      title: `Rendering your video with the new audio — job #${job.id}`,
+      description: 'It will appear under Results when it is ready.',
+      color: 'success'
+    })
     emit('queued')
   } catch (err) {
     toast.add({ title: 'Could not start the audio edit', description: apiErrorMessage(err), color: 'error' })

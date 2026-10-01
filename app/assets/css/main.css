@@ -88,3 +88,174 @@
     outline-offset: 2px;
   }
 }
+
+/* Per-tab colour scopes (see shared/utils/tabAccent.ts): inside one, Nuxt UI's "primary"
+   — sliders, switches, focus rings, bg-primary-* — takes the tab's colour. */
+.tab-scope-sky {
+  --ui-color-primary-50: var(--color-sky-50);
+  --ui-color-primary-100: var(--color-sky-100);
+  --ui-color-primary-200: var(--color-sky-200);
+  --ui-color-primary-300: var(--color-sky-300);
+  --ui-color-primary-400: var(--color-sky-400);
+  --ui-color-primary-500: var(--color-sky-500);
+  --ui-color-primary-600: var(--color-sky-600);
+  --ui-color-primary-700: var(--color-sky-700);
+  --ui-color-primary-800: var(--color-sky-800);
+  --ui-color-primary-900: var(--color-sky-900);
+  --ui-color-primary-950: var(--color-sky-950);
+  --ui-primary: var(--color-sky-600);
+}
+.dark .tab-scope-sky {
+  --ui-primary: var(--color-sky-400);
+}
+.tab-scope-violet {
+  --ui-color-primary-50: var(--color-violet-50);
+  --ui-color-primary-100: var(--color-violet-100);
+  --ui-color-primary-200: var(--color-violet-200);
+  --ui-color-primary-300: var(--color-violet-300);
+  --ui-color-primary-400: var(--color-violet-400);
+  --ui-color-primary-500: var(--color-violet-500);
+  --ui-color-primary-600: var(--color-violet-600);
+  --ui-color-primary-700: var(--color-violet-700);
+  --ui-color-primary-800: var(--color-violet-800);
+  --ui-color-primary-900: var(--color-violet-900);
+  --ui-color-primary-950: var(--color-violet-950);
+  --ui-primary: var(--color-violet-600);
+}
+.dark .tab-scope-violet {
+  --ui-primary: var(--color-violet-400);
+}
+.tab-scope-emerald {
+  --ui-color-primary-50: var(--color-emerald-50);
+  --ui-color-primary-100: var(--color-emerald-100);
+  --ui-color-primary-200: var(--color-emerald-200);
+  --ui-color-primary-300: var(--color-emerald-300);
+  --ui-color-primary-400: var(--color-emerald-400);
+  --ui-color-primary-500: var(--color-emerald-500);
+  --ui-color-primary-600: var(--color-emerald-600);
+  --ui-color-primary-700: var(--color-emerald-700);
+  --ui-color-primary-800: var(--color-emerald-800);
+  --ui-color-primary-900: var(--color-emerald-900);
+  --ui-color-primary-950: var(--color-emerald-950);
+  --ui-primary: var(--color-emerald-600);
+}
+.dark .tab-scope-emerald {
+  --ui-primary: var(--color-emerald-400);
+}
+.tab-scope-rose {
+  --ui-color-primary-50: var(--color-rose-50);
+  --ui-color-primary-100: var(--color-rose-100);
+  --ui-color-primary-200: var(--color-rose-200);
+  --ui-color-primary-300: var(--color-rose-300);
+  --ui-color-primary-400: var(--color-rose-400);
+  --ui-color-primary-500: var(--color-rose-500);
+  --ui-color-primary-600: var(--color-rose-600);
+  --ui-color-primary-700: var(--color-rose-700);
+  --ui-color-primary-800: var(--color-rose-800);
+  --ui-color-primary-900: var(--color-rose-900);
+  --ui-color-primary-950: var(--color-rose-950);
+  --ui-primary: var(--color-rose-600);
+}
+.dark .tab-scope-rose {
+  --ui-primary: var(--color-rose-400);
+}
+.tab-scope-orange {
+  --ui-color-primary-50: var(--color-orange-50);
+  --ui-color-primary-100: var(--color-orange-100);
+  --ui-color-primary-200: var(--color-orange-200);
+  --ui-color-primary-300: var(--color-orange-300);
+  --ui-color-primary-400: var(--color-orange-400);
+  --ui-color-primary-500: var(--color-orange-500);
+  --ui-color-primary-600: var(--color-orange-600);
+  --ui-color-primary-700: var(--color-orange-700);
+  --ui-color-primary-800: var(--color-orange-800);
+  --ui-color-primary-900: var(--color-orange-900);
+  --ui-color-primary-950: var(--color-orange-950);
+  --ui-primary: var(--color-orange-600);
+}
+.dark .tab-scope-orange {
+  --ui-primary: var(--color-orange-400);
+}
+
+/* Render animation (RenderAnimation.vue) and the arrival of a finished result. */
+@keyframes render-frame {
+  0%,
+  100% {
+    opacity: 0.25;
+    transform: scale(0.9);
+  }
+  40% {
+    opacity: 1;
+    transform: scale(1);
+    background-color: color-mix(in oklab, currentColor 25%, transparent);
+  }
+}
+@keyframes render-bar {
+  0%,
+  100% {
+    height: 20%;
+  }
+  50% {
+    height: 100%;
+  }
+}
+@keyframes render-sheen {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+@keyframes result-in {
+  0% {
+    opacity: 0;
+    transform: translateY(-6px);
+    background-color: color-mix(in oklab, var(--color-emerald-400) 35%, transparent);
+  }
+  60% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+.render-frame {
+  animation: render-frame calc(1.2s / var(--anim-speed, 1)) ease-in-out infinite;
+}
+.render-bar {
+  height: 20%;
+  animation: render-bar calc(0.9s / var(--anim-speed, 1)) ease-in-out infinite;
+}
+.render-paused {
+  animation-duration: calc(2.4s / var(--anim-speed, 1));
+  opacity: 0.4;
+}
+/* A soft light passing over a card whose job is running. */
+.render-card {
+  position: relative;
+  overflow: hidden;
+}
+.render-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(100deg, transparent 30%, color-mix(in oklab, currentColor 8%, transparent) 50%, transparent 70%);
+  animation: render-sheen calc(2.4s / var(--anim-speed, 1)) ease-in-out infinite;
+}
+.result-in {
+  animation: result-in calc(1.6s / var(--anim-speed, 1)) ease-out 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .render-frame,
+  .render-bar,
+  .render-card::after,
+  .result-in {
+    animation: none;
+  }
+  .render-bar {
+    height: 60%;
+  }
+}

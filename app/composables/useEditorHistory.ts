@@ -25,6 +25,8 @@ export function useEditorHistory(options: {
   const baseline = ref(snapshot.value)
   let applying = false
   let timer: ReturnType<typeof setTimeout> | undefined
+  /** When the unrendered edits were last kept in this browser (null = nothing kept). */
+  const draftSavedAt = ref<number | null>(null)
 
   const undoable = computed(() => canUndo(history.value))
   const redoable = computed(() => canRedo(history.value))
@@ -39,8 +41,14 @@ export function useEditorHistory(options: {
   }
   function writeDraft(state: string) {
     try {
-      if (state === baseline.value) localStorage.removeItem(options.draftKey())
-      else localStorage.setItem(options.draftKey(), JSON.stringify({ videoUrl: options.videoUrl(), savedAt: Date.now(), state } satisfies EditorDraft))
+      if (state === baseline.value) {
+        localStorage.removeItem(options.draftKey())
+        draftSavedAt.value = null
+      } else {
+        const savedAt = Date.now()
+        localStorage.setItem(options.draftKey(), JSON.stringify({ videoUrl: options.videoUrl(), savedAt, state } satisfies EditorDraft))
+        draftSavedAt.value = savedAt
+      }
     } catch {
       // Private mode / storage full: undo still works, the draft just isn't kept.
     }
@@ -98,6 +106,7 @@ export function useEditorHistory(options: {
   }
 
   function discardDraft() {
+    draftSavedAt.value = null
     try {
       localStorage.removeItem(options.draftKey())
     } catch {
@@ -122,5 +131,5 @@ export function useEditorHistory(options: {
   onMounted(() => window.addEventListener('keydown', onKey))
   onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 
-  return { undo: doUndo, redo: doRedo, undoable, redoable, start, pendingDraft, restoreDraft, discardDraft }
+  return { undo: doUndo, redo: doRedo, undoable, redoable, draftSavedAt, start, pendingDraft, restoreDraft, discardDraft }
 }

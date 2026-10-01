@@ -300,7 +300,7 @@ export interface AudioToVideoPayload {
   /** "#rrggbb". */
   background?: string
   resolution?: string
-  /** NONE, WAVES or BARS: a moving waveform along the bottom. */
+  /** NONE, WAVES, BARS, SPIKES, DOTS or SPECTRUM: a moving waveform along the bottom. */
   waveform?: string
   waveColor?: string
   /** Write text on the background (no cover picture). */

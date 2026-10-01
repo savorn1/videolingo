@@ -10,6 +10,7 @@
     <div
       v-if="dragging"
       class="fixed inset-0 z-50 flex items-center justify-center border-4 border-dashed border-primary-400 bg-primary-500/10 pointer-events-none"
+      :class="TAB_ACCENTS.audio.scope"
       aria-hidden="true"
     >
       <p class="rounded-lg bg-white px-4 py-2 font-medium text-primary-700 shadow dark:bg-gray-900 dark:text-primary-300">Drop audio files to add them</p>
@@ -18,11 +19,17 @@
     <form class="grid grid-cols-1 lg:grid-cols-5 gap-4 items-start" @submit.prevent="onSubmit">
       <div class="lg:col-span-3 space-y-4">
         <!-- 1. The sound -->
-        <UCard>
+        <UCard :class="STEP_TONES[1].scope" :ui="{ header: STEP_TONES[1].header }">
           <template #header>
             <div class="flex items-center justify-between gap-2">
-              <h2 class="flex items-center gap-1.5 font-semibold text-gray-900 dark:text-white">
-                1. The audio
+              <h2 class="flex items-center gap-2 font-semibold text-gray-900 dark:text-white">
+                <span
+                  class="flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold"
+                  :class="STEP_TONES[1].badge"
+                  aria-hidden="true"
+                  >1</span
+                >
+                The audio
                 <UIcon v-if="readyItems.length" name="i-lucide-circle-check" class="h-4 w-4 text-success-500" aria-label="Done" />
               </h2>
               <span v-if="items.length > 1" class="text-xs text-gray-500 dark:text-gray-400 tabular-nums">
@@ -44,7 +51,15 @@
                   </p>
                 </div>
                 <UBadge v-if="it.status === 'ready'" color="success" variant="subtle" size="sm" icon="i-lucide-check">Uploaded</UBadge>
-                <UButton size="xs" color="neutral" variant="ghost" icon="i-lucide-x" :aria-label="`Remove ${it.name}`" :disabled="saving" @click="removeItem(it.id)" />
+                <UButton
+                  size="xs"
+                  color="neutral"
+                  variant="ghost"
+                  icon="i-lucide-x"
+                  :aria-label="`Remove ${it.name}`"
+                  :disabled="saving"
+                  @click="removeItem(it.id)"
+                />
               </div>
               <UProgress v-if="it.status === 'uploading'" :model-value="Math.round(it.progress * 100)" size="xs" />
               <p v-if="it.status === 'error'" class="text-sm text-error-600 dark:text-error-400" role="alert">
@@ -85,9 +100,14 @@
         </UCard>
 
         <!-- 2. The look -->
-        <UCard>
+        <UCard :class="STEP_TONES[2].scope" :ui="{ header: STEP_TONES[2].header }">
           <template #header>
-            <h2 class="font-semibold text-gray-900 dark:text-white">2. The look</h2>
+            <h2 class="flex items-center gap-2 font-semibold text-gray-900 dark:text-white">
+              <span class="flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold" :class="STEP_TONES[2].badge" aria-hidden="true"
+                >2</span
+              >
+              The look
+            </h2>
           </template>
           <div class="space-y-5">
             <!-- Pictures: one, or a slideshow with the time each one appears -->
@@ -103,7 +123,11 @@
                   variant="ghost"
                   icon="i-lucide-align-horizontal-distribute-center"
                   :disabled="!spreadStarts"
-                  :title="spreadStarts ? `Spread over ${formatDuration(shortestSeconds ?? 0)}, the shortest recording` : 'Add the audio first, and make sure it is long enough'"
+                  :title="
+                    spreadStarts
+                      ? `Spread over ${formatDuration(shortestSeconds ?? 0)}, the shortest recording`
+                      : 'Add the audio first, and make sure it is long enough'
+                  "
                   @click="spread"
                 >
                   Spread evenly
@@ -127,7 +151,15 @@
                     />
                   </div>
                   <div class="flex items-center">
-                    <UButton size="xs" color="neutral" variant="ghost" icon="i-lucide-arrow-up" :aria-label="`Move ${sl.name} up`" :disabled="i === 0" @click="movePicture(i, -1)" />
+                    <UButton
+                      size="xs"
+                      color="neutral"
+                      variant="ghost"
+                      icon="i-lucide-arrow-up"
+                      :aria-label="`Move ${sl.name} up`"
+                      :disabled="i === 0"
+                      @click="movePicture(i, -1)"
+                    />
                     <UButton
                       size="xs"
                       color="neutral"
@@ -137,16 +169,40 @@
                       :disabled="i === slides.length - 1"
                       @click="movePicture(i, 1)"
                     />
-                    <UButton size="xs" color="neutral" variant="ghost" icon="i-lucide-x" :aria-label="`Remove ${sl.name}`" :disabled="saving" @click="removeSlide(sl.id)" />
+                    <UButton
+                      size="xs"
+                      color="neutral"
+                      variant="ghost"
+                      icon="i-lucide-x"
+                      :aria-label="`Remove ${sl.name}`"
+                      :disabled="saving"
+                      @click="removeSlide(sl.id)"
+                    />
                   </div>
                 </li>
               </ol>
 
               <div class="flex flex-wrap items-center gap-2">
-                <UButton size="xs" color="neutral" variant="soft" icon="i-lucide-image-plus" :loading="picUploading" :disabled="slides.length >= MAX_SLIDES" @click="picInput?.click()">
+                <UButton
+                  size="xs"
+                  color="neutral"
+                  variant="soft"
+                  icon="i-lucide-image-plus"
+                  :loading="picUploading"
+                  :disabled="slides.length >= MAX_SLIDES"
+                  @click="picInput?.click()"
+                >
                   {{ picUploading ? `Uploading ${Math.round(picProgress * 100)}%` : slides.length ? 'Add more pictures' : 'Add pictures' }}
                 </UButton>
-                <input ref="picInput" type="file" multiple class="hidden" accept="image/png,image/jpeg,image/webp" aria-label="Choose pictures" @change="onPickPictures" />
+                <input
+                  ref="picInput"
+                  type="file"
+                  multiple
+                  class="hidden"
+                  accept="image/png,image/jpeg,image/webp"
+                  aria-label="Choose pictures"
+                  @change="onPickPictures"
+                />
               </div>
               <p v-if="errors.cover" class="text-sm text-error-600 dark:text-error-400" role="alert">{{ errors.cover }}</p>
               <p v-if="slideError" class="text-sm text-error-600 dark:text-error-400" role="alert">{{ slideError }}</p>
@@ -206,33 +262,57 @@
 
             <!-- Waveform -->
             <div class="space-y-2">
-              <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Moving waveform</p>
-              <div class="flex flex-wrap gap-2" role="group" aria-label="Waveform style">
-                <UButton
-                  v-for="w in WAVEFORM_STYLES"
-                  :key="w.value"
-                  size="sm"
-                  :color="waveform === w.value ? 'primary' : 'neutral'"
-                  :variant="waveform === w.value ? 'soft' : 'ghost'"
-                  :aria-pressed="waveform === w.value"
-                  :title="w.hint"
-                  @click="waveform = w.value"
-                >
-                  {{ w.label }}
-                </UButton>
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Moving waveform</p>
+                <AnimationSpeed v-if="waveform !== 'NONE'" label="Preview speed" />
               </div>
-              <div v-if="waveform !== 'NONE'" class="flex flex-wrap items-center gap-3">
-                <USwitch v-model="waveAuto" label="Colour to suit the background" />
-                <input
-                  v-if="!waveAuto"
-                  v-model="waveColor"
-                  type="color"
-                  aria-label="Waveform colour"
-                  class="h-8 w-10 cursor-pointer rounded border border-gray-200 dark:border-gray-700"
-                />
+              <WaveTemplatePicker :current="currentWaveLook" @apply="applyWaveLook" @clear="waveform = 'NONE'" />
+
+              <!-- The templates are the way in; the style and colour can still be changed by hand -->
+              <div v-if="waveform !== 'NONE'" class="space-y-2">
+                <UButton
+                  size="xs"
+                  color="neutral"
+                  variant="link"
+                  :padded="false"
+                  :icon="customOpen ? 'i-lucide-chevron-up' : 'i-lucide-sliders-horizontal'"
+                  :aria-expanded="customOpen"
+                  @click="customOpen = !customOpen"
+                >
+                  {{ customOpen ? 'Hide style and colour' : 'Change style or colour' }}
+                </UButton>
+                <div v-if="customOpen" class="space-y-2 rounded-lg border border-gray-200 p-3 dark:border-gray-800">
+                  <div class="flex flex-wrap gap-2" role="group" aria-label="Waveform style">
+                    <UButton
+                      v-for="w in WAVEFORM_STYLES.filter((x) => x.value !== 'NONE')"
+                      :key="w.value"
+                      size="sm"
+                      :color="waveform === w.value ? 'primary' : 'neutral'"
+                      :variant="waveform === w.value ? 'soft' : 'ghost'"
+                      :aria-pressed="waveform === w.value"
+                      :title="w.hint"
+                      @click="waveform = w.value"
+                    >
+                      <WaveformPreview :kind="w.value" color="currentColor" mini class="h-4 w-9 shrink-0" :still="waveform !== w.value" />
+                      {{ w.label }}
+                    </UButton>
+                  </div>
+                  <div class="flex flex-wrap items-center gap-3">
+                    <USwitch v-model="waveAuto" label="Colour to suit the background" />
+                    <input
+                      v-if="!waveAuto"
+                      v-model="waveColor"
+                      type="color"
+                      aria-label="Waveform colour"
+                      class="h-8 w-10 cursor-pointer rounded border border-gray-200 dark:border-gray-700"
+                    />
+                  </div>
+                </div>
               </div>
               <p class="text-xs text-gray-500 dark:text-gray-400">
-                {{ waveform === 'NONE' ? 'A still picture makes the smallest file.' : 'Drawn along the bottom. The file is somewhat larger than a still picture.' }}
+                {{
+                  waveform === 'NONE' ? 'A still picture makes the smallest file.' : 'Drawn along the bottom. The file is somewhat larger than a still picture.'
+                }}
               </p>
             </div>
 
@@ -257,9 +337,14 @@
         </UCard>
 
         <!-- 3. The sound -->
-        <UCard>
+        <UCard :class="STEP_TONES[3].scope" :ui="{ header: STEP_TONES[3].header }">
           <template #header>
-            <h2 class="font-semibold text-gray-900 dark:text-white">3. Sound clean-up</h2>
+            <h2 class="flex items-center gap-2 font-semibold text-gray-900 dark:text-white">
+              <span class="flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold" :class="STEP_TONES[3].badge" aria-hidden="true"
+                >3</span
+              >
+              Sound clean-up
+            </h2>
           </template>
           <div class="space-y-3">
             <USwitch v-model="normalize" label="Even out the loudness" description="Brings quiet and loud recordings to the same level." />
@@ -268,9 +353,14 @@
         </UCard>
 
         <!-- 4. The details -->
-        <UCard>
+        <UCard :class="STEP_TONES[4].scope" :ui="{ header: STEP_TONES[4].header }">
           <template #header>
-            <h2 class="font-semibold text-gray-900 dark:text-white">4. Details</h2>
+            <h2 class="flex items-center gap-2 font-semibold text-gray-900 dark:text-white">
+              <span class="flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold" :class="STEP_TONES[4].badge" aria-hidden="true"
+                >4</span
+              >
+              Details
+            </h2>
           </template>
           <div class="space-y-5">
             <UFormField label="Description" description="Shared by all the videos.">
@@ -329,7 +419,11 @@
         >
           <div class="mr-auto min-w-0" aria-live="polite">
             <p v-if="blocker" class="flex items-center gap-1.5 text-sm text-gray-700 dark:text-gray-300">
-              <UIcon :name="uploadingAny ? 'i-lucide-loader' : 'i-lucide-circle-alert'" class="h-4 w-4 shrink-0" :class="uploadingAny ? 'animate-spin motion-reduce:animate-none' : 'text-warning-500'" />
+              <UIcon
+                :name="uploadingAny ? 'i-lucide-loader' : 'i-lucide-circle-alert'"
+                class="h-4 w-4 shrink-0"
+                :class="uploadingAny ? 'animate-spin motion-reduce:animate-none' : 'text-warning-500'"
+              />
               {{ blocker }}
             </p>
             <p v-else class="flex items-center gap-1.5 text-sm text-gray-700 dark:text-gray-300">
@@ -339,14 +433,19 @@
             <p class="text-xs text-gray-500 dark:text-gray-400">Videos are created hidden. Review each one, then enable it for learners.</p>
           </div>
           <UButton color="neutral" variant="ghost" to="/videos" :disabled="saving">Cancel</UButton>
-          <UButton type="submit" icon="i-lucide-clapperboard" :loading="saving" :disabled="!canSubmit">{{ submitLabel }}</UButton>
+          <UButton type="submit" color="neutral" :class="TAB_ACCENTS.audio.button" icon="i-lucide-clapperboard" :loading="saving" :disabled="!canSubmit">{{
+            submitLabel
+          }}</UButton>
         </div>
       </div>
 
       <!-- Preview: how the frame will look -->
       <aside class="lg:col-span-2 lg:sticky lg:top-4 space-y-2" aria-label="Preview">
         <p class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Preview</p>
-        <div class="relative aspect-video w-full overflow-hidden rounded-lg border border-gray-200 dark:border-gray-800" :style="{ backgroundColor: background }">
+        <div
+          class="relative aspect-video w-full overflow-hidden rounded-lg border border-gray-200 dark:border-gray-800"
+          :style="{ backgroundColor: background }"
+        >
           <img v-if="shownSlide" :src="shownSlide.previewUrl" alt="Picture shown at this time" class="absolute inset-0 h-full w-full object-contain" />
           <p
             v-else-if="titleCard"
@@ -358,17 +457,20 @@
           <div v-else class="absolute inset-0 flex items-center justify-center">
             <UIcon name="i-lucide-audio-lines" class="h-12 w-12" :class="darkBackground ? 'text-white/40' : 'text-black/30'" />
           </div>
-          <!-- A still drawing of the waveform, so the placement can be judged -->
-          <svg v-if="waveform !== 'NONE'" class="absolute inset-x-0 bottom-[5%] h-1/4 w-full" viewBox="0 0 100 25" preserveAspectRatio="none" aria-hidden="true">
-            <template v-if="waveform === 'BARS'">
-              <rect v-for="(h, i) in BAR_HEIGHTS" :key="i" :x="i * 4 + 1" :y="25 - h" width="2.6" :height="h" :fill="waveDrawColor" />
-            </template>
-            <polyline v-else :points="WAVE_POINTS" fill="none" :stroke="waveDrawColor" stroke-width="0.8" vector-effect="non-scaling-stroke" />
-          </svg>
+          <!-- A moving sketch of the chosen style, so the look and placement can be judged -->
+          <WaveformPreview
+            v-if="waveform !== 'NONE'"
+            :kind="waveform"
+            :color="waveDrawColor"
+            class="absolute w-full"
+            :class="waveformPlacement(waveform) === 'CENTER' ? 'inset-x-[10%] top-[30%] h-[40%] w-4/5' : 'inset-x-0 bottom-[5%] h-1/4'"
+          />
         </div>
         <div v-if="slides.length > 1 && previewMax > 0" class="space-y-1">
           <USlider v-model="previewSeconds" :min="0" :max="previewMax" :step="1" aria-label="Preview time" />
-          <p class="text-xs tabular-nums text-gray-500 dark:text-gray-400">Showing what appears at {{ formatDuration(previewSeconds) }} (picture {{ shownIndex + 1 }} of {{ slides.length }})</p>
+          <p class="text-xs tabular-nums text-gray-500 dark:text-gray-400">
+            Showing what appears at {{ formatDuration(previewSeconds) }} (picture {{ shownIndex + 1 }} of {{ slides.length }})
+          </p>
         </div>
         <dl class="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-gray-500 dark:text-gray-400">
           <dt>Size</dt>
@@ -386,6 +488,9 @@
 </template>
 
 <script setup lang="ts">
+import type { WaveLook } from '#shared/utils/waveTemplates'
+import { TAB_ACCENTS } from '#shared/utils/tabAccent'
+
 // Makes videos from sounds. Each audio file (and the optional cover) is uploaded
 // straight to storage first; then the server makes each video in a background
 // job, and this page hands over to the video (one file) or the list (several).
@@ -404,6 +509,7 @@ import {
   uniqueTitles,
   VIDEO_RESOLUTIONS,
   WAVEFORM_STYLES,
+  waveformPlacement,
   type VideoResolution,
   type WaveformStyle
 } from '#shared/utils/audioVideo'
@@ -533,7 +639,7 @@ const selectedSize = computed(() => VIDEO_RESOLUTIONS.find((r) => r.value === re
 const readySummary = computed(() => {
   const n = readyItems.value.length
   const parts = [`${n} video${n === 1 ? '' : 's'}`, totalLength.value, selectedSize.value]
-  if (waveform.value !== 'NONE') parts.push(waveform.value === 'BARS' ? 'bars' : 'waveform')
+  if (waveform.value !== 'NONE') parts.push(WAVEFORM_STYLES.find((w) => w.value === waveform.value)?.label.toLowerCase() ?? 'waveform')
   if (slides.value.length > 1) parts.push(`${slides.value.length} pictures`)
   return `Ready: ${parts.filter((p) => p && p !== '—').join(' · ')}`
 })
@@ -592,10 +698,19 @@ const darkBackground = computed(() => {
   return (0.299 * ((n >> 16) & 255) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255 < 0.55
 })
 const textColor = computed(() => (darkBackground.value ? '#ffffff' : '#111111'))
+// The look as it is set now (what a template saves and what marks a template as chosen).
+const currentWaveLook = computed<WaveLook | null>(() =>
+  waveform.value === 'NONE' ? null : { waveform: waveform.value, waveColor: waveAuto.value ? textColor.value : waveColor.value, background: background.value }
+)
+function applyWaveLook(look: WaveLook) {
+  waveform.value = look.waveform
+  waveAuto.value = false
+  waveColor.value = look.waveColor
+  setBackground(look.background)
+}
+const customOpen = ref(false)
 const waveDrawColor = computed(() => (waveAuto.value ? textColor.value : waveColor.value))
 const previewTitle = computed(() => readyItems.value[0]?.title.trim() || items.value[0]?.title.trim() || 'Your title here')
-const BAR_HEIGHTS = [6, 12, 9, 18, 14, 22, 10, 16, 20, 8, 15, 21, 11, 17, 9, 13, 19, 7, 12, 10, 14, 6, 9, 5]
-const WAVE_POINTS = Array.from({ length: 51 }, (_, i) => `${i * 2},${12.5 - Math.sin(i * 0.9) * (3 + 8 * Math.abs(Math.sin(i * 0.17)))}`).join(' ')
 
 function setBackground(value: string) {
   const hex = normalizeHexColor(value)
@@ -823,7 +938,10 @@ async function onSubmit() {
 
     if (collectionId.value && made.length) {
       try {
-        await collections.addVideos(collectionId.value, made.map((m) => m.id))
+        await collections.addVideos(
+          collectionId.value,
+          made.map((m) => m.id)
+        )
       } catch (err) {
         toast.add({ title: 'Made the videos, but could not add them to the collection', description: apiErrorMessage(err), color: 'warning' })
       }
@@ -854,4 +972,14 @@ async function onSubmit() {
 }
 
 useUnsavedChangesGuard(() => !submitted.value && (items.value.length > 0 || slides.value.length > 0 || picUploading.value))
+
+// Each step has its own colour (shared with the editor's tabs): a numbered badge,
+// a tinted header, and — through the scope class — its own accent for the
+// selected buttons, switches and focus rings inside the card.
+const STEP_TONES = {
+  1: { scope: TAB_ACCENTS.audio.scope, badge: TAB_ACCENTS.audio.button, header: 'bg-emerald-50/70 dark:bg-emerald-950/30' },
+  2: { scope: TAB_ACCENTS.split.scope, badge: TAB_ACCENTS.split.button, header: 'bg-violet-50/70 dark:bg-violet-950/30' },
+  3: { scope: TAB_ACCENTS.trim.scope, badge: TAB_ACCENTS.trim.button, header: 'bg-sky-50/70 dark:bg-sky-950/30' },
+  4: { scope: TAB_ACCENTS.join.scope, badge: TAB_ACCENTS.join.button, header: 'bg-orange-50/70 dark:bg-orange-950/30' }
+} as const
 </script>

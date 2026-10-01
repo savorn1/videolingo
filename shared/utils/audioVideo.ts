@@ -18,9 +18,23 @@ export const DEFAULT_BACKGROUND = '#111827'
 export const WAVEFORM_STYLES = [
   { value: 'NONE', label: 'None', hint: 'Just the picture' },
   { value: 'WAVES', label: 'Waveform', hint: 'A moving line' },
-  { value: 'BARS', label: 'Bars', hint: 'Moving frequency bars' }
+  { value: 'BARS', label: 'Bars', hint: 'Moving frequency bars' },
+  { value: 'SPIKES', label: 'Spikes', hint: 'Sticks that grow and shrink with the sound' },
+  { value: 'DOTS', label: 'Dots', hint: 'A trail of dots following the sound' },
+  { value: 'SPECTRUM', label: 'Spectrum', hint: 'A thin line over the pitches' },
+  { value: 'PULSE', label: 'Pulse', hint: 'Thin bars in the middle, mirrored up and down' },
+  { value: 'BLOCKS', label: 'Blocks', hint: 'Thick bars in the middle, mirrored up and down' },
+  { value: 'FINE', label: 'Fine', hint: 'Hair-thin bars, many of them, in the middle' },
+  { value: 'STRIPES', label: 'Stripes', hint: 'Medium bars in the middle, mirrored up and down' }
 ] as const
 export type WaveformStyle = (typeof WAVEFORM_STYLES)[number]['value']
+
+const CENTERED_STYLES = ['PULSE', 'BLOCKS', 'FINE', 'STRIPES']
+
+/** Where a style is drawn: the mirrored-bar styles (PULSE, BLOCKS, FINE, STRIPES) sit in the middle of the picture (mirrors the server), the rest along the bottom. */
+export function waveformPlacement(style: string): 'CENTER' | 'BOTTOM' {
+  return CENTERED_STYLES.includes(style) ? 'CENTER' : 'BOTTOM'
+}
 
 /** Most files made into videos in one go. */
 export const MAX_BATCH = 20

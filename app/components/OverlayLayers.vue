@@ -20,17 +20,31 @@
         :key="l.id"
         data-testid="overlay-layer"
         :data-layer-id="l.id"
-        class="absolute pointer-events-auto cursor-move"
+        class="absolute"
         :class="
-          l.id === edit.state.selectedId
-            ? 'outline-2 outline-dashed outline-primary-400 outline-offset-2'
-            : 'hover:outline hover:outline-white/60 outline-offset-2'
+          readonly
+            ? ''
+            : l.id === edit.state.selectedId
+            ? 'pointer-events-auto cursor-move outline-2 outline-dashed outline-primary-400 outline-offset-2'
+            : 'pointer-events-auto cursor-move hover:outline hover:outline-white/60 outline-offset-2'
         "
         :style="layerStyle(l)"
-        @pointerdown.stop.prevent="onDown(l, $event)"
+        @pointerdown="onPointerDown(l, $event)"
+        @dblclick.stop="l.kind === 'TEXT' && startEdit(l)"
         @click.stop
       >
-        <div v-if="l.kind === 'TEXT'" :style="textStyle(l)">{{ l.text }}</div>
+        <div
+          v-if="l.kind === 'TEXT'"
+          :data-editing="editingId === l.id || undefined"
+          :contenteditable="editingId === l.id ? 'plaintext-only' : undefined"
+          :class="editingId === l.id && 'select-text outline-none'"
+          :style="textStyle(l)"
+          @blur="editingId === l.id && endEdit(l, $event)"
+          @keydown.esc.stop.prevent="editingId === l.id && endEdit(l, $event)"
+          @keydown.enter.ctrl.stop.prevent="editingId === l.id && endEdit(l, $event)"
+          @keydown.stop="editingId === l.id"
+          >{{ l.text }}</div
+        >
         <img v-else-if="l.imageUrl" :src="l.imageUrl" alt="" draggable="false" class="block w-full h-auto" />
       </div>
     </template>
@@ -45,7 +59,7 @@
 import { animationSeconds, fontCss, type EditorLayer, type OverlayEdit } from '~/composables/useOverlayEdit'
 import { snapAxis } from '#shared/utils/layerSnap'
 
-const props = defineProps<{ edit: OverlayEdit; naturalWidth: number; naturalHeight: number; currentMs: number; zoom?: number; durationMs: number }>()
+const props = defineProps<{ edit: OverlayEdit; naturalWidth: number; naturalHeight: number; currentMs: number; zoom?: number; durationMs: number; readonly?: boolean }>()
 
 const root = useTemplateRef<HTMLDivElement>('root')
 const size = ref({ w: 0, h: 0 })
@@ -76,7 +90,7 @@ function endOf(l: EditorLayer) {
 
 // Layers on screen at the current time; the selected one always (so it can be edited), faded when it's off-screen then.
 const shown = computed(() =>
-  props.edit.state.layers.filter((l) => l.id === props.edit.state.selectedId || (props.currentMs >= l.startMs && props.currentMs < endOf(l)))
+  props.edit.state.layers.filter((l) => (!props.readonly && l.id === props.edit.state.selectedId) || (props.currentMs >= l.startMs && props.currentMs < endOf(l)))
 )
 
 // 0–1 through the entrance (and 1–0 through the exit), as the backend's fades and slides.
@@ -146,9 +160,46 @@ function frameBox(el: Element, cx: number, cy: number, p: { w: number; h: number
   return { cx, cy, halfW: r.width / k / 2 / p.w, halfH: r.height / k / 2 / p.h }
 }
 
+// ── Double-click a text layer to type on the video ───────────────────────────
+// The text is committed on blur, Esc or Ctrl/⌘+Enter (a plain Enter is a line break).
+const editingId = ref<string | null>(null)
+async function startEdit(l: EditorLayer) {
+  if (props.readonly) return
+  props.edit.select(l.id)
+  editingId.value = l.id
+  await nextTick()
+  const el = root.value?.querySelector<HTMLElement>('[data-editing]')
+  if (!el) return
+  el.focus()
+  const range = document.createRange()
+  range.selectNodeContents(el)
+  const sel = window.getSelection()
+  sel?.removeAllRanges()
+  sel?.addRange(range)
+}
+function endEdit(l: EditorLayer, e: Event) {
+  const el = e.target as HTMLElement
+  editingId.value = null
+  const text = (el.innerText ?? '').replace(/\n$/, '')
+  if (text.trim()) l.text = text
+  else el.innerText = l.text ?? ''
+}
+function onPointerDown(l: EditorLayer, e: PointerEvent) {
+  if (props.readonly) return
+  e.stopPropagation()
+  if (editingId.value === l.id) return // let the caret move; no drag while typing
+  e.preventDefault()
+  if (e.shiftKey || e.ctrlKey || e.metaKey) {
+    props.edit.toggleMulti(l.id)
+    return
+  }
+  // Grabbing a layer of the group drags the whole group; grabbing another one picks just that.
+  if (!props.edit.isPicked(l.id)) props.edit.select(l.id)
+  onDown(l, e)
+}
+
 function onDown(l: EditorLayer, e: PointerEvent) {
   if (e.button !== 0) return
-  props.edit.state.selectedId = l.id
   const rect = root.value!.getBoundingClientRect()
   // Screen px per layout px (the zoom around the preview), then per picture fraction.
   const k = rect.width / Math.max(size.value.w, 1)
@@ -169,6 +220,7 @@ function onDown(l: EditorLayer, e: PointerEvent) {
   const yEdges = others.flatMap((o) => [o.cy - o.halfH, o.cy + o.halfH])
 
   const start = { cx: e.clientX, cy: e.clientY, x: l.x, y: l.y }
+  const mates = props.edit.group.value.filter((m) => m.id !== l.id).map((m) => ({ m, x: m.x, y: m.y }))
   dragging.value = true
   const move = (ev: PointerEvent) => {
     const rawX = start.x + (ev.clientX - start.cx) / k / p.w
@@ -179,6 +231,10 @@ function onDown(l: EditorLayer, e: PointerEvent) {
     guide.y = sy.guide
     l.x = Math.round(Math.min(1, Math.max(0, sx.value)) * 1000) / 1000
     l.y = Math.round(Math.min(1, Math.max(0, sy.value)) * 1000) / 1000
+    for (const g of mates) {
+      g.m.x = clamp01(g.x + (l.x - start.x))
+      g.m.y = clamp01(g.y + (l.y - start.y))
+    }
   }
   const up = () => {
     dragging.value = false
@@ -207,22 +263,23 @@ function onKeyDown(e: KeyboardEvent) {
   const l = props.edit.selected.value
   if (!l || isEditable(e.target)) return
   const step = e.shiftKey ? NUDGE_BIG : NUDGE
+  const all = props.edit.group.value
   switch (e.key) {
     case 'ArrowLeft':
-      l.x = clamp01(l.x - step)
+      for (const g of all) g.x = clamp01(g.x - step)
       break
     case 'ArrowRight':
-      l.x = clamp01(l.x + step)
+      for (const g of all) g.x = clamp01(g.x + step)
       break
     case 'ArrowUp':
-      l.y = clamp01(l.y - step)
+      for (const g of all) g.y = clamp01(g.y - step)
       break
     case 'ArrowDown':
-      l.y = clamp01(l.y + step)
+      for (const g of all) g.y = clamp01(g.y + step)
       break
     case 'Delete':
     case 'Backspace':
-      props.edit.remove(l.id)
+      props.edit.removeGroup()
       break
     default:
       return
