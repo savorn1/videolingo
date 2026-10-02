@@ -122,7 +122,7 @@
                     {{ making.get(v.id)!.label }}
                   </UBadge>
                   <UBadge v-else-if="!v.enabled" color="warning" variant="subtle" size="sm">Disabled</UBadge>
-                  <span class="text-xs text-gray-400 shrink-0 hidden sm:inline" :title="formatDateTime(v.createdAt)">{{
+                  <span class="text-xs text-gray-500 shrink-0 hidden sm:inline dark:text-gray-400" :title="formatDateTime(v.createdAt)">{{
                     formatRelativeTime(v.createdAt)
                   }}</span>
                 </NuxtLink>
@@ -198,7 +198,7 @@
             <ol class="divide-y divide-gray-100 dark:divide-gray-800">
               <li v-for="(v, i) in watchStats.topVideos.slice(0, 5)" :key="v.videoId">
                 <NuxtLink :to="`/videos/${v.videoId}`" class="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors">
-                  <span class="w-5 text-xs font-semibold text-gray-400 tabular-nums">{{ i + 1 }}</span>
+                  <span class="w-5 text-xs font-semibold text-gray-500 tabular-nums dark:text-gray-400">{{ i + 1 }}</span>
                   <span class="flex-1 min-w-0 text-sm text-gray-900 dark:text-white truncate">{{ v.title }}</span>
                   <span class="text-xs text-gray-500 tabular-nums">{{ formatCount(v.views) }} views</span>
                 </NuxtLink>

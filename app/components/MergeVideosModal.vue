@@ -58,7 +58,7 @@
                 aria-hidden="true"
                 title="Drag to reorder"
               />
-              <span class="flex w-8 shrink-0 items-center justify-end gap-1.5 text-xs tabular-nums text-gray-400">
+              <span class="flex w-8 shrink-0 items-center justify-end gap-1.5 text-xs tabular-nums text-gray-500 dark:text-gray-400">
                 <span class="h-2 w-2 rounded-full" :class="SEGMENT_COLORS[i % SEGMENT_COLORS.length]" aria-hidden="true" />{{ i + 1 }}
               </span>
               <div class="h-10 w-16 shrink-0 overflow-hidden rounded bg-gray-100 dark:bg-gray-800">

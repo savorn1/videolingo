@@ -67,7 +67,7 @@
                 </td>
                 <td class="py-1.5 text-right tabular-nums">
                   <NuxtLink v-if="r.videos" :to="`/videos?language=${r.code}`" class="hover:underline">{{ r.videos }}</NuxtLink>
-                  <span v-else class="text-gray-400">0</span>
+                  <span v-else class="text-gray-500 dark:text-gray-400">0</span>
                 </td>
                 <td class="py-1.5 text-right tabular-nums">{{ r.transcripts }}</td>
                 <td class="py-1.5 text-right tabular-nums">{{ r.translationsInto }}</td>

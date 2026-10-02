@@ -83,7 +83,12 @@
             @time="onPlayerTime"
             @ended="tracker.onEnded"
           />
-          <div v-else class="w-full aspect-video rounded-lg bg-gray-900 flex items-center justify-center animate-pulse" aria-label="Loading video" role="status">
+          <div
+            v-else
+            class="w-full aspect-video rounded-lg bg-gray-900 flex items-center justify-center animate-pulse"
+            aria-label="Loading video"
+            role="status"
+          >
             <UIcon name="i-lucide-play" class="w-10 h-10 text-white/30" />
           </div>
         </UCard>
@@ -132,7 +137,7 @@
           <UCard>
             <h3 class="text-sm font-semibold text-gray-500 dark:text-gray-400 mb-1">Description</h3>
             <p v-if="video.description" class="text-sm text-gray-900 dark:text-white whitespace-pre-line">{{ video.description }}</p>
-            <p v-else class="text-sm text-gray-400">No description.</p>
+            <p v-else class="text-sm text-gray-500 dark:text-gray-400">No description.</p>
           </UCard>
         </template>
 
@@ -359,7 +364,7 @@ function onAddToJoin() {
   const v = video.value
   if (!v) return
   if (!joinQueue.value.some((q) => q.id === v.id)) joinQueue.value = [...joinQueue.value, joinClipFrom(v)]
-  toast.add({ title: 'Added to the join list', description: 'Open any video\'s editor › Join to use it.', color: 'success' })
+  toast.add({ title: 'Added to the join list', description: "Open any video's editor › Join to use it.", color: 'success' })
 }
 
 const moreItems = computed<DropdownMenuItem[][]>(() => [

@@ -52,7 +52,7 @@
     <div class="flex flex-wrap items-center gap-x-6 gap-y-2">
       <div class="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
         <template v-if="progress?.completed">
-          <UIcon name="i-lucide-circle-check" class="w-4 h-4 text-success-500" />
+          <UIcon name="i-lucide-circle-check" class="w-4 h-4 text-success-600 dark:text-success-500" />
           <span>Watched{{ progress.completedAt ? ` ${formatRelativeTime(progress.completedAt)}` : '' }}</span>
         </template>
         <template v-else>

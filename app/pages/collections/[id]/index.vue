@@ -104,7 +104,7 @@
             </div>
             <ol class="divide-y divide-gray-100 dark:divide-gray-800">
               <li v-for="item in group.items" :key="item.videoId" class="flex items-center gap-3 px-4 py-3" :class="item.deleted ? 'opacity-60' : ''">
-                <span class="w-6 text-right text-sm font-semibold text-gray-400 tabular-nums">{{ item.position + 1 }}</span>
+                <span class="w-6 text-right text-sm font-semibold text-gray-500 tabular-nums dark:text-gray-400">{{ item.position + 1 }}</span>
                 <NuxtLink :to="`/videos/${item.videoId}`" class="relative w-24 aspect-video shrink-0 rounded overflow-hidden bg-gray-100 dark:bg-gray-800">
                   <img
                     v-if="item.thumbnailUrl && !brokenThumbs.has(item.videoId)"
@@ -324,7 +324,13 @@ const showMerge = ref(false)
 const mergeItems = computed(() =>
   items.value
     .filter((i) => !i.deleted)
-    .map((i) => ({ id: i.videoId, title: i.title ?? `Video ${i.videoId}`, durationSeconds: i.durationSeconds, thumbnailUrl: i.thumbnailUrl, blocked: null as string | null }))
+    .map((i) => ({
+      id: i.videoId,
+      title: i.title ?? `Video ${i.videoId}`,
+      durationSeconds: i.durationSeconds,
+      thumbnailUrl: i.thumbnailUrl,
+      blocked: null as string | null
+    }))
 )
 const videosLoading = ref(false)
 const brokenThumbs = reactive(new Set<number>())

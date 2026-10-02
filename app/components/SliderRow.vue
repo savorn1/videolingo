@@ -1,7 +1,15 @@
 <template>
   <div class="flex items-center gap-3">
     <span class="w-16 shrink-0 text-xs text-gray-500">{{ label }}</span>
-    <USlider :model-value="model" :min="min" :max="max" :step="step" class="flex-1" :aria-label="label" @update:model-value="(v) => (model = tidy(Number(v)))" />
+    <USlider
+      :model-value="model"
+      :min="min"
+      :max="max"
+      :step="step"
+      class="flex-1"
+      :aria-label="label"
+      @update:model-value="(v) => (model = tidy(Number(v)))"
+    />
     <div class="flex w-24 shrink-0 items-center gap-1">
       <UInput
         :model-value="model"
@@ -15,7 +23,7 @@
         @change="onType"
       >
         <template v-if="unit" #trailing>
-          <span class="text-xs text-gray-400">{{ unit }}</span>
+          <span class="text-xs text-gray-500 dark:text-gray-400">{{ unit }}</span>
         </template>
       </UInput>
       <!-- Always takes its space, so rows don't shift when a value moves off its default -->

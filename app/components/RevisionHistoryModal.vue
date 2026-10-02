@@ -29,7 +29,7 @@
               <div class="flex items-center gap-2">
                 <span class="font-semibold text-gray-900 dark:text-white">#{{ r.number }}</span>
                 <UBadge v-if="r.id === latest?.id" size="sm" color="success" variant="subtle">Current</UBadge>
-                <span class="ml-auto text-xs text-gray-400 tabular-nums">{{ r.itemCount }} {{ itemNoun }}</span>
+                <span class="ml-auto text-xs text-gray-500 tabular-nums dark:text-gray-400">{{ r.itemCount }} {{ itemNoun }}</span>
               </div>
               <div class="text-gray-700 dark:text-gray-200 truncate">{{ r.summary }}</div>
               <div class="text-xs text-gray-500" :title="formatDateTime(r.createdAt)">
@@ -72,7 +72,9 @@
                   </div>
                 </template>
                 <div v-else class="flex gap-2">
-                  <span class="shrink-0 w-4 font-mono text-gray-400">{{ row.type === 'added' ? '+' : row.type === 'removed' ? '−' : '' }}</span>
+                  <span class="shrink-0 w-4 font-mono text-gray-500 dark:text-gray-400">{{
+                    row.type === 'added' ? '+' : row.type === 'removed' ? '−' : ''
+                  }}</span>
                   <span class="shrink-0 w-36 font-mono text-[11px] pt-0.5 text-gray-500">{{ span(row.type === 'added' ? row.after : row.before) }}</span>
                   <span class="whitespace-pre-line" :class="row.type === 'removed' ? 'line-through text-gray-500' : 'text-gray-900 dark:text-white'">
                     {{ (row.type === 'added' ? row.after : row.before).text }}

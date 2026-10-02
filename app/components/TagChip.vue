@@ -2,7 +2,7 @@
   <span
     class="inline-flex items-center gap-0.5 rounded-md bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 text-xs text-gray-700 dark:text-gray-300 whitespace-nowrap"
   >
-    <span class="text-gray-400">#</span>{{ name }}
+    <span class="text-gray-500 dark:text-gray-400">#</span>{{ name }}
     <button
       v-if="removable"
       type="button"

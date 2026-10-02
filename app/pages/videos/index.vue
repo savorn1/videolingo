@@ -54,7 +54,7 @@
         />
         <div class="flex items-center gap-2">
           <UInput v-model="filter.createdFrom" type="date" aria-label="Uploaded from" class="w-40" :max="filter.createdTo" />
-          <span class="text-sm text-gray-400">–</span>
+          <span class="text-sm text-gray-500 dark:text-gray-400">–</span>
           <UInput v-model="filter.createdTo" type="date" aria-label="Uploaded to" class="w-40" :min="filter.createdFrom" />
         </div>
       </div>
@@ -124,7 +124,7 @@
               <div v-if="row.categories.length || row.tags.length" class="flex flex-wrap gap-1 mt-1">
                 <CategoryBadge v-for="c in row.categories" :key="c.id" :name="c.name" :color="c.color" :enabled="c.enabled" />
                 <TagChip v-for="t in row.tags.slice(0, 4)" :key="t.id" :name="t.name" />
-                <span v-if="row.tags.length > 4" class="text-xs text-gray-400">+{{ row.tags.length - 4 }}</span>
+                <span v-if="row.tags.length > 4" class="text-xs text-gray-500 dark:text-gray-400">+{{ row.tags.length - 4 }}</span>
               </div>
             </div>
           </div>
@@ -134,7 +134,7 @@
           <NuxtLink v-if="row.ownerUsername" :to="`/users/${row.ownerId}`" class="text-primary-600 dark:text-primary-400 hover:underline" @click.stop>
             {{ row.ownerUsername }}
           </NuxtLink>
-          <span v-else class="text-gray-400">{{ row.ownerId ? 'Deleted user' : '—' }}</span>
+          <span v-else class="text-gray-500 dark:text-gray-400">{{ row.ownerId ? 'Deleted user' : '—' }}</span>
         </template>
 
         <template #actions-data="{ row }">

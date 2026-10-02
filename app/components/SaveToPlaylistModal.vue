@@ -15,9 +15,9 @@
             @click="addTo(p)"
           >
             <span class="truncate">{{ p.title }}</span>
-            <UIcon v-if="added.has(p.id)" name="i-lucide-check" class="w-4 h-4 text-success-500 shrink-0" />
+            <UIcon v-if="added.has(p.id)" name="i-lucide-check" class="w-4 h-4 text-success-600 dark:text-success-500 shrink-0" />
             <UIcon v-else-if="saving === p.id" name="i-lucide-loader-2" class="w-4 h-4 animate-spin shrink-0" />
-            <span v-else class="text-xs text-gray-400 shrink-0">{{ p.videoCount }} video{{ p.videoCount === 1 ? '' : 's' }}</span>
+            <span v-else class="text-xs text-gray-500 shrink-0 dark:text-gray-400">{{ p.videoCount }} video{{ p.videoCount === 1 ? '' : 's' }}</span>
           </button>
         </div>
         <EmptyState v-else icon="i-lucide-list-plus" title="No playlists yet" description="Make one below." class="py-4" />

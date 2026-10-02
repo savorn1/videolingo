@@ -22,7 +22,7 @@
         <span class="text-xs text-gray-500 w-20 text-center tabular-nums">{{ Math.round(pxPerSec) }} px/s</span>
         <UTooltip text="Zoom in"><UButton size="sm" color="neutral" variant="soft" icon="i-lucide-zoom-in" aria-label="Zoom in" @click="zoomIn" /></UTooltip>
         <span class="text-sm font-medium tabular-nums text-gray-900 dark:text-white ml-2">
-          {{ formatTimestamp(playheadMs) }} <span class="text-gray-400">/ {{ formatTimestamp(durationMs) }}</span>
+          {{ formatTimestamp(playheadMs) }} <span class="text-gray-500 dark:text-gray-400">/ {{ formatTimestamp(durationMs) }}</span>
         </span>
         <USelect v-model="selectedAudio" :items="audioOptions" size="sm" class="w-52 ml-auto" aria-label="Preview audio" />
       </div>
@@ -100,7 +100,7 @@
               <div
                 v-for="tick in ticks"
                 :key="tick.ms"
-                class="absolute top-0 bottom-0 border-l border-gray-200 dark:border-gray-800 text-[10px] text-gray-400 pl-1 pt-0.5 pointer-events-none"
+                class="absolute top-0 bottom-0 border-l border-gray-200 dark:border-gray-800 text-[10px] text-gray-500 pl-1 pt-0.5 pointer-events-none dark:text-gray-400"
                 :style="{ left: `${tick.px}px` }"
               >
                 {{ tick.label }}

@@ -187,7 +187,10 @@
         <template #header>
           <div class="flex items-center justify-between gap-2">
             <h2 class="font-semibold text-gray-900 dark:text-white flex items-center gap-1.5">
-              <UIcon name="i-lucide-sliders-horizontal" class="w-4 h-4 text-gray-400" />
+              <!-- The tile takes the colour of the tool that is open, so the header says which one it is -->
+              <span class="flex size-6 items-center justify-center rounded-md transition-colors" :class="TAB_ACCENTS[mode].soft">
+                <UIcon name="i-lucide-sliders-horizontal" class="size-3.5" />
+              </span>
               Edit
               <UBadge
                 v-if="runningCount"
@@ -212,7 +215,9 @@
                 Draft saved {{ draftSavedLabel }}
               </span>
               <UPopover v-model:open="recipesOpen">
-                <UButton size="xs" color="neutral" variant="ghost" icon="i-lucide-chef-hat" title="Reuse a look on this video">Recipes</UButton>
+                <UButton size="xs" color="neutral" variant="soft" :class="HEADER_TONES.recipes" icon="i-lucide-chef-hat" title="Reuse a look on this video"
+                  >Recipes</UButton
+                >
                 <template #content>
                   <div class="w-80 space-y-3 p-3">
                     <p class="text-xs text-gray-500 dark:text-gray-400">
@@ -265,7 +270,8 @@
               <UButton
                 size="xs"
                 color="neutral"
-                variant="ghost"
+                :variant="history.undoable.value ? 'soft' : 'ghost'"
+                :class="history.undoable.value ? HEADER_TONES.history : ''"
                 icon="i-lucide-undo-2"
                 :disabled="!history.undoable.value"
                 title="Undo (Ctrl/⌘+Z)"
@@ -276,7 +282,8 @@
               <UButton
                 size="xs"
                 color="neutral"
-                variant="ghost"
+                :variant="history.redoable.value ? 'soft' : 'ghost'"
+                :class="history.redoable.value ? HEADER_TONES.history : ''"
                 icon="i-lucide-redo-2"
                 :disabled="!history.redoable.value"
                 title="Redo (Ctrl/⌘+Shift+Z)"
@@ -793,7 +800,7 @@
                   :aria-invalid="rowProblem(seg) ? 'true' : undefined"
                   @focusin="selectedSegment = i"
                 >
-                  <span class="w-5 text-xs text-gray-400 tabular-nums">{{ i + 1 }}</span>
+                  <span class="w-5 text-xs text-gray-500 tabular-nums dark:text-gray-400">{{ i + 1 }}</span>
                   <UInput
                     :model-value="formatTimecode(seg.startMsSeconds * 1000)"
                     size="sm"
@@ -802,7 +809,7 @@
                     :aria-label="`Segment ${i + 1} start`"
                     @change="(e: Event) => typeSegment(i, 'start', e)"
                   />
-                  <span class="text-xs text-gray-400">to</span>
+                  <span class="text-xs text-gray-500 dark:text-gray-400">to</span>
                   <UInput
                     :model-value="seg.endMsSeconds == null ? '' : formatTimecode(seg.endMsSeconds * 1000)"
                     size="sm"
@@ -1289,6 +1296,12 @@ function onQueued() {
 
 const mode = ref<'trim' | 'split' | 'audio' | 'overlay' | 'join'>('trim')
 
+// Colours of the buttons in the Edit header: Recipes in amber (like the saved presets), Undo/Redo in blue while there is something to undo or redo.
+const HEADER_TONES = {
+  recipes: 'bg-amber-50 text-amber-800 hover:bg-amber-100 dark:bg-amber-950/50 dark:text-amber-300 dark:hover:bg-amber-900/60',
+  history: 'bg-sky-50 text-sky-700 hover:bg-sky-100 dark:bg-sky-950/50 dark:text-sky-300 dark:hover:bg-sky-900/60'
+}
+
 // The keys that matter on the tab that is open.
 const TAB_KEYS: Partial<Record<typeof mode.value, string>> = {
   trim: 'I set start · O set end · ← → step a frame · Space play',
@@ -1303,10 +1316,10 @@ const EDITOR_SHORTCUTS = [
   { keys: 'K', label: 'Play / pause' },
   { keys: '←', label: 'Previous frame' },
   { keys: '→', label: 'Next frame' },
-  { keys: 'shift ←', label: 'Back 1 second' },
-  { keys: 'shift →', label: 'Forward 1 second' },
-  { keys: 'J', label: 'Back 5 seconds' },
-  { keys: 'L', label: 'Forward 5 seconds' },
+  { keys: 'shift ←', label: 'Back 10 seconds' },
+  { keys: 'shift →', label: 'Forward 10 seconds' },
+  { keys: 'J', label: 'Back 10 seconds' },
+  { keys: 'L', label: 'Forward 10 seconds' },
   { keys: 'F', label: 'Full screen' },
   { keys: 'I', label: 'Set the trim start to the playhead (Trim tab)' },
   { keys: 'O', label: 'Set the trim end to the playhead (Trim tab)' },

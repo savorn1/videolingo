@@ -37,9 +37,9 @@
               @click="importTrack(t)"
             >
               <span class="truncate"
-                >{{ t.label }} <span class="text-xs text-gray-400">{{ t.language }}</span></span
+                >{{ t.label }} <span class="text-xs text-gray-500 dark:text-gray-400">{{ t.language }}</span></span
               >
-              <span class="text-xs text-gray-400 shrink-0">{{ t.cueCount }} cues</span>
+              <span class="text-xs text-gray-500 shrink-0 dark:text-gray-400">{{ t.cueCount }} cues</span>
             </button>
           </div>
         </template>
@@ -448,7 +448,7 @@
                 <UIcon v-if="t.builtin" name="i-lucide-star" class="w-3 h-3 text-amber-400" />
                 {{ t.name }}
               </span>
-              <span class="text-gray-400">{{ t.data.length }} layer{{ t.data.length === 1 ? '' : 's' }}</span>
+              <span class="text-gray-500 dark:text-gray-400">{{ t.data.length }} layer{{ t.data.length === 1 ? '' : 's' }}</span>
             </span>
             <button
               type="button"
@@ -477,7 +477,7 @@
       <p class="text-xs text-gray-500 dark:text-gray-400">
         The server draws the text with its own copy of the font, so it can differ slightly from this preview.
       </p>
-      <p class="text-xs text-error-500 min-h-4">{{ edit.error.value }}</p>
+      <p class="text-xs text-error-600 dark:text-error-400 min-h-4">{{ edit.error.value }}</p>
       <div class="flex gap-2">
         <UButton
           v-if="canWrite"

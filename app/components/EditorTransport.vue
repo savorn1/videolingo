@@ -35,13 +35,13 @@
         :title="loopOn && selection ? 'Stop — back to the selection start (Home)' : 'Stop — back to the start (Home)'"
         @click="stop"
       />
-      <UButton v-bind="btn" icon="i-lucide-step-back" aria-label="Previous frame" title="Previous frame (←) · Shift+← 1 s back" @click="step(-1)" />
-      <UButton v-bind="btn" icon="i-lucide-step-forward" aria-label="Next frame" title="Next frame (→) · Shift+→ 1 s ahead" @click="step(1)" />
+      <UButton v-bind="btn" icon="i-lucide-step-back" aria-label="Previous frame" title="Previous frame (←) · Shift+← 10 s back" @click="step(-1)" />
+      <UButton v-bind="btn" icon="i-lucide-step-forward" aria-label="Next frame" title="Next frame (→) · Shift+→ 10 s ahead" @click="step(1)" />
 
       <span class="ml-2 text-xs tabular-nums text-gray-900 dark:text-white" data-testid="transport-time">{{ formatTimecode(timeMs) }}</span>
-      <span class="text-xs tabular-nums text-gray-400">/ {{ formatTimecode(durationMs) }}</span>
+      <span class="text-xs tabular-nums text-gray-500 dark:text-gray-400">/ {{ formatTimecode(durationMs) }}</span>
       <span
-        class="ml-2 hidden sm:inline text-xs tabular-nums text-gray-400"
+        class="ml-2 hidden sm:inline text-xs tabular-nums text-gray-500 dark:text-gray-400"
         :title="fpsMeasured ? 'Measured from the video' : 'Assumed until the video has played for a moment'"
       >
         frame {{ frameNo }} · {{ fpsMeasured ? '' : '~' }}{{ fps }} fps
@@ -116,6 +116,8 @@ const props = defineProps<{
   arrowKeysTaken?: boolean
 }>()
 
+/** How far J, L and Shift+← / Shift+→ jump. */
+const SHIFT_SKIP_SECONDS = 10
 const btn = { size: 'sm', color: 'neutral', variant: 'ghost', square: true } as const
 const rateItems = EDITOR_RATES.map((v) => ({ label: `${v}×`, value: v }))
 
@@ -331,14 +333,14 @@ function onKeyDown(e: KeyboardEvent) {
     case 'ArrowLeft':
     case 'ArrowRight':
       if (onSlider || props.arrowKeysTaken) return
-      if (e.shiftKey) skip(e.code === 'ArrowLeft' ? -1 : 1)
+      if (e.shiftKey) skip(e.code === 'ArrowLeft' ? -SHIFT_SKIP_SECONDS : SHIFT_SKIP_SECONDS)
       else step(e.code === 'ArrowLeft' ? -1 : 1)
       break
     case 'KeyJ':
-      skip(-5)
+      skip(-SHIFT_SKIP_SECONDS)
       break
     case 'KeyL':
-      skip(5)
+      skip(SHIFT_SKIP_SECONDS)
       break
     case 'Home':
       if (onSlider) return

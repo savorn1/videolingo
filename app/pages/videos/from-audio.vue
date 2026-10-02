@@ -30,7 +30,7 @@
                   >1</span
                 >
                 The audio
-                <UIcon v-if="readyItems.length" name="i-lucide-circle-check" class="h-4 w-4 text-success-500" aria-label="Done" />
+                <UIcon v-if="readyItems.length" name="i-lucide-circle-check" class="h-4 w-4 text-success-600 dark:text-success-500" aria-label="Done" />
               </h2>
               <span v-if="items.length > 1" class="text-xs text-gray-500 dark:text-gray-400 tabular-nums">
                 {{ items.length }} files, {{ items.length }} videos
@@ -461,7 +461,7 @@
               {{ blocker }}
             </p>
             <p v-else class="flex items-center gap-1.5 text-sm text-gray-700 dark:text-gray-300">
-              <UIcon name="i-lucide-circle-check" class="h-4 w-4 shrink-0 text-success-500" />
+              <UIcon name="i-lucide-circle-check" class="h-4 w-4 shrink-0 text-success-600 dark:text-success-500" />
               {{ readySummary }}
             </p>
             <p class="text-xs text-gray-500 dark:text-gray-400">Videos are created hidden. Review each one, then enable it for learners.</p>

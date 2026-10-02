@@ -34,7 +34,7 @@
         <div class="min-w-0">
           <p class="font-medium text-gray-900 dark:text-white">
             {{ k.point }}
-            <span class="font-mono text-xs font-normal text-gray-400 ml-1 tabular-nums">{{ formatDuration(k.timestampSeconds) }}</span>
+            <span class="font-mono text-xs font-normal text-gray-500 ml-1 tabular-nums dark:text-gray-400">{{ formatDuration(k.timestampSeconds) }}</span>
           </p>
           <p v-if="k.explanation" class="text-gray-600 dark:text-gray-400">{{ k.explanation }}</p>
         </div>
@@ -50,7 +50,7 @@
         </div>
         <div v-if="revealed.has(i)" class="mt-2 text-gray-700 dark:text-gray-300">
           {{ q.answer }}
-          <span class="font-mono text-xs text-gray-400 ml-1 tabular-nums">{{ formatDuration(q.timestampSeconds) }}</span>
+          <span class="font-mono text-xs text-gray-500 ml-1 tabular-nums dark:text-gray-400">{{ formatDuration(q.timestampSeconds) }}</span>
         </div>
         <UButton v-else size="xs" color="neutral" variant="link" :padded="false" class="mt-1" icon="i-lucide-eye" @click="reveal(i)">Show answer</UButton>
       </li>
@@ -71,7 +71,7 @@
             :aria-pressed="answers[i] === j"
             @click="answers[i] = j"
           >
-            <span class="font-mono text-xs text-gray-400 w-4">{{ String.fromCharCode(65 + j) }}</span>
+            <span class="font-mono text-xs text-gray-500 w-4 dark:text-gray-400">{{ String.fromCharCode(65 + j) }}</span>
             <span class="flex-1">{{ opt }}</span>
             <UIcon v-if="answers[i] !== undefined && j === q.correctOptionIndex" name="i-lucide-check" class="w-4 h-4 text-success-600" />
             <UIcon v-else-if="answers[i] === j" name="i-lucide-x" class="w-4 h-4 text-error-600" />
@@ -85,13 +85,13 @@
             {{ answers[i] === q.correctOptionIndex ? 'Correct.' : 'Not quite.' }}
           </span>
           {{ q.explanation }}
-          <span class="font-mono text-xs text-gray-400 tabular-nums">{{ formatDuration(q.timestampSeconds) }}</span>
+          <span class="font-mono text-xs text-gray-500 tabular-nums dark:text-gray-400">{{ formatDuration(q.timestampSeconds) }}</span>
         </p>
       </div>
       <div class="flex items-center justify-between rounded-md bg-gray-50 dark:bg-gray-900 px-3 py-2">
         <span class="text-gray-700 dark:text-gray-300">
           Score: <strong>{{ score }}</strong> / {{ quiz.questions.length }}
-          <span v-if="answeredCount < quiz.questions.length" class="text-gray-400">({{ answeredCount }} answered)</span>
+          <span v-if="answeredCount < quiz.questions.length" class="text-gray-500 dark:text-gray-400">({{ answeredCount }} answered)</span>
         </span>
         <UButton v-if="answeredCount" size="xs" color="neutral" variant="ghost" icon="i-lucide-rotate-ccw" @click="resetQuiz">Retry</UButton>
       </div>

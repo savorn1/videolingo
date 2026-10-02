@@ -79,14 +79,14 @@
               class="flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed px-6 py-10 text-center cursor-pointer transition-colors"
               :class="dragging ? 'border-primary-400 bg-primary-50/50 dark:bg-primary-950/20' : 'border-gray-300 dark:border-gray-700 hover:border-primary-400'"
             >
-              <UIcon name="i-lucide-cloud-upload" class="w-10 h-10 text-gray-400" />
+              <UIcon name="i-lucide-cloud-upload" class="w-10 h-10 text-sky-600 dark:text-sky-400" />
               <span class="font-medium text-gray-900 dark:text-white">Drag &amp; drop a video here, or click to choose</span>
               <span class="text-xs text-gray-500">MP4, WebM, MOV, M4V, OGV or MKV · up to {{ maxUploadMb.toLocaleString() }} MB</span>
               <input type="file" class="sr-only" :accept="accept" aria-label="Choose a video file" @change="onFilePicked" />
             </label>
             <div v-else class="rounded-lg border border-gray-200 dark:border-gray-800 p-3">
               <div class="flex items-center gap-3">
-                <UIcon name="i-lucide-file-video" class="w-8 h-8 text-gray-400 shrink-0" />
+                <UIcon name="i-lucide-file-video" class="w-8 h-8 text-violet-600 dark:text-violet-400 shrink-0" />
                 <div class="min-w-0 flex-1">
                   <p class="font-medium text-gray-900 dark:text-white truncate">{{ file.name }}</p>
                   <p class="text-xs text-gray-500">
@@ -181,7 +181,7 @@
                     @error="thumbBroken = true"
                     @load="thumbBroken = false"
                   />
-                  <UIcon v-else name="i-lucide-image" class="w-8 h-8 text-gray-400" />
+                  <UIcon v-else name="i-lucide-image" class="w-8 h-8 text-rose-500 dark:text-rose-400" />
                 </div>
                 <div class="flex-1 min-w-56 space-y-2">
                   <UInput v-model="form.thumbnailUrl" placeholder="https://… (image address)" class="w-full" icon="i-lucide-link" aria-label="Thumbnail URL" />
@@ -263,7 +263,10 @@
           read-duration
           @duration="onPlayerDuration"
         />
-        <div v-else class="aspect-video rounded-lg bg-gray-100 dark:bg-gray-800 flex flex-col items-center justify-center gap-2 text-gray-400">
+        <div
+          v-else
+          class="aspect-video rounded-lg bg-gray-100 dark:bg-gray-800 flex flex-col items-center justify-center gap-2 text-gray-500 dark:text-gray-400"
+        >
           <UIcon
             :name="inspecting || probing ? 'i-lucide-loader-circle' : 'i-lucide-film'"
             class="w-8 h-8"

@@ -92,8 +92,8 @@
 
         <template #issueCount-data="{ row }">
           <UBadge v-if="row.issueCount" color="warning" variant="subtle" icon="i-lucide-triangle-alert">{{ row.issueCount }}</UBadge>
-          <UIcon v-else-if="row.cueCount" name="i-lucide-circle-check" class="w-4 h-4 text-success-500" />
-          <span v-else class="text-gray-400">—</span>
+          <UIcon v-else-if="row.cueCount" name="i-lucide-circle-check" class="w-4 h-4 text-success-600 dark:text-success-500" />
+          <span v-else class="text-gray-500 dark:text-gray-400">—</span>
         </template>
 
         <template #actions-data="{ row }">

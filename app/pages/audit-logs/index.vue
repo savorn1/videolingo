@@ -28,9 +28,9 @@
         <template #username-data="{ row }">
           <div class="flex items-center gap-1.5">
             <span v-if="row.username" class="font-medium">{{ row.username }}</span>
-            <span v-else class="text-gray-400">—</span>
+            <span v-else class="text-gray-500 dark:text-gray-400">—</span>
             <UTooltip v-if="row.authType === 'api-key'" text="Used an API key">
-              <UIcon name="i-lucide-key-round" class="w-3.5 h-3.5 text-amber-500" />
+              <UIcon name="i-lucide-key-round" class="w-3.5 h-3.5 text-amber-600 dark:text-amber-500" />
             </UTooltip>
           </div>
         </template>

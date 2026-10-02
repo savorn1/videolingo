@@ -47,7 +47,7 @@
           </div>
         </template>
         <template #variables-data="{ row }">
-          <span v-if="!row.variables.length" class="text-gray-400">—</span>
+          <span v-if="!row.variables.length" class="text-gray-500 dark:text-gray-400">—</span>
           <div v-else class="flex flex-wrap gap-1">
             <UBadge v-for="v in row.variables" :key="v" color="primary" variant="subtle" size="sm" class="font-mono">{{ v }}</UBadge>
           </div>
@@ -60,7 +60,7 @@
           >
             {{ row.usageCount }} send{{ row.usageCount === 1 ? '' : 's' }}
           </NuxtLink>
-          <span v-else class="text-gray-400">Never used</span>
+          <span v-else class="text-gray-500 dark:text-gray-400">Never used</span>
         </template>
         <template #actions-data="{ row }">
           <div class="min-w-max">

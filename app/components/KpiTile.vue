@@ -13,7 +13,7 @@
             <UIcon :name="deltaIcon" class="w-3.5 h-3.5" />
             {{ delta.text }}
           </span>
-          <span class="text-gray-400">{{ comparedTo }}</span>
+          <span class="text-gray-500 dark:text-gray-400">{{ comparedTo }}</span>
         </p>
         <p v-if="sublabel && !loading" class="text-xs text-gray-500 dark:text-gray-400 mt-1.5 leading-snug">{{ sublabel }}</p>
         <!-- Sparkline: the shape of the period at a glance, no axes -->
@@ -26,7 +26,15 @@
           :aria-label="`Trend over the period, ending at ${value}`"
         >
           <polygon :points="`0,30 ${sparkPoints} 100,30`" fill="currentColor" fill-opacity="0.1" />
-          <polyline :points="sparkPoints" fill="none" stroke="currentColor" stroke-width="1.75" vector-effect="non-scaling-stroke" stroke-linejoin="round" stroke-linecap="round" />
+          <polyline
+            :points="sparkPoints"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.75"
+            vector-effect="non-scaling-stroke"
+            stroke-linejoin="round"
+            stroke-linecap="round"
+          />
         </svg>
       </div>
       <div class="shrink-0 rounded-xl p-2.5 text-white" :class="[chipClasses, shadowClasses]" aria-hidden="true">

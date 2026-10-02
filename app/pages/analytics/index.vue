@@ -11,7 +11,7 @@
         <p class="text-xs text-gray-500 leading-tight">
           <span class="font-medium text-gray-700 dark:text-gray-300">{{ formatDate(range.from) }} – {{ formatDate(range.to) }}</span>
           <br />
-          <span class="text-gray-400">vs the {{ days }} days before</span>
+          <span class="text-gray-500 dark:text-gray-400">vs the {{ days }} days before</span>
         </p>
         <USelect v-model="rangeKey" :items="RANGE_PRESETS" icon="i-lucide-calendar" class="w-44" aria-label="Date range" />
       </div>

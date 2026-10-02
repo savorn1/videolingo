@@ -83,7 +83,7 @@
             <!-- Caption preview: the segment being spoken right now. -->
             <div class="min-h-12 px-4 py-3 text-sm text-center text-gray-900 dark:text-white border-t border-gray-100 dark:border-gray-800">
               <template v-if="activeSegmentText">{{ activeSegmentText }}</template>
-              <span v-else class="text-gray-400">{{ formatTimestamp(currentMs) }}</span>
+              <span v-else class="text-gray-500 dark:text-gray-400">{{ formatTimestamp(currentMs) }}</span>
             </div>
           </UCard>
 
@@ -198,7 +198,7 @@
                   :class="[rowErrors[i] ? 'bg-error-50/60 dark:bg-error-950/30' : '', matches[matchCursor] === i ? 'ring-2 ring-inset ring-yellow-400' : '']"
                 >
                   <div class="flex flex-wrap items-center gap-2">
-                    <span class="w-6 text-xs text-gray-400 tabular-nums">{{ i + 1 }}</span>
+                    <span class="w-6 text-xs text-gray-500 tabular-nums dark:text-gray-400">{{ i + 1 }}</span>
                     <UInput v-model="row.start" size="xs" class="w-28 font-mono" aria-label="Start time" placeholder="0:00.000">
                       <template #trailing>
                         <UTooltip text="Set to player time">
@@ -214,7 +214,7 @@
                         </UTooltip>
                       </template>
                     </UInput>
-                    <span class="text-gray-400">→</span>
+                    <span class="text-gray-500 dark:text-gray-400">→</span>
                     <UInput v-model="row.end" size="xs" class="w-28 font-mono" aria-label="End time" placeholder="0:02.000">
                       <template #trailing>
                         <UTooltip text="Set to player time">

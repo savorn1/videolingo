@@ -525,9 +525,11 @@ watch(isFullscreen, (fs) => {
 watch(isPlaying, () => wakeControls())
 
 // ── Keyboard ───────────────────────────────────────────────────────────────
+/** How far ← and → jump. */
+const SKIP_MS = 10_000
 const SHORTCUT_HELP = [
   { keys: 'space', label: 'Play / pause' },
-  { keys: '← →', label: 'Back / forward 5 seconds' },
+  { keys: '← →', label: 'Back / forward 10 seconds' },
   { keys: 'A D', label: 'Previous / next line' },
   { keys: 'R', label: 'Replay the line' },
   { keys: 'L', label: 'Loop the line' },
@@ -542,8 +544,8 @@ const SHORTCUT_HELP = [
 const videoFocused = () => document.activeElement?.tagName === 'VIDEO'
 defineShortcuts({
   ' ': () => !videoFocused() && player.value?.togglePlay(),
-  arrowleft: () => !videoFocused() && seek(Math.max(0, currentMs.value - 5000), isPlaying.value),
-  arrowright: () => !videoFocused() && seek(currentMs.value + 5000, isPlaying.value),
+  arrowleft: () => !videoFocused() && seek(Math.max(0, currentMs.value - SKIP_MS), isPlaying.value),
+  arrowright: () => !videoFocused() && seek(currentMs.value + SKIP_MS, isPlaying.value),
   a: () => canStep.value && previousLine(),
   d: () => canStep.value && nextLine(),
   r: () => canStep.value && replayLine(),
@@ -652,7 +654,9 @@ async function load() {
       .then((s) => (studyItems.value = s))
       .catch(() => (studyItems.value = []))
   } catch (err) {
-    error.value = apiErrorMessage(err)
+    // A video that was hidden, archived or removed since it was last opened answers 404 — say what that means.
+    const status = (err as { response?: { status?: number }; statusCode?: number })?.response?.status ?? (err as { statusCode?: number })?.statusCode
+    error.value = status === 404 ? 'This video isn’t available right now — it may have been hidden, archived or removed.' : apiErrorMessage(err)
   } finally {
     loading.value = false
   }

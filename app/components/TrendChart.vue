@@ -29,7 +29,7 @@
 
     <div v-else class="flex gap-2">
       <!-- Y axis (recessive) -->
-      <div class="flex flex-col justify-between text-[11px] text-gray-400 tabular-nums text-right -mt-1.5 w-14 shrink-0" :style="{ height }">
+      <div class="flex flex-col justify-between text-[11px] text-gray-500 tabular-nums text-right -mt-1.5 w-14 shrink-0 dark:text-gray-400" :style="{ height }">
         <span v-for="t in ticks" :key="t">{{ format(t) }}</span>
       </div>
       <div class="flex-1 min-w-0">
@@ -87,7 +87,9 @@
             class="absolute inset-x-0 border-t border-dashed border-gray-400/60 dark:border-gray-500/60 pointer-events-none"
             :style="{ bottom: `${(average / top) * 100}%` }"
           >
-            <span class="absolute right-0 -top-4 text-[10px] text-gray-400 bg-(--ui-bg)/80 px-1 rounded">avg {{ format(Math.round(average)) }}</span>
+            <span class="absolute right-0 -top-4 text-[10px] text-gray-500 bg-(--ui-bg)/80 px-1 rounded dark:text-gray-400"
+              >avg {{ format(Math.round(average)) }}</span
+            >
           </div>
 
           <!-- Line crosshair + marker -->
@@ -107,12 +109,12 @@
           >
             <p class="font-medium text-gray-900 dark:text-white">{{ items[hover]!.tooltip ?? items[hover]!.label }}</p>
             <p class="text-gray-600 dark:text-gray-300 tabular-nums">{{ format(items[hover]!.value) }} {{ unit }}</p>
-            <p v-if="hoverChange" class="tabular-nums text-gray-400">{{ hoverChange }} vs previous</p>
+            <p v-if="hoverChange" class="tabular-nums text-gray-500 dark:text-gray-400">{{ hoverChange }} vs previous</p>
           </div>
         </div>
 
         <!-- X axis -->
-        <div class="relative h-4 mt-1 text-[11px] text-gray-400">
+        <div class="relative h-4 mt-1 text-[11px] text-gray-500 dark:text-gray-400">
           <span v-for="l in xLabels" :key="l.index" class="absolute -translate-x-1/2 whitespace-nowrap" :style="{ left: `${xPct(l.index)}%` }">{{
             l.text
           }}</span>

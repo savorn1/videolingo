@@ -52,9 +52,10 @@
           </div>
           <ol v-if="parsed.segments.length" class="text-xs font-mono space-y-1 text-gray-700 dark:text-gray-300">
             <li v-for="(s, i) in parsed.segments.slice(0, 3)" :key="i" class="truncate">
-              <span class="text-gray-400">{{ formatTimestamp(s.startMs) }}</span> {{ s.speaker ? `${s.speaker}: ` : '' }}{{ s.text.replace(/\n/g, ' ') }}
+              <span class="text-gray-500 dark:text-gray-400">{{ formatTimestamp(s.startMs) }}</span> {{ s.speaker ? `${s.speaker}: ` : ''
+              }}{{ s.text.replace(/\n/g, ' ') }}
             </li>
-            <li v-if="parsed.segments.length > 3" class="text-gray-400">… and {{ parsed.segments.length - 3 }} more</li>
+            <li v-if="parsed.segments.length > 3" class="text-gray-500 dark:text-gray-400">… and {{ parsed.segments.length - 3 }} more</li>
           </ol>
           <UAlert
             v-if="parsed.warnings.length"

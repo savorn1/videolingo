@@ -36,19 +36,32 @@
 
     <UDashboardPanel>
       <template #header>
-        <UDashboardNavbar>
+        <!-- A brand-coloured line along the top, a faintly tinted bar under it, and the tools grouped in a soft pill -->
+        <UDashboardNavbar
+          :ui="{
+            root: 'border-t-2 border-t-primary-500 border-b-primary-100 bg-primary-50/50 backdrop-blur dark:border-b-primary-950 dark:bg-primary-950/30'
+          }"
+        >
           <template #left>
             <UBreadcrumb :items="breadcrumbItems" />
           </template>
 
           <template #right>
-            <UDashboardSearchButton />
-            <WhatsNewButton />
-            <JobsIndicator />
-            <InboxBell />
-            <UColorModeButton />
+            <div class="flex items-center gap-0.5 rounded-lg bg-white/80 p-0.5 ring-1 ring-primary-100 dark:bg-gray-900/70 dark:ring-primary-900/60">
+              <UDashboardSearchButton class="text-sky-600 hover:bg-sky-50 dark:text-sky-400 dark:hover:bg-sky-950/40" />
+              <WhatsNewButton />
+              <JobsIndicator />
+              <InboxBell />
+              <UColorModeButton class="text-violet-600 hover:bg-violet-50 dark:text-amber-300 dark:hover:bg-amber-950/40" />
+            </div>
             <UDropdownMenu :items="profileItems" :content="{ align: 'end' }" :ui="{ content: 'w-56' }">
-              <UButton size="sm" color="neutral" variant="ghost" trailing-icon="i-lucide-chevron-down">
+              <UButton
+                size="sm"
+                color="neutral"
+                variant="soft"
+                class="bg-primary-100 text-primary-800 hover:bg-primary-200 dark:bg-primary-900/50 dark:text-primary-200 dark:hover:bg-primary-900"
+                trailing-icon="i-lucide-chevron-down"
+              >
                 <UserAvatar :name="username" size="2xs" />
                 {{ username }}
               </UButton>

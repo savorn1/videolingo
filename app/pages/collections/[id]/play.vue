@@ -202,9 +202,14 @@
                 :data-current="i === current || undefined"
                 @click="playItem(i)"
               >
-                <span class="w-6 shrink-0 text-center text-xs tabular-nums text-gray-400">
+                <span class="w-6 shrink-0 text-center text-xs tabular-nums text-gray-500 dark:text-gray-400">
                   <UIcon v-if="i === current" name="i-lucide-audio-lines" class="w-4 h-4 text-primary-500" />
-                  <UIcon v-else-if="progressOf(i)?.completed" name="i-lucide-circle-check" class="w-4 h-4 text-success-500" aria-label="Watched" />
+                  <UIcon
+                    v-else-if="progressOf(i)?.completed"
+                    name="i-lucide-circle-check"
+                    class="w-4 h-4 text-success-600 dark:text-success-500"
+                    aria-label="Watched"
+                  />
                   <template v-else>{{ n + 1 }}</template>
                 </span>
                 <span class="relative w-24 aspect-video shrink-0 rounded overflow-hidden bg-gray-100 dark:bg-gray-800">

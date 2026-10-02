@@ -16,7 +16,7 @@
         :style="{ left: pct(edit.state.range[0]), width: pct(edit.state.range[1] - edit.state.range[0]) }"
       />
       <div v-for="t in ticks" :key="t" class="absolute top-0 h-full border-l border-gray-300 dark:border-gray-700" :style="{ left: pct(t) }">
-        <span v-if="t < durationMs * 0.95" class="absolute top-0 left-1 text-[10px] leading-none text-gray-400 tabular-nums">{{
+        <span v-if="t < durationMs * 0.95" class="absolute top-0 left-1 text-[10px] leading-none text-gray-500 tabular-nums dark:text-gray-400">{{
           formatDuration(Math.round(t / 1000))
         }}</span>
       </div>
@@ -74,7 +74,7 @@
         />
       </div>
 
-      <p v-if="!edit.state.clips.length" class="absolute inset-0 flex items-center justify-center text-xs text-gray-400 pointer-events-none">
+      <p v-if="!edit.state.clips.length" class="absolute inset-0 flex items-center justify-center text-xs text-gray-500 pointer-events-none dark:text-gray-400">
         No clips — the sound is empty
       </p>
 

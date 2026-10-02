@@ -1,6 +1,12 @@
 <template>
   <UPopover v-model:open="open" :content="{ align: 'end' }">
-    <UButton color="neutral" variant="ghost" icon="i-lucide-sparkles" class="relative" aria-label="What's new">
+    <UButton
+      color="neutral"
+      variant="ghost"
+      icon="i-lucide-sparkles"
+      class="relative text-amber-600 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-950/40"
+      aria-label="What's new"
+    >
       <span v-if="hasUnseen" class="absolute top-1 right-1 w-2 h-2 rounded-full bg-primary-500" aria-hidden="true" />
     </UButton>
 
@@ -13,7 +19,7 @@
           <li v-for="e in CHANGELOG" :key="e.id" class="px-3 py-2.5">
             <div class="flex items-center gap-2">
               <UBadge :color="areaColor(e.area)" variant="subtle" size="sm">{{ e.area }}</UBadge>
-              <span class="text-[11px] text-gray-400">{{ formatDate(e.date) }}</span>
+              <span class="text-[11px] text-gray-500 dark:text-gray-400">{{ formatDate(e.date) }}</span>
             </div>
             <p class="text-sm font-medium text-gray-900 dark:text-white mt-1">{{ e.title }}</p>
             <p class="text-xs text-gray-600 dark:text-gray-400 mt-0.5">{{ e.description }}</p>

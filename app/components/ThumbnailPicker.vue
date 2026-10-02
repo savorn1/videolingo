@@ -15,10 +15,10 @@
         @seeked="seeking = false"
         @error="loadError = true"
       />
-      <div v-if="!ready && !loadError" class="absolute inset-0 flex items-center justify-center text-gray-400">
+      <div v-if="!ready && !loadError" class="absolute inset-0 flex items-center justify-center text-gray-500 dark:text-gray-400">
         <UIcon name="i-lucide-loader-circle" class="w-6 h-6 animate-spin" />
       </div>
-      <div v-if="loadError" class="absolute inset-0 flex items-center justify-center p-4 text-center text-sm text-gray-300">
+      <div v-if="loadError" class="absolute inset-0 flex items-center justify-center p-4 text-center text-sm text-gray-500 dark:text-gray-300">
         This video can’t be read here, so a frame can’t be picked from it.
       </div>
     </div>

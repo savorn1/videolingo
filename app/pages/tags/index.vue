@@ -47,7 +47,7 @@
           <NuxtLink v-if="row.videoCount" :to="`/videos?tagId=${row.id}`" class="tabular-nums text-primary-600 dark:text-primary-400 hover:underline">
             {{ row.videoCount }} video{{ row.videoCount === 1 ? '' : 's' }}
           </NuxtLink>
-          <span v-else class="text-gray-400">Unused</span>
+          <span v-else class="text-gray-500 dark:text-gray-400">Unused</span>
         </template>
         <template #actions-data="{ row }">
           <div class="min-w-max">

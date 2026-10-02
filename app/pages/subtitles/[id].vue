@@ -207,7 +207,7 @@
                   <div class="min-w-0 flex-1">
                     <p class="text-sm text-gray-900 dark:text-white whitespace-pre-line">{{ cues[i]!.text }}</p>
                     <div class="flex flex-wrap items-center gap-1.5 mt-1">
-                      <span class="text-[11px] text-gray-400 tabular-nums"
+                      <span class="text-[11px] text-gray-500 tabular-nums dark:text-gray-400"
                         >{{ charsPerSecond(cues[i]!.text, cues[i]!.startMs, cues[i]!.endMs).toFixed(1) }} cps</span
                       >
                       <UTooltip v-for="issue in issuesByCue.get(i) ?? []" :key="issue.type" :text="issue.message">
@@ -236,7 +236,7 @@
                   :class="[rowErrors[i] ? 'bg-error-50/60 dark:bg-error-950/30' : '', i === activeIndex ? 'ring-2 ring-inset ring-primary-300' : '']"
                 >
                   <div class="flex flex-wrap items-center gap-2">
-                    <span class="w-6 text-xs text-gray-400 tabular-nums">{{ i + 1 }}</span>
+                    <span class="w-6 text-xs text-gray-500 tabular-nums dark:text-gray-400">{{ i + 1 }}</span>
                     <UInput v-model="draft[i]!.start" size="xs" class="w-28 font-mono" aria-label="Start time">
                       <template #trailing>
                         <UButton
@@ -250,7 +250,7 @@
                         />
                       </template>
                     </UInput>
-                    <span class="text-gray-400">→</span>
+                    <span class="text-gray-500 dark:text-gray-400">→</span>
                     <UInput v-model="draft[i]!.end" size="xs" class="w-28 font-mono" aria-label="End time">
                       <template #trailing>
                         <UButton

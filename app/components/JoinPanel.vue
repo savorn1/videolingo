@@ -65,14 +65,14 @@
               aria-hidden="true"
               title="Drag to reorder"
             />
-            <span class="w-4 text-xs text-gray-400 tabular-nums">{{ i + 1 }}</span>
+            <span class="w-4 text-xs text-gray-500 tabular-nums dark:text-gray-400">{{ i + 1 }}</span>
             <img v-if="c.thumbnailUrl" :src="c.thumbnailUrl" alt="" class="h-8 w-14 rounded object-cover bg-gray-100 dark:bg-gray-800" />
             <div v-else class="h-8 w-14 rounded bg-gray-100 dark:bg-gray-800" />
             <span class="flex-1 min-w-0">
               <span class="block truncate">{{ c.title }}</span>
               <span class="flex items-center gap-1.5 text-xs text-gray-500">
                 <span>{{ c.id === video.id ? 'This video · ' : '' }}{{ formatDuration(c.durationSeconds) }}</span>
-                <span v-if="c.blocked" class="text-error-500">{{ c.blocked }}</span>
+                <span v-if="c.blocked" class="text-error-600 dark:text-error-400">{{ c.blocked }}</span>
                 <UBadge
                   v-if="differsInShape(c)"
                   color="warning"
@@ -159,7 +159,7 @@
       <p class="text-xs text-gray-500 dark:text-gray-400">
         You choose the title, size, fade and categories next. The new video is created hidden until you have looked at it.
       </p>
-      <p class="text-xs text-error-500 min-h-4">{{ problem }}</p>
+      <p class="text-xs text-error-600 dark:text-error-400 min-h-4">{{ problem }}</p>
       <UButton
         v-if="canWrite"
         color="neutral"

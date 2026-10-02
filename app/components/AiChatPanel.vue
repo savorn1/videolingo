@@ -18,7 +18,7 @@
             @click="open(c.id)"
           >
             <span class="block truncate">{{ c.title }}</span>
-            <span class="block text-xs text-gray-400"
+            <span class="block text-xs text-gray-500 dark:text-gray-400"
               >{{ c.messageCount / 2 }} question{{ c.messageCount === 2 ? '' : 's' }} · {{ formatUsd(c.totalCostUsd) }}</span
             >
           </button>

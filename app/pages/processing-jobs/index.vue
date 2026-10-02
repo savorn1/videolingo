@@ -45,7 +45,7 @@
         <USelect v-model="filter.type" :items="typeFilterOptions" placeholder="Type" class="w-48" />
         <div class="flex items-center gap-2">
           <UInput v-model="filter.createdFrom" type="date" aria-label="Created from" class="w-40" :max="filter.createdTo" />
-          <span class="text-sm text-gray-400">–</span>
+          <span class="text-sm text-gray-500 dark:text-gray-400">–</span>
           <UInput v-model="filter.createdTo" type="date" aria-label="Created to" class="w-40" :min="filter.createdFrom" />
         </div>
         <UBadge v-if="filter.videoId" color="neutral" variant="subtle" size="lg" class="gap-1">

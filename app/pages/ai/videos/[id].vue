@@ -144,7 +144,7 @@
               <div class="flex flex-wrap items-center justify-between gap-2 border-t border-gray-100 dark:border-gray-800 pt-2">
                 <div class="space-y-0.5">
                   <AiUsageLine :usage="resultFor(task.value)!.usage" />
-                  <p class="text-xs text-gray-400" :title="formatDateTime(resultFor(task.value)!.createdAt)">
+                  <p class="text-xs text-gray-500 dark:text-gray-400" :title="formatDateTime(resultFor(task.value)!.createdAt)">
                     {{ formatRelativeTime(resultFor(task.value)!.createdAt) }} by {{ resultFor(task.value)!.createdBy ?? '—' }}
                     <template v-if="resultFor(task.value)!.transcriptLanguage">
                       · from the {{ languageLabel(resultFor(task.value)!.transcriptLanguage) }} transcript

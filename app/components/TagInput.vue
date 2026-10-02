@@ -2,7 +2,7 @@
   <div class="space-y-2">
     <div class="flex flex-wrap gap-1.5">
       <TagChip v-for="t in video.tags" :key="t.id" :name="t.name" :removable="!disabled" :busy="busyTagId === t.id" @remove="removeTag(t)" />
-      <span v-if="!video.tags.length" class="text-xs text-gray-400">No tags yet</span>
+      <span v-if="!video.tags.length" class="text-xs text-gray-500 dark:text-gray-400">No tags yet</span>
     </div>
 
     <div v-if="!disabled" class="relative">
@@ -38,9 +38,9 @@
           @mousedown.prevent="choose(i)"
           @mouseenter="highlighted = i"
         >
-          <span v-if="opt.kind === 'existing'"><span class="text-gray-400">#</span>{{ opt.tag.name }}</span>
+          <span v-if="opt.kind === 'existing'"><span class="text-gray-500 dark:text-gray-400">#</span>{{ opt.tag.name }}</span>
           <span v-else class="text-primary-600 dark:text-primary-400">Create “{{ opt.name }}”</span>
-          <span v-if="opt.kind === 'existing' && opt.onVideo" class="text-xs text-gray-400">added</span>
+          <span v-if="opt.kind === 'existing' && opt.onVideo" class="text-xs text-gray-500 dark:text-gray-400">added</span>
         </li>
       </ul>
     </div>

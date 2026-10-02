@@ -50,8 +50,13 @@
             <ol class="divide-y divide-gray-100 dark:divide-gray-800">
               <li v-for="v in group.items" :key="v.videoId">
                 <NuxtLink :to="playLink(v.videoId)" class="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800/40">
-                  <span class="w-6 text-center text-sm tabular-nums text-gray-400">
-                    <UIcon v-if="progress.get(v.videoId)?.completed" name="i-lucide-circle-check" class="w-5 h-5 text-success-500" aria-label="Watched" />
+                  <span class="w-6 text-center text-sm tabular-nums text-gray-500 dark:text-gray-400">
+                    <UIcon
+                      v-if="progress.get(v.videoId)?.completed"
+                      name="i-lucide-circle-check"
+                      class="w-5 h-5 text-success-600 dark:text-success-500"
+                      aria-label="Watched"
+                    />
                     <template v-else>{{ videos.indexOf(v) + 1 }}</template>
                   </span>
                   <span class="relative w-28 aspect-video shrink-0 rounded overflow-hidden bg-gray-100 dark:bg-gray-800">

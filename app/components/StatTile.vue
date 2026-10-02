@@ -6,7 +6,7 @@
           <p class="text-sm text-gray-500 dark:text-gray-400">{{ label }}</p>
           <div v-if="loading" class="h-8 w-24 mt-1.5 rounded bg-gray-100 dark:bg-gray-800 animate-pulse" />
           <p v-else class="text-2xl font-semibold text-gray-900 dark:text-white mt-1 truncate">{{ value }}</p>
-          <p v-if="sublabel && !loading" class="text-xs text-gray-400 dark:text-gray-500 mt-1">{{ sublabel }}</p>
+          <p v-if="sublabel && !loading" class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ sublabel }}</p>
         </div>
         <div class="shrink-0 rounded-xl p-2.5 text-white" :class="[colorClasses, shadowClasses]">
           <UIcon :name="icon" class="w-5 h-5" />

@@ -28,7 +28,7 @@
                 <UIcon name="i-lucide-mail" class="w-3.5 h-3.5 shrink-0" />
                 <span class="truncate">{{ profile.email }}</span>
               </span>
-              <span v-else class="text-sm text-gray-400">No email set</span>
+              <span v-else class="text-sm text-gray-500 dark:text-gray-400">No email set</span>
             </template>
           </div>
         </div>
@@ -40,37 +40,37 @@
     </UCard>
 
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-    <UCard class="lg:col-span-2">
-      <template #header>
-        <div class="flex items-center gap-2">
-          <UIcon name="i-lucide-user-round" class="w-4 h-4 text-gray-400 dark:text-gray-500" />
-          <h2 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Account</h2>
-        </div>
-      </template>
-      <DynamicForm v-model="profileForm" :fields="profileFields" :loading="savingProfile" :error="profileError" submit-label="Save" @submit="onSaveProfile" />
-    </UCard>
+      <UCard class="lg:col-span-2">
+        <template #header>
+          <div class="flex items-center gap-2">
+            <UIcon name="i-lucide-user-round" class="w-4 h-4 text-sky-600 dark:text-sky-400" />
+            <h2 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Account</h2>
+          </div>
+        </template>
+        <DynamicForm v-model="profileForm" :fields="profileFields" :loading="savingProfile" :error="profileError" submit-label="Save" @submit="onSaveProfile" />
+      </UCard>
 
-    <UCard>
-      <template #header>
-        <div class="flex items-center gap-2">
-          <UIcon name="i-lucide-palette" class="w-4 h-4 text-gray-400 dark:text-gray-500" />
-          <h2 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Preferences</h2>
-        </div>
-      </template>
-      <p class="text-sm text-gray-500 dark:text-gray-400 mb-3">Choose how tables look across the app.</p>
-      <UTabs :model-value="theme" :items="tableStyleItems" :content="false" class="w-full" @update:model-value="(value) => setTheme(value as TableTheme)" />
-    </UCard>
+      <UCard>
+        <template #header>
+          <div class="flex items-center gap-2">
+            <UIcon name="i-lucide-palette" class="w-4 h-4 text-violet-600 dark:text-violet-400" />
+            <h2 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Preferences</h2>
+          </div>
+        </template>
+        <p class="text-sm text-gray-500 dark:text-gray-400 mb-3">Choose how tables look across the app.</p>
+        <UTabs :model-value="theme" :items="tableStyleItems" :content="false" class="w-full" @update:model-value="(value) => setTheme(value as TableTheme)" />
+      </UCard>
 
-    <UCard>
-      <template #header>
-        <div class="flex items-center gap-2">
-          <UIcon name="i-lucide-shield-check" class="w-4 h-4 text-gray-400 dark:text-gray-500" />
-          <h2 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Security</h2>
-        </div>
-      </template>
-      <p class="text-sm text-gray-500 dark:text-gray-400 mb-3">Change your password to keep your account secure.</p>
-      <UButton color="neutral" variant="soft" icon="i-lucide-key-round" @click="showChangePassword = true"> Change password </UButton>
-    </UCard>
+      <UCard>
+        <template #header>
+          <div class="flex items-center gap-2">
+            <UIcon name="i-lucide-shield-check" class="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+            <h2 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Security</h2>
+          </div>
+        </template>
+        <p class="text-sm text-gray-500 dark:text-gray-400 mb-3">Change your password to keep your account secure.</p>
+        <UButton color="neutral" variant="soft" icon="i-lucide-key-round" @click="showChangePassword = true"> Change password </UButton>
+      </UCard>
     </div>
 
     <ChangePasswordModal v-model="showChangePassword" :loading="savingPassword" :error="passwordError" @submit="onChangePassword" />

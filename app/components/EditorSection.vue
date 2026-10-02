@@ -5,8 +5,11 @@
     >
       <h3 class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{{ title }}</h3>
       <span v-if="changed" class="size-1.5 shrink-0 rounded-full bg-warning-500" role="img" aria-label="Has changes" title="Has changes" />
-      <span v-if="hint" class="min-w-0 truncate text-xs font-normal text-gray-400">{{ hint }}</span>
-      <UIcon name="i-lucide-chevron-down" class="ml-auto h-4 w-4 shrink-0 text-gray-400 transition-transform group-open:rotate-180 motion-reduce:transition-none" />
+      <span v-if="hint" class="min-w-0 truncate text-xs font-normal text-gray-500 dark:text-gray-400">{{ hint }}</span>
+      <UIcon
+        name="i-lucide-chevron-down"
+        class="ml-auto h-4 w-4 shrink-0 text-gray-400 transition-transform group-open:rotate-180 motion-reduce:transition-none"
+      />
     </summary>
     <div class="space-y-2 pt-2">
       <slot />

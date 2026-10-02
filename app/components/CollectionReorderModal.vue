@@ -27,7 +27,7 @@
             @dragend="dragging = dropTarget = null"
           >
             <UIcon name="i-lucide-grip-vertical" class="w-4 h-4 text-gray-400 cursor-grab shrink-0" aria-hidden="true" />
-            <span class="w-6 text-right text-xs font-semibold text-gray-400 tabular-nums">{{ i + 1 }}</span>
+            <span class="w-6 text-right text-xs font-semibold text-gray-500 tabular-nums dark:text-gray-400">{{ i + 1 }}</span>
             <span class="relative w-16 aspect-video shrink-0 rounded overflow-hidden bg-gray-100 dark:bg-gray-800">
               <img v-if="item.thumbnailUrl" :src="item.thumbnailUrl" alt="" class="w-full h-full object-cover" loading="lazy" />
             </span>

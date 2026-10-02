@@ -11,15 +11,17 @@
           <span class="text-error-600 dark:text-error-400 line-through">{{ t.text }}</span>
           <span class="text-xs text-success-700 dark:text-success-300">{{ t.expected }}</span>
         </span>
-        <span v-else-if="t.status === 'missing'" class="text-gray-400 underline decoration-dotted" :title="`Missing: ${t.text}`">{{ t.text }}</span>
-        <span v-else class="text-error-500 line-through opacity-70" :title="`Not in the line: ${t.text}`">{{ t.text }}</span>
+        <span v-else-if="t.status === 'missing'" class="text-gray-500 underline decoration-dotted dark:text-gray-400" :title="`Missing: ${t.text}`">{{
+          t.text
+        }}</span>
+        <span v-else class="text-error-600 dark:text-error-400 line-through opacity-70" :title="`Not in the line: ${t.text}`">{{ t.text }}</span>
         {{ ' ' }}
       </template>
     </p>
     <p class="text-xs text-gray-500">
       {{ result.correct }} of {{ result.total }} right · <span class="text-success-600 dark:text-success-400">right</span> ·
       <span class="text-error-600 dark:text-error-400 line-through">wrong</span> (with the right word under it) ·
-      <span class="text-gray-400 underline decoration-dotted">missing</span>
+      <span class="text-gray-500 underline decoration-dotted dark:text-gray-400">missing</span>
     </p>
   </div>
 </template>

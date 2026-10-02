@@ -52,7 +52,7 @@
       >
         {{ line?.text }}
       </p>
-      <p v-else class="rounded-md border border-dashed border-gray-300 dark:border-gray-700 px-3 py-2 text-sm text-gray-400">
+      <p v-else class="rounded-md border border-dashed border-gray-300 dark:border-gray-700 px-3 py-2 text-sm text-gray-500 dark:text-gray-400">
         Listen, then type what you hear.
       </p>
 
@@ -63,7 +63,7 @@
 
       <!-- ── Shadowing ─────────────────────────────────────────────────── -->
       <template v-if="mode === 'shadow'">
-        <p v-if="micError" class="text-xs text-error-500">{{ micError }}</p>
+        <p v-if="micError" class="text-xs text-error-600 dark:text-error-400">{{ micError }}</p>
         <div class="flex flex-wrap items-center gap-2">
           <UButton v-if="!recording" size="sm" color="error" variant="soft" icon="i-lucide-mic" @click="startRecording">
             {{ recordingUrl ? 'Record again' : 'Record yourself' }}
@@ -78,7 +78,7 @@
           </template>
         </div>
         <audio v-if="recordingUrl" ref="mine" :src="recordingUrl" class="hidden" />
-        <p v-if="heardError" class="text-xs text-error-500">{{ heardError }}</p>
+        <p v-if="heardError" class="text-xs text-error-600 dark:text-error-400">{{ heardError }}</p>
         <div v-if="heard !== null" class="space-y-1" data-testid="pronunciation-result">
           <p class="text-xs text-gray-500">
             Heard: <span class="text-gray-800 dark:text-gray-200">“{{ heard || '(nothing)' }}”</span>

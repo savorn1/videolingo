@@ -53,3 +53,24 @@ describe('icon-only buttons', () => {
     expect(offenders).toEqual([])
   })
 })
+
+describe('text colours', () => {
+  // On a white page, gray-300/400 text is about 1.5:1 and 2.5:1 — too faint to read — and error-500 red is 3.8:1.
+  // Text needs 4.5:1, so it should use gray-500 (4.8:1) or darker, and error-600. (Icons are exempt, and so are
+  // classes set with :class, which this doesn't read.) Keep the dark-mode shade next to it: dark:text-gray-400.
+  it('are dark enough to read in light mode', () => {
+    const faint = new Set(['text-gray-300', 'text-gray-400', 'text-error-500'])
+    const offenders: string[] = []
+    for (const file of files(join(root, 'app'), '.vue')) {
+      const text = readFileSync(file, 'utf8')
+      for (const m of text.matchAll(/<([A-Za-z][\w.-]*)((?:[^<>"']|"[^"]*"|'[^']*')*?)>/gs)) {
+        if (['UIcon', 'Icon', 'svg', 'path', 'circle', 'rect', 'line', 'polyline', 'input', 'USwitch'].includes(m[1]!)) continue
+        const cls = /\sclass="([^"]*)"/.exec(m[2]!)?.[1]
+        if (!cls || /placeholder|disabled/.test(cls)) continue
+        const bad = cls.split(/\s+/).filter((t) => faint.has(t))
+        if (bad.length) offenders.push(`${file.replace(root + '/', '')}: <${m[1]}> ${bad.join(' ')}`)
+      }
+    }
+    expect(offenders).toEqual([])
+  })
+})

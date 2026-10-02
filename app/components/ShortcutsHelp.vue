@@ -3,14 +3,14 @@
     <UButton size="xs" color="neutral" variant="ghost" icon="i-lucide-keyboard" aria-label="Keyboard shortcuts" :class="buttonClass" @click="open = true" />
   </UTooltip>
 
-  <UModal v-model:open="open" title="Keyboard shortcuts" :ui="{ content: 'sm:max-w-sm' }">
+  <UModal v-model:open="open" title="Keyboard shortcuts" :ui="{ content: 'sm:max-w-2xl' }">
     <template #body>
-      <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
+      <dl class="grid grid-cols-[auto_1fr] md:grid-cols-[auto_1fr_auto_1fr] md:gap-x-8 text-sm">
         <template v-for="s in items" :key="s.label">
-          <dt class="flex items-center gap-1 flex-wrap">
-            <UKbd v-for="(k, i) in s.keys.split(' ')" :key="i" :value="k" />
+          <dt class="flex flex-wrap items-center gap-1 border-b border-gray-100 py-2.5 pr-4 dark:border-gray-800/70">
+            <UKbd v-for="(k, i) in s.keys.split(' ').filter(Boolean)" :key="i" :value="k" :class="keyTone(k)" />
           </dt>
-          <dd class="text-gray-600 dark:text-gray-300">{{ s.label }}</dd>
+          <dd class="border-b border-gray-100 py-2.5 text-gray-700 dark:border-gray-800/70 dark:text-gray-200">{{ s.label }}</dd>
         </template>
       </dl>
     </template>
@@ -18,6 +18,17 @@
 </template>
 
 <script setup lang="ts">
+// Soft tints by kind of key — no outlines, no legend — so the list stays calm but can be scanned by colour:
+// arrows blue, modifiers violet (and a little back), letters green, space and the rest amber.
+const ARROWS = new Set(['←', '→', '↑', '↓', '←→', '←→↑↓'])
+const MODIFIERS = new Set(['shift', 'ctrl/⌘', 'ctrl', '⌘', 'alt', 'option'])
+function keyTone(key: string): string {
+  if (ARROWS.has(key)) return 'bg-sky-50 text-sky-700 dark:bg-sky-950/60 dark:text-sky-300'
+  if (MODIFIERS.has(key.toLowerCase())) return 'bg-violet-50 text-violet-700 opacity-80 dark:bg-violet-950/60 dark:text-violet-300'
+  if (/^[a-z?[\]]$/i.test(key)) return 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300'
+  return 'bg-amber-50 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300'
+}
+
 // A consistent "press ? for shortcuts" pattern: a small keyboard-icon button
 // (for anyone who doesn't know to press ?) plus the key itself, both opening
 // the same list. Each area (the editor, the watch page…) mounts one of

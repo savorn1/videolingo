@@ -65,7 +65,7 @@
           >
             {{ row.videoCount }} video{{ row.videoCount === 1 ? '' : 's' }}
           </NuxtLink>
-          <span v-else class="text-gray-400">None</span>
+          <span v-else class="text-gray-500 dark:text-gray-400">None</span>
         </template>
 
         <template #actions-data="{ row }">

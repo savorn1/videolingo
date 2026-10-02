@@ -1,6 +1,12 @@
 <template>
   <UPopover v-model:open="open" :content="{ align: 'end' }">
-    <UButton color="neutral" variant="ghost" icon="i-lucide-bell" class="relative" :aria-label="unread ? `Notifications, ${unread} unread` : 'Notifications'">
+    <UButton
+      color="neutral"
+      variant="ghost"
+      icon="i-lucide-bell"
+      class="relative text-rose-600 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-950/40"
+      :aria-label="unread ? `Notifications, ${unread} unread` : 'Notifications'"
+    >
       <span
         v-if="unread"
         class="absolute top-0.5 right-0.5 min-w-4 h-4 px-1 rounded-full bg-error-500 text-white text-[10px] font-semibold leading-4 text-center tabular-nums"
@@ -57,7 +63,7 @@
                     :class="expanded === n.id ? 'whitespace-pre-wrap break-words' : 'line-clamp-2'"
                     >{{ n.body }}</span
                   >
-                  <span class="block text-[11px] text-gray-400 mt-1" :title="formatDateTime(n.createdAt)">
+                  <span class="block text-[11px] text-gray-500 mt-1 dark:text-gray-400" :title="formatDateTime(n.createdAt)">
                     {{ formatRelativeTime(n.createdAt) }}<template v-if="n.sentBy"> · from {{ n.sentBy }}</template>
                   </span>
                 </span>

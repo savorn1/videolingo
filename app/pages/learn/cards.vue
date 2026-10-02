@@ -44,15 +44,24 @@
             <span>{{ reviewed }} reviewed</span>
             <span>{{ queue.length }} left in this session</span>
           </div>
-          <div class="h-1.5 rounded-full bg-gray-100 dark:bg-gray-800 overflow-hidden" role="progressbar" :aria-valuenow="progress" aria-valuemin="0" aria-valuemax="100">
-            <div class="h-full rounded-full bg-primary-500 dark:bg-primary-400 transition-[width] duration-300 motion-reduce:transition-none" :style="{ width: `${progress}%` }" />
+          <div
+            class="h-1.5 rounded-full bg-gray-100 dark:bg-gray-800 overflow-hidden"
+            role="progressbar"
+            :aria-valuenow="progress"
+            aria-valuemin="0"
+            aria-valuemax="100"
+          >
+            <div
+              class="h-full rounded-full bg-primary-500 dark:bg-primary-400 transition-[width] duration-300 motion-reduce:transition-none"
+              :style="{ width: `${progress}%` }"
+            />
           </div>
         </div>
         <UCard :ui="{ body: 'p-6 sm:p-8' }" class="cursor-pointer" @click="!revealed && (revealed = true)">
           <div class="text-center space-y-4 min-h-48 flex flex-col justify-center">
             <UBadge class="self-center" color="neutral" variant="subtle" size="sm">{{ sourceLabel(current.source) }}</UBadge>
             <p class="text-2xl font-semibold text-gray-900 dark:text-white whitespace-pre-line">{{ current.front }}</p>
-            <p v-if="!revealed" class="text-xs text-gray-400">Click the card or press space to reveal</p>
+            <p v-if="!revealed" class="text-xs text-gray-500 dark:text-gray-400">Click the card or press space to reveal</p>
             <template v-if="revealed">
               <USeparator />
               <p class="text-lg text-gray-800 dark:text-gray-200 whitespace-pre-line">{{ current.back }}</p>
@@ -129,7 +138,14 @@
         />
         <ul v-else class="divide-y divide-gray-100 dark:divide-gray-800">
           <li v-for="c in shownCards" :key="c.id" class="group flex items-start gap-3 px-4 py-3.5 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
-            <div class="shrink-0 mt-0.5 rounded-lg p-2" :class="isDue(c) ? 'bg-warning-50 text-warning-600 dark:bg-warning-950 dark:text-warning-400' : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'">
+            <div
+              class="shrink-0 mt-0.5 rounded-lg p-2"
+              :class="
+                isDue(c)
+                  ? 'bg-warning-50 text-warning-600 dark:bg-warning-950 dark:text-warning-400'
+                  : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'
+              "
+            >
               <UIcon :name="sourceIcon(c.source)" class="w-4 h-4 block" />
             </div>
             <div class="min-w-0 flex-1">
@@ -138,11 +154,17 @@
                 <UBadge color="neutral" variant="subtle" size="sm">{{ sourceLabel(c.source) }}</UBadge>
               </div>
               <p class="text-sm text-gray-600 dark:text-gray-300 mt-0.5 whitespace-pre-line break-words">{{ c.back }}</p>
-              <p v-if="c.context" class="text-xs italic text-gray-500 mt-1 line-clamp-2 border-l-2 border-gray-200 dark:border-gray-700 pl-2">“{{ c.context }}”</p>
+              <p v-if="c.context" class="text-xs italic text-gray-500 mt-1 line-clamp-2 border-l-2 border-gray-200 dark:border-gray-700 pl-2">
+                “{{ c.context }}”
+              </p>
               <div class="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-xs">
                 <span
                   class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-medium"
-                  :class="isDue(c) ? 'bg-warning-50 text-warning-700 dark:bg-warning-950 dark:text-warning-400' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'"
+                  :class="
+                    isDue(c)
+                      ? 'bg-warning-50 text-warning-700 dark:bg-warning-950 dark:text-warning-400'
+                      : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'
+                  "
                 >
                   <UIcon :name="isDue(c) ? 'i-lucide-alarm-clock' : 'i-lucide-calendar-clock'" class="w-3 h-3" />
                   {{ isDue(c) ? 'Due now' : `Next ${formatRelativeTime(c.dueAt)}` }}

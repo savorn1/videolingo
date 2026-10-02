@@ -114,7 +114,7 @@
 
           <ul v-if="preview" class="space-y-1.5 text-sm">
             <li class="flex items-center gap-2">
-              <UIcon name="i-lucide-users" class="w-4 h-4 text-gray-400" />
+              <UIcon name="i-lucide-users" class="w-4 h-4 text-sky-600 dark:text-sky-400" />
               <strong>{{ preview.recipientCount }}</strong> recipient{{ preview.recipientCount === 1 ? '' : 's' }}
               <span v-if="form.channels.length" class="text-gray-500">× {{ form.channels.length }} channel{{ form.channels.length === 1 ? '' : 's' }}</span>
             </li>

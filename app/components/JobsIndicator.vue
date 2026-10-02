@@ -1,6 +1,14 @@
 <template>
   <UTooltip v-if="allowed && counts.total > 0" :text="label">
-    <UButton to="/processing-jobs" size="sm" color="neutral" variant="ghost" :aria-label="`${label}. Open the jobs list`" data-testid="jobs-indicator">
+    <UButton
+      to="/processing-jobs"
+      size="sm"
+      color="neutral"
+      variant="ghost"
+      class="text-orange-600 hover:bg-orange-50 dark:text-orange-400 dark:hover:bg-orange-950/40"
+      :aria-label="`${label}. Open the jobs list`"
+      data-testid="jobs-indicator"
+    >
       <UIcon name="i-lucide-loader" class="h-4 w-4 animate-spin motion-reduce:animate-none" />
       <span class="text-xs tabular-nums">{{ counts.total }}</span>
     </UButton>

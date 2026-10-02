@@ -112,7 +112,9 @@
           </NuxtLink>
           <span class="text-gray-500 truncate flex-1">{{ u.username ?? '—' }}</span>
           <span class="font-medium tabular-nums">{{ formatUsd(u.costUsd) }}</span>
-          <span class="text-xs text-gray-400 w-20 text-right" :title="formatDateTime(u.createdAt)">{{ formatRelativeTime(u.createdAt) }}</span>
+          <span class="text-xs text-gray-500 w-20 text-right dark:text-gray-400" :title="formatDateTime(u.createdAt)">{{
+            formatRelativeTime(u.createdAt)
+          }}</span>
         </li>
       </ul>
     </UCard>

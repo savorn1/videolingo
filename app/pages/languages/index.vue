@@ -53,7 +53,7 @@
             >
               {{ row.transcriptCount }} transcript{{ row.transcriptCount === 1 ? '' : 's' }}
             </NuxtLink>
-            <span v-if="!row.videoCount && !row.transcriptCount" class="text-gray-400">Unused</span>
+            <span v-if="!row.videoCount && !row.transcriptCount" class="text-gray-500 dark:text-gray-400">Unused</span>
           </div>
         </template>
 

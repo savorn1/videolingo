@@ -8,13 +8,19 @@
       <li v-for="(r, i) in visible" :key="r.key" class="text-sm rounded-md px-2 py-1.5 -mx-2 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
         <div class="flex items-baseline justify-between gap-2">
           <div class="flex items-baseline gap-2 min-w-0">
-            <span class="w-4 shrink-0 text-xs text-gray-400 tabular-nums text-right">{{ i + 1 }}</span>
-            <component :is="r.to ? NuxtLink : 'span'" :to="r.to" class="min-w-0 truncate text-gray-800 dark:text-gray-200" :class="r.to ? 'hover:underline' : ''" :title="r.label">
+            <span class="w-4 shrink-0 text-xs text-gray-500 tabular-nums text-right dark:text-gray-400">{{ i + 1 }}</span>
+            <component
+              :is="r.to ? NuxtLink : 'span'"
+              :to="r.to"
+              class="min-w-0 truncate text-gray-800 dark:text-gray-200"
+              :class="r.to ? 'hover:underline' : ''"
+              :title="r.label"
+            >
               {{ r.label }}
             </component>
           </div>
           <div class="flex items-baseline gap-2 shrink-0">
-            <span class="text-xs text-gray-400 tabular-nums" :title="'Share of total'">{{ share(r.value) }}</span>
+            <span class="text-xs text-gray-500 tabular-nums dark:text-gray-400" :title="'Share of total'">{{ share(r.value) }}</span>
             <span class="font-medium tabular-nums text-gray-900 dark:text-white">{{ format(r.value) }}</span>
           </div>
         </div>
