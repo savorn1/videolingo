@@ -138,23 +138,16 @@
         />
         <ul v-else class="divide-y divide-gray-100 dark:divide-gray-800">
           <li v-for="c in shownCards" :key="c.id" class="group flex items-start gap-3 px-4 py-3.5 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
-            <div
-              class="shrink-0 mt-0.5 rounded-lg p-2"
-              :class="
-                isDue(c)
-                  ? 'bg-warning-50 text-warning-600 dark:bg-warning-950 dark:text-warning-400'
-                  : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'
-              "
-            >
+            <div class="shrink-0 mt-0.5 rounded-lg p-2" :class="sourceTone(c.source)">
               <UIcon :name="sourceIcon(c.source)" class="w-4 h-4 block" />
             </div>
             <div class="min-w-0 flex-1">
               <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
                 <p class="font-medium text-gray-900 dark:text-white break-words">{{ c.front }}</p>
-                <UBadge color="neutral" variant="subtle" size="sm">{{ sourceLabel(c.source) }}</UBadge>
+                <UBadge color="neutral" variant="subtle" size="sm" :class="sourceTone(c.source)">{{ sourceLabel(c.source) }}</UBadge>
               </div>
               <p class="text-sm text-gray-600 dark:text-gray-300 mt-0.5 whitespace-pre-line break-words">{{ c.back }}</p>
-              <p v-if="c.context" class="text-xs italic text-gray-500 mt-1 line-clamp-2 border-l-2 border-gray-200 dark:border-gray-700 pl-2">
+              <p v-if="c.context" class="text-xs italic text-gray-500 mt-1 line-clamp-2 border-l-2 border-violet-300 dark:border-violet-800 pl-2">
                 “{{ c.context }}”
               </p>
               <div class="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-xs">
@@ -163,7 +156,7 @@
                   :class="
                     isDue(c)
                       ? 'bg-warning-50 text-warning-700 dark:bg-warning-950 dark:text-warning-400'
-                      : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'
+                      : 'bg-sky-50 text-sky-800 dark:bg-sky-950/60 dark:text-sky-300'
                   "
                 >
                   <UIcon :name="isDue(c) ? 'i-lucide-alarm-clock' : 'i-lucide-calendar-clock'" class="w-3 h-3" />
@@ -176,7 +169,7 @@
                 <NuxtLink
                   v-if="c.videoId"
                   :to="`/learn/watch/${c.videoId}${c.atMs ? `?t=${c.atMs}` : ''}`"
-                  class="inline-flex items-center gap-1 text-primary-600 dark:text-primary-400 hover:underline"
+                  class="inline-flex items-center gap-1 text-sky-700 dark:text-sky-300 hover:underline"
                 >
                   <UIcon name="i-lucide-play" class="w-3 h-3" />
                   See in video
@@ -267,6 +260,14 @@ function isDue(c: StudyCard) {
 }
 function sourceIcon(source: string | null | undefined) {
   return source === 'KEY_POINT' ? 'i-lucide-lightbulb' : source === 'WORD' ? 'i-lucide-type' : 'i-lucide-square-pen'
+}
+// Each kind of card has its own colour: key points amber (an idea), words sky (a term), written-by-hand violet.
+function sourceTone(source: string | null | undefined) {
+  return source === 'KEY_POINT'
+    ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
+    : source === 'WORD'
+      ? 'bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300'
+      : 'bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-300'
 }
 function sourceLabel(source: string | null | undefined) {
   return source === 'KEY_POINT' ? 'Key point' : source === 'WORD' ? 'Word' : 'Card'

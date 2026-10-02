@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest'
-import { bucketSeries, describeDelta, describeRateDelta, formatCount, niceBytesTop, niceSecondsTop, rangeDates } from './analytics'
+import {
+  bucketSeries,
+  describeDelta,
+  describeRateDelta,
+  formatCount,
+  niceBytesTop,
+  niceSecondsTop,
+  rangeDates,
+  daysInRange,
+  validateCustomRange
+} from './analytics'
 
 describe('describeDelta', () => {
   it('reports whole-percent changes with a direction', () => {
@@ -70,5 +80,25 @@ describe('axis tops', () => {
     expect(niceSecondsTop(2000)).toBe(50 * 60)
     expect(niceSecondsTop(30 * 3600)).toBe(50 * 3600)
     expect(niceSecondsTop(5.7 * 86_400)).toBe(10 * 86_400)
+  })
+})
+
+describe('custom ranges', () => {
+  const today = new Date(2026, 9, 2) // 2 Oct 2026
+  it('counts days inclusively', () => {
+    expect(daysInRange('2026-09-01', '2026-09-30')).toBe(30)
+    expect(daysInRange('2026-09-05', '2026-09-05')).toBe(1)
+  })
+  it('accepts a sensible range and rejects the rest', () => {
+    expect(validateCustomRange('2026-09-01', '2026-09-30', today)).toBeNull()
+    expect(validateCustomRange('', '2026-09-30', today)).toBe('Pick both dates')
+    expect(validateCustomRange('2026-09-30', '2026-09-01', today)).toMatch(/start/)
+    expect(validateCustomRange('2026-09-01', '2026-10-03', today)).toMatch(/future/)
+    expect(validateCustomRange('2024-01-01', '2026-09-30', today)).toMatch(/two years/)
+  })
+  it('uses a valid custom range and falls back to 30 days otherwise', () => {
+    expect(rangeDates('custom', today, { from: '2026-09-01', to: '2026-09-10' })).toEqual({ from: '2026-09-01', to: '2026-09-10' })
+    expect(rangeDates('custom', today, { from: 'x', to: 'y' })).toEqual(rangeDates('30d', today))
+    expect(rangeDates('custom', today)).toEqual(rangeDates('30d', today))
   })
 })

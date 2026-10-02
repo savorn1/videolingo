@@ -1,12 +1,10 @@
 <template>
-  <span
-    class="inline-flex items-center gap-0.5 rounded-md bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 text-xs text-gray-700 dark:text-gray-300 whitespace-nowrap"
-  >
-    <span class="text-gray-500 dark:text-gray-400">#</span>{{ name }}
+  <span class="inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-xs font-medium whitespace-nowrap" :class="tone.chip">
+    <span :class="tone.hash">#</span>{{ name }}
     <button
       v-if="removable"
       type="button"
-      class="ml-0.5 -mr-0.5 rounded text-gray-400 hover:text-error-500 disabled:opacity-40"
+      class="ml-0.5 -mr-0.5 rounded opacity-60 hover:text-error-600 hover:opacity-100 disabled:opacity-40"
       :disabled="busy"
       :aria-label="`Remove tag ${name}`"
       @click.stop="emit('remove')"
@@ -17,6 +15,8 @@
 </template>
 
 <script setup lang="ts">
-defineProps<{ name: string; removable?: boolean; busy?: boolean }>()
+const props = defineProps<{ name: string; removable?: boolean; busy?: boolean }>()
+// Each tag has its own colour, worked out from its name (see shared/utils/tagColor.ts).
+const tone = computed(() => tagTone(props.name))
 const emit = defineEmits<{ remove: [] }>()
 </script>

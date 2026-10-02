@@ -108,7 +108,12 @@
           <!-- Settings (edit mode) / facts (view mode) -->
           <UCard v-if="editing">
             <template #header>
-              <h2 class="font-semibold text-gray-900 dark:text-white">Track settings</h2>
+              <h2 class="flex items-center gap-2 font-semibold text-gray-900 dark:text-white">
+                <span class="flex size-6 items-center justify-center rounded-md bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300">
+                  <UIcon name="i-lucide-settings-2" class="size-3.5" />
+                </span>
+                Track settings
+              </h2>
             </template>
             <div class="space-y-4">
               <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -161,8 +166,15 @@
           <template #header>
             <div class="flex flex-wrap items-center justify-between gap-2">
               <div class="flex items-center gap-2">
-                <h2 class="font-semibold text-gray-900 dark:text-white">Cues</h2>
-                <UBadge color="neutral" variant="subtle" size="sm">{{ (editing ? draft.length : cues.length).toLocaleString() }}</UBadge>
+                <h2 class="flex items-center gap-2 font-semibold text-gray-900 dark:text-white">
+                  <span class="flex size-6 items-center justify-center rounded-md bg-violet-100 text-violet-700 dark:bg-violet-950 dark:text-violet-300">
+                    <UIcon name="i-lucide-subtitles" class="size-3.5" />
+                  </span>
+                  Cues
+                </h2>
+                <UBadge color="neutral" variant="subtle" size="sm" class="bg-violet-50 text-violet-800 dark:bg-violet-950/60 dark:text-violet-300">{{
+                  (editing ? draft.length : cues.length).toLocaleString()
+                }}</UBadge>
                 <button v-if="editing && invalidCount" type="button" @click="onlyIssues = true">
                   <UBadge color="error" variant="subtle" size="sm" class="cursor-pointer">{{ invalidCount }} to fix</UBadge>
                 </button>
@@ -201,8 +213,8 @@
                   @click="seek(cues[i]!.startMs, true)"
                 >
                   <div class="shrink-0 w-24 font-mono text-[11px] leading-4 text-gray-500 tabular-nums pt-0.5">
-                    <div class="text-primary-600 dark:text-primary-400">{{ formatTimestamp(cues[i]!.startMs) }}</div>
-                    <div>{{ formatTimestamp(cues[i]!.endMs) }}</div>
+                    <div class="text-sky-700 dark:text-sky-300">{{ formatTimestamp(cues[i]!.startMs) }}</div>
+                    <div class="text-violet-700 dark:text-violet-300">{{ formatTimestamp(cues[i]!.endMs) }}</div>
                   </div>
                   <div class="min-w-0 flex-1">
                     <p class="text-sm text-gray-900 dark:text-white whitespace-pre-line">{{ cues[i]!.text }}</p>
@@ -250,7 +262,7 @@
                         />
                       </template>
                     </UInput>
-                    <span class="text-gray-500 dark:text-gray-400">→</span>
+                    <span class="text-violet-600 dark:text-violet-400">→</span>
                     <UInput v-model="draft[i]!.end" size="xs" class="w-28 font-mono" aria-label="End time">
                       <template #trailing>
                         <UButton

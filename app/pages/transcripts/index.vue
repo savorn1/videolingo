@@ -56,8 +56,20 @@
 
           <template #language-data="{ row }">
             <div class="flex items-center gap-1.5 whitespace-nowrap">
-              {{ languageLabel(row.language) }}
-              <UBadge v-if="row.videoLanguage && row.language !== row.videoLanguage" size="sm" color="neutral" variant="outline">Translation</UBadge>
+              <span
+                class="inline-flex items-center gap-1 rounded-md bg-sky-50 px-1.5 py-0.5 text-xs font-medium text-sky-800 dark:bg-sky-950/60 dark:text-sky-300"
+              >
+                <UIcon name="i-lucide-globe" class="size-3" />
+                {{ languageLabel(row.language) }}
+              </span>
+              <!-- A transcript in a language other than the video's own -->
+              <span
+                v-if="row.videoLanguage && row.language !== row.videoLanguage"
+                class="inline-flex items-center gap-1 rounded-md bg-violet-100 px-1.5 py-0.5 text-[11px] font-semibold text-violet-800 dark:bg-violet-950 dark:text-violet-300"
+              >
+                <UIcon name="i-lucide-languages" class="size-3" />
+                Translation
+              </span>
             </div>
           </template>
 
@@ -131,7 +143,7 @@
                 :to="{ path: `/transcripts/${hit.transcriptId}`, query: { q: debouncedTextQuery.trim(), t: hit.startMs } }"
                 class="flex gap-4 py-3 px-2 -mx-2 rounded-md hover:bg-gray-50 dark:hover:bg-gray-800/50"
               >
-                <span class="shrink-0 w-20 font-mono text-xs text-gray-500 pt-0.5 tabular-nums">{{ formatTimestamp(hit.startMs) }}</span>
+                <span class="shrink-0 w-20 pt-0.5 font-mono text-xs tabular-nums text-sky-700 dark:text-sky-300">{{ formatTimestamp(hit.startMs) }}</span>
                 <span class="min-w-0 flex-1">
                   <span class="block text-sm text-gray-900 dark:text-white whitespace-pre-line">
                     <template v-for="(part, i) in splitHighlight(hit.text, debouncedTextQuery)" :key="i">

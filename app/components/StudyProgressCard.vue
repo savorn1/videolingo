@@ -6,7 +6,11 @@
         <div class="flex items-center gap-3">
           <div
             class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl"
-            :class="streak ? 'bg-warning-50 text-warning-600 dark:bg-warning-950 dark:text-warning-400' : 'bg-gray-100 text-gray-400 dark:bg-gray-800 dark:text-gray-500'"
+            :class="
+              streak
+                ? 'bg-warning-50 text-warning-600 dark:bg-warning-950 dark:text-warning-400'
+                : 'bg-gray-100 text-gray-400 dark:bg-gray-800 dark:text-gray-500'
+            "
           >
             <UIcon name="i-lucide-flame" class="h-6 w-6" />
           </div>
@@ -21,7 +25,7 @@
         <!-- Today's goal -->
         <div class="min-w-0 space-y-2">
           <div class="flex items-baseline justify-between gap-2">
-            <p class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Today</p>
+            <p class="text-xs font-semibold uppercase tracking-wide text-sky-700 dark:text-sky-300">Today</p>
             <p class="text-xs tabular-nums text-gray-500 dark:text-gray-400">{{ todayMinutes }} of {{ goalMinutes }} min</p>
           </div>
           <div
@@ -34,7 +38,7 @@
           >
             <div
               class="h-full rounded-full transition-[width] duration-500 motion-reduce:transition-none"
-              :class="goalDone >= 1 ? 'bg-success-500' : 'bg-primary-500 dark:bg-primary-400'"
+              :class="goalDone >= 1 ? 'bg-success-500' : 'bg-sky-500 dark:bg-sky-400'"
               :style="{ width: `${Math.round(goalDone * 100)}%` }"
             />
           </div>
@@ -63,7 +67,7 @@
         <!-- Last 7 days -->
         <div class="min-w-0">
           <div class="flex items-baseline justify-between gap-2">
-            <p class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Last 7 days</p>
+            <p class="text-xs font-semibold uppercase tracking-wide text-violet-700 dark:text-violet-300">Last 7 days</p>
             <p v-if="best > 1" class="text-xs text-gray-500 dark:text-gray-400">Best streak {{ best }}</p>
           </div>
           <ul class="mt-2 flex h-14 items-end gap-1.5" aria-label="Study time per day">
@@ -71,7 +75,7 @@
               <span class="flex w-full flex-1 items-end">
                 <span
                   class="w-full rounded-sm"
-                  :class="d.active ? 'bg-primary-500 dark:bg-primary-400' : d.seconds ? 'bg-primary-200 dark:bg-primary-900' : 'bg-gray-100 dark:bg-gray-800'"
+                  :class="d.active ? 'bg-violet-500 dark:bg-violet-400' : d.seconds ? 'bg-violet-200 dark:bg-violet-900' : 'bg-gray-100 dark:bg-gray-800'"
                   :style="{ height: d.height }"
                 />
               </span>

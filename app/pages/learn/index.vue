@@ -4,7 +4,7 @@
 
     <UAlert
       v-if="stats && stats.due"
-      color="primary"
+      color="warning"
       variant="subtle"
       icon="i-lucide-layers"
       class="mb-6"
@@ -12,7 +12,14 @@
       description="A few minutes of review now makes the words stick."
     >
       <template #actions>
-        <UButton size="sm" icon="i-lucide-play" to="/learn/cards">Review now</UButton>
+        <UButton
+          size="sm"
+          color="neutral"
+          class="bg-amber-500 text-amber-950 hover:bg-amber-600 dark:bg-amber-400 dark:hover:bg-amber-300"
+          icon="i-lucide-play"
+          to="/learn/cards"
+          >Review now</UButton
+        >
       </template>
     </UAlert>
 
@@ -23,7 +30,9 @@
     <!-- Collections -->
     <section v-if="collections.length" class="mb-6">
       <h2 class="font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
-        <UIcon name="i-lucide-library" class="w-4 h-4 text-gray-400" />
+        <span class="flex size-6 items-center justify-center rounded-md bg-violet-100 text-violet-700 dark:bg-violet-950 dark:text-violet-300">
+          <UIcon name="i-lucide-library" class="size-3.5" />
+        </span>
         Courses & collections
       </h2>
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-4">
@@ -31,7 +40,7 @@
           v-for="c in collections"
           :key="c.id"
           :to="`/learn/collections/${c.id}`"
-          class="group rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 overflow-hidden hover:shadow-md hover:border-primary-300 transition"
+          class="group rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 overflow-hidden hover:shadow-md hover:border-violet-300 dark:hover:border-violet-700 transition"
         >
           <CollectionCover :src="c.coverUrl">
             <span class="absolute bottom-2 right-2 rounded bg-black/70 px-1.5 py-0.5 text-xs font-semibold text-white">
@@ -50,7 +59,9 @@
     <section>
       <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
         <h2 class="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-          <UIcon name="i-lucide-clapperboard" class="w-4 h-4 text-gray-400" />
+          <span class="flex size-6 items-center justify-center rounded-md bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300">
+            <UIcon name="i-lucide-clapperboard" class="size-3.5" />
+          </span>
           All videos
           <span v-if="total" class="text-sm font-normal text-gray-500 dark:text-gray-400 tabular-nums">{{ total }}</span>
         </h2>

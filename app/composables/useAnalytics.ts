@@ -225,6 +225,9 @@ export function useAnalyticsArea<A extends AnalyticsArea>(area: A, range: Ref<{ 
   const data = ref<AnalyticsByArea[A] | null>(null) as Ref<AnalyticsByArea[A] | null>
   const loading = ref(true)
   const error = ref('')
+  // Shared by every area: when the numbers on screen were fetched, and a counter the page's Refresh button bumps.
+  const updatedAt = useState<number | null>('analytics-updated', () => null)
+  const refreshTick = useState<number>('analytics-refresh', () => 0)
   let seq = 0
 
   async function load() {
@@ -233,7 +236,10 @@ export function useAnalyticsArea<A extends AnalyticsArea>(area: A, range: Ref<{ 
     error.value = ''
     try {
       const result = await get(area, range.value.from, range.value.to)
-      if (mine === seq) data.value = result
+      if (mine === seq) {
+        data.value = result
+        updatedAt.value = Date.now()
+      }
     } catch (err) {
       if (mine === seq) error.value = apiErrorMessage(err)
     } finally {
@@ -242,6 +248,7 @@ export function useAnalyticsArea<A extends AnalyticsArea>(area: A, range: Ref<{ 
   }
 
   watch(range, load, { deep: true })
+  watch(refreshTick, load)
   onMounted(load)
   return { data, loading, error, reload: load }
 }

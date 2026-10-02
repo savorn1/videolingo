@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatJobParameters, isActiveJobStatus, jobTypeMeta, logsToText } from './processingJobs'
+import { formatJobParameters, isActiveJobStatus, JOB_STATUSES, JOB_TYPES, jobTypeMeta, logsToText } from './processingJobs'
 import { humanize } from './format'
 
 Object.assign(globalThis, { humanize })
@@ -23,7 +23,8 @@ describe('jobTypeMeta', () => {
   })
 
   it('falls back to a humanized label for a type the UI does not know yet', () => {
-    expect(jobTypeMeta('DETECT_SCENES')).toEqual({ label: 'Detect scenes', icon: 'i-lucide-cog' })
+    expect(jobTypeMeta('DETECT_SCENES')).toMatchObject({ label: 'Detect scenes', icon: 'i-lucide-cog' })
+    expect(jobTypeMeta('DETECT_SCENES').tone).toBeTruthy()
   })
 })
 
@@ -49,5 +50,16 @@ describe('logsToText', () => {
       { level: 'ERROR', message: 'Boom', createdAt: '2026-09-23T12:00:02' }
     ])
     expect(text).toBe('2026-09-23 12:00:01 INFO  Started\n2026-09-23 12:00:02 ERROR Boom')
+  })
+})
+
+describe('job colours', () => {
+  it('give every status a tile tone and every type its own colour', () => {
+    for (const s of JOB_STATUSES) {
+      expect(s.tone.edge, s.value).toBeTruthy()
+      expect(s.tone.count, s.value).toBeTruthy()
+      expect(s.tone.active, s.value).toBeTruthy()
+    }
+    expect(new Set(JOB_TYPES.map((t) => t.tone)).size).toBe(JOB_TYPES.length)
   })
 })

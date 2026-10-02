@@ -18,11 +18,11 @@
         v-for="s in JOB_STATUSES"
         :key="s.value"
         type="button"
-        class="text-left rounded-lg border p-3 transition-colors"
+        class="text-left rounded-lg border border-l-4 p-3 transition-colors"
         :class="
           filter.status === s.value
-            ? 'border-primary-500 bg-primary-50 dark:bg-primary-950/40 ring-1 ring-primary-500'
-            : 'border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 hover:border-gray-300 dark:hover:border-gray-700'
+            ? [s.tone.active, 'ring-1']
+            : ['border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 hover:border-gray-300 dark:hover:border-gray-700', s.tone.edge]
         "
         :aria-pressed="filter.status === s.value"
         @click="onFilterStatus(s.value)"
@@ -32,7 +32,7 @@
         </div>
         <!-- A div, not a <p>: the skeleton is a block element, and a div inside
              a <p> is invalid HTML that the browser re-parses, which broke hydration. -->
-        <div class="mt-2 text-2xl font-bold tabular-nums text-gray-900 dark:text-white">
+        <div class="mt-2 text-2xl font-bold tabular-nums" :class="s.tone.count">
           <USkeleton v-if="!counts" class="h-7 w-10" />
           <template v-else>{{ (counts[s.value] ?? 0).toLocaleString() }}</template>
         </div>
@@ -84,7 +84,9 @@
 
         <template #type-data="{ row }">
           <div class="flex items-center gap-2 whitespace-nowrap">
-            <UIcon :name="jobTypeMeta(row.type).icon" class="w-4 h-4 text-gray-400" />
+            <span class="flex size-6 shrink-0 items-center justify-center rounded-md" :class="jobTypeMeta(row.type).tone">
+              <UIcon :name="jobTypeMeta(row.type).icon" class="w-3.5 h-3.5" />
+            </span>
             {{ jobTypeMeta(row.type).label }}
           </div>
         </template>

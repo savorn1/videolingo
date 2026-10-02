@@ -105,8 +105,15 @@
           <template #header>
             <div class="flex flex-wrap items-center justify-between gap-3">
               <div class="flex items-center gap-2">
-                <h2 class="font-semibold text-gray-900 dark:text-white">Segments</h2>
-                <UBadge color="neutral" variant="subtle" size="sm">{{ (editing ? draft.length : segments.length).toLocaleString() }}</UBadge>
+                <h2 class="flex items-center gap-2 font-semibold text-gray-900 dark:text-white">
+                  <span class="flex size-6 items-center justify-center rounded-md bg-violet-100 text-violet-700 dark:bg-violet-950 dark:text-violet-300">
+                    <UIcon name="i-lucide-text-quote" class="size-3.5" />
+                  </span>
+                  Segments
+                </h2>
+                <UBadge color="neutral" variant="subtle" size="sm" class="bg-violet-50 text-violet-800 dark:bg-violet-950/60 dark:text-violet-300">{{
+                  (editing ? draft.length : segments.length).toLocaleString()
+                }}</UBadge>
                 <UBadge v-if="editing && invalidCount" color="error" variant="subtle" size="sm">{{ invalidCount }} to fix</UBadge>
               </div>
               <div class="flex items-center gap-2">
@@ -170,14 +177,14 @@
                 >
                   <button
                     type="button"
-                    class="shrink-0 w-20 text-left font-mono text-xs text-primary-600 dark:text-primary-400 hover:underline pt-0.5 tabular-nums"
+                    class="shrink-0 w-20 text-left font-mono text-xs text-sky-700 dark:text-sky-300 hover:underline pt-0.5 tabular-nums"
                     :title="`Play from ${formatTimestamp(seg.startMs)}`"
                     @click="seek(seg.startMs, true)"
                   >
                     {{ formatTimestamp(seg.startMs) }}
                   </button>
                   <div class="min-w-0 flex-1 text-sm text-gray-900 dark:text-white whitespace-pre-line">
-                    <span v-if="seg.speaker" class="font-semibold text-gray-500 dark:text-gray-400">{{ seg.speaker }}: </span>
+                    <span v-if="seg.speaker" class="font-semibold text-emerald-700 dark:text-emerald-300">{{ seg.speaker }}: </span>
                     <template v-for="(part, p) in splitHighlight(seg.text, find)" :key="p">
                       <mark v-if="part.match" class="bg-yellow-200 dark:bg-yellow-500/40 text-inherit rounded-sm px-0.5">{{ part.text }}</mark>
                       <template v-else>{{ part.text }}</template>
@@ -214,7 +221,7 @@
                         </UTooltip>
                       </template>
                     </UInput>
-                    <span class="text-gray-500 dark:text-gray-400">→</span>
+                    <span class="text-violet-600 dark:text-violet-400">→</span>
                     <UInput v-model="row.end" size="xs" class="w-28 font-mono" aria-label="End time" placeholder="0:02.000">
                       <template #trailing>
                         <UTooltip text="Set to player time">

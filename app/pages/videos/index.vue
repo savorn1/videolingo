@@ -130,8 +130,36 @@
           </div>
         </template>
 
+        <template #language-data="{ row }">
+          <span
+            v-if="row.language"
+            class="inline-flex items-center gap-1 whitespace-nowrap rounded-md bg-sky-50 px-1.5 py-0.5 text-xs font-medium text-sky-800 dark:bg-sky-950/60 dark:text-sky-300"
+          >
+            <UIcon name="i-lucide-globe" class="size-3" />
+            {{ languageLabel(row.language) }}
+          </span>
+          <span v-else class="text-gray-500 dark:text-gray-400">—</span>
+        </template>
+
+        <template #durationSeconds-data="{ row }">
+          <span class="inline-flex items-center gap-1 whitespace-nowrap tabular-nums">
+            <UIcon name="i-lucide-clock" class="size-3.5 text-violet-600 dark:text-violet-400" />
+            {{ formatDuration(row.durationSeconds) }}
+          </span>
+        </template>
+
+        <template #viewCount-data="{ row }">
+          <span
+            class="inline-flex items-center gap-1 whitespace-nowrap tabular-nums"
+            :class="row.viewCount ? 'text-emerald-700 dark:text-emerald-300' : 'text-gray-500 dark:text-gray-400'"
+          >
+            <UIcon name="i-lucide-eye" class="size-3.5" />
+            {{ (row.viewCount ?? 0).toLocaleString() }}
+          </span>
+        </template>
+
         <template #ownerUsername-data="{ row }">
-          <NuxtLink v-if="row.ownerUsername" :to="`/users/${row.ownerId}`" class="text-primary-600 dark:text-primary-400 hover:underline" @click.stop>
+          <NuxtLink v-if="row.ownerUsername" :to="`/users/${row.ownerId}`" class="text-violet-700 dark:text-violet-300 hover:underline" @click.stop>
             {{ row.ownerUsername }}
           </NuxtLink>
           <span v-else class="text-gray-500 dark:text-gray-400">{{ row.ownerId ? 'Deleted user' : '—' }}</span>

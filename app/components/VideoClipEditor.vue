@@ -299,7 +299,7 @@
         <UTabs
           v-model="mode"
           :items="tabItems"
-          variant="link"
+          variant="pill"
           :ui="{ list: 'mb-4', trigger: 'flex-1 flex-col gap-1 px-1 text-xs', leadingIcon: 'size-5', label: 'truncate', indicator: TAB_TONES[mode].indicator }"
         >
           <!-- ── Trim & crop ───────────────────────────────────────────── -->
@@ -2260,48 +2260,28 @@ const trimSummary = computed(() => {
   if (orientActive.value) parts.push(describeOrientation(orient.value))
   return parts.join(' · ')
 })
-// Each tab has its own colour: its icon is tinted (stronger when selected) and the
-// underline under the selected tab matches, so it's clear which tool is open.
+// Each tab has its own colour: the selected tab is a filled pill in it with white text and icon (the 700
+// shade keeps white above 4.5:1), so it's clear which tool is open. The others stay plain.
 const TAB_TONES: Record<typeof mode.value, { indicator: string; ui: { trigger: string; leadingIcon: string; label: string } }> = {
   trim: {
-    indicator: 'bg-sky-600 dark:bg-sky-400',
-    ui: {
-      trigger: 'data-[state=active]:text-sky-700 dark:data-[state=active]:text-sky-400',
-      leadingIcon: 'text-sky-600/70 group-data-[state=active]:text-sky-600 dark:text-sky-400/70 dark:group-data-[state=active]:text-sky-400',
-      label: ''
-    }
+    indicator: 'bg-sky-700 shadow-sm',
+    ui: { trigger: 'data-[state=active]:text-white', leadingIcon: 'group-data-[state=active]:text-white', label: '' }
   },
   split: {
-    indicator: 'bg-violet-600 dark:bg-violet-400',
-    ui: {
-      trigger: 'data-[state=active]:text-violet-700 dark:data-[state=active]:text-violet-400',
-      leadingIcon: 'text-violet-600/70 group-data-[state=active]:text-violet-600 dark:text-violet-400/70 dark:group-data-[state=active]:text-violet-400',
-      label: ''
-    }
+    indicator: 'bg-violet-700 shadow-sm',
+    ui: { trigger: 'data-[state=active]:text-white', leadingIcon: 'group-data-[state=active]:text-white', label: '' }
   },
   audio: {
-    indicator: 'bg-emerald-600 dark:bg-emerald-400',
-    ui: {
-      trigger: 'data-[state=active]:text-emerald-700 dark:data-[state=active]:text-emerald-400',
-      leadingIcon: 'text-emerald-600/70 group-data-[state=active]:text-emerald-600 dark:text-emerald-400/70 dark:group-data-[state=active]:text-emerald-400',
-      label: ''
-    }
+    indicator: 'bg-emerald-700 shadow-sm',
+    ui: { trigger: 'data-[state=active]:text-white', leadingIcon: 'group-data-[state=active]:text-white', label: '' }
   },
   overlay: {
-    indicator: 'bg-rose-600 dark:bg-rose-400',
-    ui: {
-      trigger: 'data-[state=active]:text-rose-700 dark:data-[state=active]:text-rose-400',
-      leadingIcon: 'text-rose-600/70 group-data-[state=active]:text-rose-600 dark:text-rose-400/70 dark:group-data-[state=active]:text-rose-400',
-      label: ''
-    }
+    indicator: 'bg-rose-700 shadow-sm',
+    ui: { trigger: 'data-[state=active]:text-white', leadingIcon: 'group-data-[state=active]:text-white', label: '' }
   },
   join: {
-    indicator: 'bg-orange-600 dark:bg-orange-400',
-    ui: {
-      trigger: 'data-[state=active]:text-orange-700 dark:data-[state=active]:text-orange-400',
-      leadingIcon: 'text-orange-600/70 group-data-[state=active]:text-orange-600 dark:text-orange-400/70 dark:group-data-[state=active]:text-orange-400',
-      label: ''
-    }
+    indicator: 'bg-orange-700 shadow-sm',
+    ui: { trigger: 'data-[state=active]:text-white', leadingIcon: 'group-data-[state=active]:text-white', label: '' }
   }
 }
 // A tab whose edit is being made shows its progress on the tab, so it can be left

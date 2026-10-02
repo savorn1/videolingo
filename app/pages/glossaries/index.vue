@@ -49,14 +49,30 @@
           </div>
         </template>
         <template #languages-data="{ row }">
-          <span class="whitespace-nowrap">
-            {{ row.sourceLanguage ? languageLabel(row.sourceLanguage) : 'Any language' }}
-            <UIcon name="i-lucide-arrow-right" class="w-3 h-3 mx-1 align-middle text-gray-400" />
-            {{ languageLabel(row.targetLanguage) }}
+          <!-- From → to, each side in its own colour so the direction reads at a glance -->
+          <span class="inline-flex items-center gap-1.5 whitespace-nowrap">
+            <span
+              class="rounded-md px-1.5 py-0.5 text-xs font-medium"
+              :class="
+                row.sourceLanguage
+                  ? 'bg-sky-50 text-sky-800 dark:bg-sky-950/60 dark:text-sky-300'
+                  : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'
+              "
+            >
+              {{ row.sourceLanguage ? languageLabel(row.sourceLanguage) : 'Any language' }}
+            </span>
+            <UIcon name="i-lucide-arrow-right" class="w-3.5 h-3.5 text-violet-600 dark:text-violet-400" />
+            <span class="rounded-md bg-emerald-50 px-1.5 py-0.5 text-xs font-medium text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
+              {{ languageLabel(row.targetLanguage) }}
+            </span>
           </span>
         </template>
         <template #termCount-data="{ row }">
-          <span class="tabular-nums">{{ row.termCount.toLocaleString() }}</span>
+          <span
+            class="inline-flex min-w-8 justify-center rounded-md bg-violet-50 px-1.5 py-0.5 text-xs font-semibold tabular-nums text-violet-800 dark:bg-violet-950/60 dark:text-violet-300"
+          >
+            {{ row.termCount.toLocaleString() }}
+          </span>
         </template>
         <template #enabled-data="{ row }">
           <UBadge :color="row.enabled ? 'success' : 'neutral'" variant="subtle">{{ row.enabled ? 'Enabled' : 'Off' }}</UBadge>

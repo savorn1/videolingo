@@ -75,8 +75,15 @@
       <UCard class="xl:col-span-2" :ui="{ body: 'p-0 sm:p-0' }">
         <template #header>
           <div class="flex flex-wrap items-center gap-2">
-            <h2 class="font-semibold text-gray-900 dark:text-white">Videos</h2>
-            <UBadge color="neutral" variant="subtle" size="sm">{{ collection.videoCount }}</UBadge>
+            <h2 class="flex items-center gap-2 font-semibold text-gray-900 dark:text-white">
+              <span class="flex size-6 items-center justify-center rounded-md bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300">
+                <UIcon name="i-lucide-clapperboard" class="size-3.5" />
+              </span>
+              Videos
+            </h2>
+            <UBadge color="neutral" variant="subtle" size="sm" class="bg-sky-50 text-sky-800 dark:bg-sky-950/60 dark:text-sky-300">{{
+              collection.videoCount
+            }}</UBadge>
             <UInput v-if="items.length > 8" v-model="itemSearch" size="sm" icon="i-lucide-search" placeholder="Search this collection's videos" class="w-56" />
             <UButton
               v-if="collection.videoCount > 1"
@@ -98,13 +105,13 @@
           <template v-for="group in groupedItems" :key="group.label ?? '__none__'">
             <div
               v-if="group.label"
-              class="sticky top-0 z-10 bg-gray-50 dark:bg-gray-900/90 backdrop-blur px-4 py-1.5 text-xs font-semibold text-gray-500 dark:text-gray-400 border-y border-gray-100 dark:border-gray-800"
+              class="sticky top-0 z-10 bg-violet-50 dark:bg-violet-950/70 backdrop-blur px-4 py-1.5 text-xs font-semibold text-violet-800 dark:text-violet-300 border-y border-violet-100 dark:border-violet-900"
             >
               {{ group.label }}
             </div>
             <ol class="divide-y divide-gray-100 dark:divide-gray-800">
               <li v-for="item in group.items" :key="item.videoId" class="flex items-center gap-3 px-4 py-3" :class="item.deleted ? 'opacity-60' : ''">
-                <span class="w-6 text-right text-sm font-semibold text-gray-500 tabular-nums dark:text-gray-400">{{ item.position + 1 }}</span>
+                <span class="w-6 text-right text-sm font-semibold text-sky-700 tabular-nums dark:text-sky-300">{{ item.position + 1 }}</span>
                 <NuxtLink :to="`/videos/${item.videoId}`" class="relative w-24 aspect-video shrink-0 rounded overflow-hidden bg-gray-100 dark:bg-gray-800">
                   <img
                     v-if="item.thumbnailUrl && !brokenThumbs.has(item.videoId)"
@@ -230,7 +237,7 @@
           </div>
           <div v-if="analytics.videos.length" class="rounded-lg border border-gray-200 dark:border-gray-800 max-h-96 overflow-y-auto">
             <table class="w-full text-sm">
-              <thead class="sticky top-0 bg-gray-50 dark:bg-gray-900 text-left text-xs text-gray-500">
+              <thead class="sticky top-0 bg-sky-50 text-left text-xs text-sky-800 dark:bg-sky-950 dark:text-sky-300">
                 <tr>
                   <th class="px-3 py-2 font-medium">Video</th>
                   <th class="px-3 py-2 font-medium text-right">Started</th>

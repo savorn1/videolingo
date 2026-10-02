@@ -82,10 +82,19 @@ export const COLLECTION_VISIBILITIES: {
   description: string
   icon: string
   color: 'success' | 'info' | 'neutral'
+  /** A coloured edge for the collection's card, so who can see it reads before the label does. */
+  accent: string
 }[] = [
-  { value: 'PUBLIC', label: 'Public', description: 'Listed for all learners', icon: 'i-lucide-globe', color: 'success' },
-  { value: 'UNLISTED', label: 'Unlisted', description: 'Anyone with the link', icon: 'i-lucide-link', color: 'info' },
-  { value: 'PRIVATE', label: 'Private', description: 'Only the owner', icon: 'i-lucide-lock', color: 'neutral' }
+  { value: 'PUBLIC', label: 'Public', description: 'Listed for all learners', icon: 'i-lucide-globe', color: 'success', accent: 'border-t-emerald-500' },
+  { value: 'UNLISTED', label: 'Unlisted', description: 'Anyone with the link', icon: 'i-lucide-link', color: 'info', accent: 'border-t-sky-500' },
+  {
+    value: 'PRIVATE',
+    label: 'Private',
+    description: 'Only the owner',
+    icon: 'i-lucide-lock',
+    color: 'neutral',
+    accent: 'border-t-gray-400 dark:border-t-gray-500'
+  }
 ]
 
 export function useCollections() {

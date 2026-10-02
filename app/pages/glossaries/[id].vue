@@ -22,7 +22,12 @@
     <div v-else-if="isNew || glossary" class="grid grid-cols-1 xl:grid-cols-3 gap-4 items-start">
       <UCard>
         <template #header>
-          <h2 class="font-semibold text-gray-900 dark:text-white">Glossary</h2>
+          <h2 class="flex items-center gap-2 font-semibold text-gray-900 dark:text-white">
+            <span class="flex size-6 items-center justify-center rounded-md bg-violet-100 text-violet-700 dark:bg-violet-950 dark:text-violet-300">
+              <UIcon name="i-lucide-book-a" class="size-3.5" />
+            </span>
+            Glossary
+          </h2>
         </template>
         <fieldset :disabled="!canWrite" class="space-y-4">
           <UFormField label="Name" required>
@@ -53,8 +58,15 @@
         <template #header>
           <div class="flex flex-wrap items-center justify-between gap-2">
             <div class="flex items-center gap-2">
-              <h2 class="font-semibold text-gray-900 dark:text-white">Terms</h2>
-              <UBadge color="neutral" variant="subtle" size="sm">{{ terms.length.toLocaleString() }}</UBadge>
+              <h2 class="flex items-center gap-2 font-semibold text-gray-900 dark:text-white">
+                <span class="flex size-6 items-center justify-center rounded-md bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300">
+                  <UIcon name="i-lucide-list" class="size-3.5" />
+                </span>
+                Terms
+              </h2>
+              <UBadge color="neutral" variant="subtle" size="sm" class="bg-violet-50 text-violet-800 dark:bg-violet-950/60 dark:text-violet-300">{{
+                terms.length.toLocaleString()
+              }}</UBadge>
               <UBadge v-if="problemCount" color="error" variant="subtle" size="sm">{{ problemCount }} to fix</UBadge>
             </div>
             <div class="flex items-center gap-2">
@@ -74,7 +86,7 @@
         />
         <div v-else class="max-h-[70vh] overflow-y-auto">
           <table class="w-full text-sm">
-            <thead class="sticky top-0 z-10 bg-gray-50 dark:bg-gray-900 text-left text-xs text-gray-500">
+            <thead class="sticky top-0 z-10 bg-violet-50 text-left text-xs text-violet-800 dark:bg-violet-950 dark:text-violet-300">
               <tr>
                 <th class="px-4 py-2 font-medium">Source</th>
                 <th class="px-2 py-2 font-medium">Translation</th>

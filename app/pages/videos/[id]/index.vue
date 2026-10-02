@@ -101,7 +101,14 @@
                 <UBadge v-else :color="video.enabled ? 'success' : 'warning'" variant="subtle">{{ video.enabled ? 'Enabled' : 'Disabled' }}</UBadge>
                 <UBadge v-if="video.archived" color="neutral" variant="subtle" icon="i-lucide-archive">Archived</UBadge>
                 <UBadge :color="visibilityMeta.color" variant="subtle" :icon="visibilityMeta.icon">{{ visibilityMeta.label }}</UBadge>
-                <UBadge v-if="video.language" color="neutral" variant="subtle" icon="i-lucide-languages">{{ languageLabel(video.language) }}</UBadge>
+                <UBadge
+                  v-if="video.language"
+                  color="neutral"
+                  variant="subtle"
+                  icon="i-lucide-languages"
+                  class="bg-sky-50 text-sky-800 dark:bg-sky-950/60 dark:text-sky-300"
+                  >{{ languageLabel(video.language) }}</UBadge
+                >
                 <CategoryBadge v-for="c in video.categories" :key="c.id" :name="c.name" :color="c.color" :enabled="c.enabled" />
               </div>
               <div class="pb-2 border-b border-gray-100 dark:border-gray-800">
@@ -135,7 +142,7 @@
       <UTabs v-model="tab" :items="tabItems" variant="link" class="w-full" :ui="{ list: 'mb-4' }">
         <template #details>
           <UCard>
-            <h3 class="text-sm font-semibold text-gray-500 dark:text-gray-400 mb-1">Description</h3>
+            <h3 class="mb-1 text-sm font-semibold text-violet-700 dark:text-violet-300">Description</h3>
             <p v-if="video.description" class="text-sm text-gray-900 dark:text-white whitespace-pre-line">{{ video.description }}</p>
             <p v-else class="text-sm text-gray-500 dark:text-gray-400">No description.</p>
           </UCard>
@@ -233,7 +240,12 @@
 
           <UCard>
             <template #header>
-              <h3 class="font-semibold text-gray-900 dark:text-white">Daily views</h3>
+              <h3 class="flex items-center gap-2 font-semibold text-gray-900 dark:text-white">
+                <span class="flex size-6 items-center justify-center rounded-md bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
+                  <UIcon name="i-lucide-chart-no-axes-column" class="size-3.5" />
+                </span>
+                Daily views
+              </h3>
             </template>
             <div v-if="stats && periodViews > 0" class="flex items-end gap-px h-40" role="img" :aria-label="`Daily views over the last ${statDays} days`">
               <div v-for="day in stats.dailyViews" :key="day.date" class="group relative flex-1 h-full flex items-end">

@@ -51,7 +51,12 @@
         <UCard class="lg:col-span-2" :ui="{ body: 'p-0 sm:p-0' }">
           <template #header>
             <div class="flex items-center justify-between gap-2">
-              <h2 class="font-semibold text-gray-900 dark:text-white">Videos in this category</h2>
+              <h2 class="flex items-center gap-2 font-semibold text-gray-900 dark:text-white">
+                <span class="flex size-6 items-center justify-center rounded-md bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300">
+                  <UIcon name="i-lucide-clapperboard" class="size-3.5" />
+                </span>
+                Videos in this category
+              </h2>
               <UButton
                 v-if="category.videoCount"
                 size="xs"
@@ -68,7 +73,7 @@
             <li v-for="v in videos" :key="v.id">
               <NuxtLink :to="`/videos/${v.id}`" class="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800/40">
                 <div class="relative w-20 aspect-video shrink-0 rounded overflow-hidden bg-gray-100 dark:bg-gray-800">
-                  <UIcon name="i-lucide-clapperboard" class="absolute inset-0 m-auto w-4 h-4 text-gray-400" />
+                  <UIcon name="i-lucide-clapperboard" class="absolute inset-0 m-auto w-4 h-4 text-sky-600 dark:text-sky-400" />
                 </div>
                 <div class="min-w-0 flex-1">
                   <p class="font-semibold text-sm text-gray-900 dark:text-white truncate">{{ v.title }}</p>

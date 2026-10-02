@@ -28,7 +28,7 @@ export function describeRateDelta(current: number, previous: number): DeltaInfo 
   return { text: `${points > 0 ? '+' : '−'}${Math.abs(points)} pts`, direction: points > 0 ? 'up' : 'down' }
 }
 
-export type RangeKey = '7d' | '30d' | '90d' | '365d' | 'month' | 'prev-month'
+export type RangeKey = '7d' | '30d' | '90d' | '365d' | 'month' | 'prev-month' | 'custom'
 
 export const RANGE_PRESETS: { value: RangeKey; label: string }[] = [
   { value: '7d', label: 'Last 7 days' },
@@ -36,15 +36,20 @@ export const RANGE_PRESETS: { value: RangeKey; label: string }[] = [
   { value: '90d', label: 'Last 90 days' },
   { value: '365d', label: 'Last 12 months' },
   { value: 'month', label: 'This month' },
-  { value: 'prev-month', label: 'Last month' }
+  { value: 'prev-month', label: 'Last month' },
+  { value: 'custom', label: 'Custom range…' }
 ]
+
+/** The longest custom range offered, in days. */
+export const MAX_CUSTOM_DAYS = 731
 
 function isoDate(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
 /** [from, to] (inclusive ISO dates) for a preset, relative to `today`. */
-export function rangeDates(key: RangeKey, today: Date = new Date()): { from: string; to: string } {
+export function rangeDates(key: RangeKey, today: Date = new Date(), custom?: { from: string; to: string }): { from: string; to: string } {
+  if (key === 'custom' && custom && validateCustomRange(custom.from, custom.to, today) === null) return { from: custom.from, to: custom.to }
   const y = today.getFullYear()
   const m = today.getMonth()
   const d = today.getDate()
@@ -63,6 +68,24 @@ export function rangeDates(key: RangeKey, today: Date = new Date()): { from: str
     default:
       return { from: back(30), to: isoDate(today) }
   }
+}
+
+const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/
+
+/** Whole days from `from` to `to`, counting both ends. */
+export function daysInRange(from: string, to: string): number {
+  const [fy, fm, fd] = from.split('-').map(Number)
+  const [ty, tm, td] = to.split('-').map(Number)
+  return Math.round((Date.UTC(ty!, tm! - 1, td!) - Date.UTC(fy!, fm! - 1, fd!)) / 86_400_000) + 1
+}
+
+/** Null when a typed range can be used; otherwise what is wrong with it. */
+export function validateCustomRange(from: string, to: string, today: Date = new Date()): string | null {
+  if (!ISO_DAY.test(from) || !ISO_DAY.test(to)) return 'Pick both dates'
+  if (from > to) return 'The start must be on or before the end'
+  if (to > isoDate(today)) return 'The end can’t be in the future'
+  if (daysInRange(from, to) > MAX_CUSTOM_DAYS) return 'Pick at most two years'
+  return null
 }
 
 export interface SeriesBucket {

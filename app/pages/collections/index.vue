@@ -59,7 +59,13 @@
       <USkeleton v-for="i in 4" :key="i" class="h-64 rounded-lg" />
     </div>
     <div v-else-if="rows.length" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-      <UCard v-for="c in rows" :key="c.id" :ui="{ body: 'p-0 sm:p-0' }" class="overflow-hidden flex flex-col group">
+      <UCard
+        v-for="c in rows"
+        :key="c.id"
+        :ui="{ body: 'p-0 sm:p-0' }"
+        class="overflow-hidden flex flex-col group border-t-4"
+        :class="visibilityMeta(c.visibility).accent"
+      >
         <div class="relative">
           <NuxtLink :to="`/collections/${c.id}`" class="block">
             <CollectionCover :src="c.coverUrl">
@@ -95,7 +101,10 @@
             <UBadge :color="visibilityMeta(c.visibility).color" variant="subtle" :icon="visibilityMeta(c.visibility).icon" size="sm">
               {{ visibilityMeta(c.visibility).label }}
             </UBadge>
-            <span class="truncate" :title="formatDateTime(c.updatedAt)">{{ c.ownerUsername ?? '—' }} · {{ formatRelativeTime(c.updatedAt) }}</span>
+            <span class="flex min-w-0 items-center gap-1 truncate" :title="formatDateTime(c.updatedAt)">
+              <UIcon name="i-lucide-user-round" class="size-3.5 shrink-0 text-violet-600 dark:text-violet-400" />
+              <span class="truncate">{{ c.ownerUsername ?? '—' }} · {{ formatRelativeTime(c.updatedAt) }}</span>
+            </span>
           </div>
         </div>
       </UCard>
@@ -127,11 +136,7 @@
       />
     </div>
 
-    <CollectionFormModal
-      v-model="showForm"
-      :collection="editing"
-      @saved="(c) => (editing ? (load(), loadTileCounts()) : navigateTo(`/collections/${c.id}`))"
-    />
+    <CollectionFormModal v-model="showForm" :collection="editing" @saved="(c) => (editing ? (load(), loadTileCounts()) : navigateTo(`/collections/${c.id}`))" />
 
     <ConfirmModal
       :model-value="confirmDelete !== null"

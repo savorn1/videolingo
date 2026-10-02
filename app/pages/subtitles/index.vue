@@ -64,7 +64,15 @@
           <div class="min-w-0 max-w-xs">
             <div class="flex items-center gap-1.5">
               <p class="font-semibold text-gray-900 dark:text-white truncate">{{ row.label }}</p>
-              <UBadge v-if="row.isDefault" color="primary" variant="subtle" size="sm" icon="i-lucide-star">Default</UBadge>
+              <UBadge
+                v-if="row.isDefault"
+                color="neutral"
+                variant="subtle"
+                size="sm"
+                icon="i-lucide-star"
+                class="bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300"
+                >Default</UBadge
+              >
             </div>
             <p class="text-xs text-gray-500 truncate" :title="row.videoTitle ?? undefined">{{ row.videoTitle ?? `Video #${row.videoId}` }}</p>
           </div>
@@ -72,8 +80,19 @@
 
         <template #language-data="{ row }">
           <div class="flex items-center gap-1.5 whitespace-nowrap">
-            {{ languageLabel(row.language) }}
-            <UBadge v-if="row.kind === 'CAPTIONS'" size="sm" color="neutral" variant="outline">CC</UBadge>
+            <span
+              class="inline-flex items-center gap-1 rounded-md bg-sky-50 px-1.5 py-0.5 text-xs font-medium text-sky-800 dark:bg-sky-950/60 dark:text-sky-300"
+            >
+              <UIcon name="i-lucide-globe" class="size-3" />
+              {{ languageLabel(row.language) }}
+            </span>
+            <!-- CC = also describes sounds, for people who can't hear them -->
+            <span
+              class="rounded bg-violet-100 px-1 py-0.5 text-[10px] font-bold leading-none text-violet-800 dark:bg-violet-950 dark:text-violet-300"
+              v-if="row.kind === 'CAPTIONS'"
+              title="Closed captions"
+              >CC</span
+            >
           </div>
         </template>
 
@@ -85,7 +104,12 @@
           <StatusBadge :status="row.reviewStatus" />
         </template>
         <template #published-data="{ row }">
-          <UBadge :color="row.published ? 'success' : 'neutral'" variant="subtle" :icon="row.published ? 'i-lucide-eye' : 'i-lucide-eye-off'">
+          <UBadge
+            :color="row.published ? 'success' : 'neutral'"
+            variant="subtle"
+            :icon="row.published ? 'i-lucide-eye' : 'i-lucide-eye-off'"
+            :class="row.published ? '' : 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300'"
+          >
             {{ row.published ? 'Published' : 'Unpublished' }}
           </UBadge>
         </template>

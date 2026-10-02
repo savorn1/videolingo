@@ -2,7 +2,9 @@
   <section v-if="items.length" class="mb-6">
     <div class="flex items-center justify-between mb-3">
       <h2 class="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-        <UIcon name="i-lucide-history" class="w-4 h-4 text-gray-400" />
+        <span class="flex size-6 items-center justify-center rounded-md bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300">
+          <UIcon name="i-lucide-history" class="size-3.5" />
+        </span>
         Continue watching
         <span v-if="rest.length" class="text-sm font-normal text-gray-500 dark:text-gray-400">and {{ rest.length }} more</span>
       </h2>
@@ -18,7 +20,7 @@
         <HoverScrubThumbnail :thumbnail-url="hero.thumbnailUrl" :duration-seconds="hero.videoDurationSeconds ?? hero.progress.durationSeconds" />
       </div>
       <div class="flex min-w-0 flex-1 flex-col justify-center gap-2">
-        <p class="text-xs font-semibold uppercase tracking-wide text-primary-600 dark:text-primary-400">Pick up where you left off</p>
+        <p class="text-xs font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">Pick up where you left off</p>
         <h3 class="line-clamp-2 text-lg font-semibold leading-snug text-gray-900 dark:text-white" :title="hero.title">{{ hero.title }}</h3>
         <p class="text-sm text-gray-500 dark:text-gray-400">{{ remaining(hero) }} · watched {{ formatRelativeTime(hero.progress.lastWatchedAt) }}</p>
         <div v-if="hero.progress.percent" class="flex items-center gap-2">
@@ -30,12 +32,14 @@
             aria-valuemax="100"
             aria-label="Watched so far"
           >
-            <div class="h-full rounded-full bg-primary-500" :style="{ width: `${hero.progress.percent}%` }" />
+            <div class="h-full rounded-full bg-emerald-500" :style="{ width: `${hero.progress.percent}%` }" />
           </div>
           <span class="text-xs tabular-nums text-gray-500">{{ Math.round(hero.progress.percent) }}%</span>
         </div>
         <!-- Looks like a button; the whole card is the link, so it can't be a real button inside it -->
-        <span class="mt-1 inline-flex w-fit items-center gap-1.5 rounded-md bg-primary-500 px-3 py-1.5 text-sm font-medium text-white group-hover:bg-primary-600">
+        <span
+          class="mt-1 inline-flex w-fit items-center gap-1.5 rounded-md bg-primary-500 px-3 py-1.5 text-sm font-medium text-white group-hover:bg-primary-600"
+        >
           <UIcon name="i-lucide-play" class="h-4 w-4" />
           Resume
         </span>

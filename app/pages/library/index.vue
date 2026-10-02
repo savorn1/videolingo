@@ -51,12 +51,27 @@
         :progress="progress.get(v.id)"
       >
         <template v-if="!v.enabled" #badge>
-          <UBadge color="neutral" variant="solid" size="sm" class="absolute top-2 left-2">Disabled</UBadge>
+          <UBadge color="neutral" variant="solid" size="sm" class="absolute top-2 left-2 bg-amber-500 text-amber-950 dark:bg-amber-400">Disabled</UBadge>
         </template>
         <div class="flex flex-wrap items-center gap-1.5 text-xs">
-          <UBadge v-if="v.language" size="sm" color="neutral" variant="subtle" icon="i-lucide-mic">{{ languageLabel(v.language) }}</UBadge>
+          <UBadge
+            v-if="v.language"
+            size="sm"
+            color="neutral"
+            variant="subtle"
+            icon="i-lucide-mic"
+            class="bg-sky-50 text-sky-800 dark:bg-sky-950/60 dark:text-sky-300"
+            title="Spoken language"
+            >{{ languageLabel(v.language) }}</UBadge
+          >
           <UTooltip v-if="subtitleLanguages(v.id).length" :text="`Subtitles: ${subtitleLanguages(v.id).map(languageLabel).join(', ')}`">
-            <UBadge size="sm" color="primary" variant="subtle" icon="i-lucide-subtitles">
+            <UBadge
+              size="sm"
+              color="neutral"
+              variant="subtle"
+              icon="i-lucide-subtitles"
+              class="bg-violet-50 text-violet-800 dark:bg-violet-950/60 dark:text-violet-300"
+            >
               {{
                 subtitleLanguages(v.id)
                   .slice(0, 3)
@@ -68,9 +83,13 @@
           <CategoryBadge v-for="c in v.categories.slice(0, 2)" :key="c.id" :name="c.name" :color="c.color" :enabled="c.enabled" />
         </div>
         <p class="flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400">
-          <span class="flex items-center gap-1"><UIcon name="i-lucide-eye" class="w-3.5 h-3.5" />{{ v.viewCount.toLocaleString() }}</span>
+          <span class="flex items-center gap-1" :class="v.viewCount ? 'text-emerald-700 dark:text-emerald-300' : ''"
+            ><UIcon name="i-lucide-eye" class="w-3.5 h-3.5" />{{ v.viewCount.toLocaleString() }}</span
+          >
           <span v-if="v.createdAt" :title="formatDateTime(v.createdAt)">{{ formatRelativeTime(v.createdAt) }}</span>
-          <span v-if="v.ownerUsername" class="truncate">by {{ v.ownerUsername }}</span>
+          <span v-if="v.ownerUsername" class="truncate"
+            >by <span class="text-violet-700 dark:text-violet-300">{{ v.ownerUsername }}</span></span
+          >
         </p>
       </VideoCard>
     </div>
