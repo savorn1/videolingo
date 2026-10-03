@@ -173,6 +173,8 @@ export interface RowAction {
   label: string
   icon: string
   color?: 'primary' | 'secondary' | 'success' | 'info' | 'warning' | 'error' | 'neutral'
+  /** A colour for what the action does (see shared/utils/actionTone.ts): tints its icon in the "…" menu and its button. Leave out for the plain look. */
+  tone?: 'sky' | 'violet' | 'emerald' | 'amber' | 'orange' | 'teal' | 'indigo' | 'rose' | 'red'
   /** Shows a spinner in place of the icon — for an action with its own async in-flight state. */
   loading?: boolean
   onClick: () => void

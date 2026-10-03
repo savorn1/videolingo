@@ -13,13 +13,29 @@ export const MAX_SEGMENTS = 20
 /** How many of one video's edits the server lets be queued or running at once (VideoEditService.MAX_QUEUED_EDITS_PER_VIDEO); they still run one at a time. */
 export const MAX_QUEUED_EDITS = 3
 
-/** Null = valid; a message otherwise. `durationMs` null = unknown, so only what can be checked without it is. */
-export function validateTrim(startMs: number, endMs: number | null, durationMs: number | null): string | null {
+/** How far past the end of the video a trim may run when extended (VideoEditRules.MAX_EXTEND_MS): the last frame is held and the sound is silent. */
+export const MAX_EXTEND_MS = 300_000
+
+/** The latest time a trim's end can be set to. */
+export function trimLimitMs(durationMs: number, extend: boolean): number {
+  return durationMs + (extend ? MAX_EXTEND_MS : 0)
+}
+
+/** How much of a trim's range is past the end of the video (0 when it isn't). */
+export function extensionMs(endMs: number | null, durationMs: number): number {
+  return endMs != null && durationMs > 0 ? Math.max(0, Math.round(endMs - durationMs)) : 0
+}
+
+/** Null = valid; a message otherwise. `durationMs` null = unknown, so only what can be checked without it is. With `extend`, the end may run up to MAX_EXTEND_MS past the video. */
+export function validateTrim(startMs: number, endMs: number | null, durationMs: number | null, extend = false): string | null {
   if (startMs < 0) return "The start can't be before the beginning"
   if (endMs != null && endMs <= startMs) return 'The end must be after the start'
   if (durationMs != null) {
     if (startMs >= durationMs) return 'The start is at or past the end of the video'
-    if (endMs != null && endMs > durationMs) return 'The end is past the end of the video'
+    if (endMs != null && endMs > durationMs) {
+      if (!extend) return 'The end is past the end of the video'
+      if (endMs - durationMs > MAX_EXTEND_MS) return `The end can be at most ${MAX_EXTEND_MS / 1000} s past the end of the video`
+    }
   }
   return null
 }

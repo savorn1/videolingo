@@ -148,6 +148,18 @@
           </span>
         </template>
 
+        <template #fileSize-data="{ row }">
+          <span
+            v-if="row.fileSize !== null"
+            class="inline-flex whitespace-nowrap rounded-md px-1.5 py-0.5 text-xs font-medium tabular-nums"
+            :class="fileSizeTone(row.fileSize)"
+            :title="fileSizeClass(row.fileSize) === 'large' ? 'A large file' : undefined"
+          >
+            {{ formatFileSize(row.fileSize) }}
+          </span>
+          <span v-else :class="fileSizeTone(null)">—</span>
+        </template>
+
         <template #viewCount-data="{ row }">
           <span
             class="inline-flex items-center gap-1 whitespace-nowrap tabular-nums"
@@ -271,6 +283,7 @@
 </template>
 
 <script setup lang="ts">
+import { fileSizeClass, fileSizeTone } from '#shared/utils/fileSizeTone'
 import type { ColumnDef, RowAction } from '#shared/types'
 import type { Video } from '~/composables/useVideos'
 import type { MergeItem } from '#shared/utils/mergeVideos'
@@ -567,29 +580,29 @@ watch(view, loadTileCounts)
 function rowActions(row: Video): RowAction[] {
   // One inline button (the likeliest next step) and the rest in the "…" menu —
   // the whole row already opens the video, so View doesn't need a button.
-  const view: RowAction = { label: 'View', icon: 'i-lucide-play', onClick: () => navigateTo(`/videos/${row.id}`) }
-  const peek: RowAction = { label: 'Quick view', icon: 'i-lucide-eye', onClick: () => (peeking.value = row) }
+  const view: RowAction = { label: 'View', icon: 'i-lucide-play', tone: 'emerald', onClick: () => navigateTo(`/videos/${row.id}`) }
+  const peek: RowAction = { label: 'Quick view', icon: 'i-lucide-eye', tone: 'sky', onClick: () => (peeking.value = row) }
   if (row.deleted) {
     return [
-      { label: 'Restore', icon: 'i-lucide-rotate-ccw', color: 'success', loading: busy.value, onClick: () => onRestore(row) },
+      { label: 'Restore', icon: 'i-lucide-rotate-ccw', color: 'success', tone: 'emerald', loading: busy.value, onClick: () => onRestore(row) },
       peek,
       view,
-      { label: 'Delete permanently', icon: 'i-lucide-trash-2', color: 'error', onClick: () => (confirmPurge.value = row) }
+      { label: 'Delete permanently', icon: 'i-lucide-trash-2', color: 'error', tone: 'red', onClick: () => (confirmPurge.value = row) }
     ]
   }
   return [
     peek,
-    { label: 'Edit', icon: 'i-lucide-pencil', color: 'primary', onClick: () => openEdit(row) },
+    { label: 'Edit', icon: 'i-lucide-square-pen', color: 'primary', tone: 'violet', onClick: () => openEdit(row) },
     view,
     row.enabled
-      ? { label: 'Disable', icon: 'i-lucide-eye-off', color: 'warning', onClick: () => (confirmDisable.value = row) }
-      : { label: 'Enable', icon: 'i-lucide-eye', color: 'success', onClick: () => setStatus(row, true) },
-    { label: 'Duplicate', icon: 'i-lucide-copy', loading: duplicating.value === row.id, onClick: () => onDuplicate(row) },
+      ? { label: 'Disable', icon: 'i-lucide-eye-off', color: 'warning', tone: 'amber', onClick: () => (confirmDisable.value = row) }
+      : { label: 'Enable', icon: 'i-lucide-eye', color: 'success', tone: 'emerald', onClick: () => setStatus(row, true) },
+    { label: 'Duplicate', icon: 'i-lucide-copy-plus', tone: 'sky', loading: duplicating.value === row.id, onClick: () => onDuplicate(row) },
     row.archived
-      ? { label: 'Unarchive', icon: 'i-lucide-archive-restore', onClick: () => onArchiveToggle(row, false) }
-      : { label: 'Archive', icon: 'i-lucide-archive', onClick: () => onArchiveToggle(row, true) },
-    { label: 'Statistics', icon: 'i-lucide-chart-column', onClick: () => navigateTo(`/videos/${row.id}?tab=statistics`) },
-    { label: 'Delete', icon: 'i-lucide-trash-2', color: 'error', onClick: () => (confirmDelete.value = row) }
+      ? { label: 'Unarchive', icon: 'i-lucide-archive-restore', tone: 'teal', onClick: () => onArchiveToggle(row, false) }
+      : { label: 'Archive', icon: 'i-lucide-archive', tone: 'orange', onClick: () => onArchiveToggle(row, true) },
+    { label: 'Statistics', icon: 'i-lucide-chart-column', tone: 'indigo', onClick: () => navigateTo(`/videos/${row.id}?tab=statistics`) },
+    { label: 'Delete', icon: 'i-lucide-trash-2', color: 'error', tone: 'red', onClick: () => (confirmDelete.value = row) }
   ]
 }
 

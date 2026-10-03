@@ -159,6 +159,8 @@
         <EditorTransport
           :player="preview"
           :selection="mode === 'trim' ? range : mode === 'audio' ? audioEdit.state.range : null"
+          :selection-editable="mode === 'trim'"
+          @update:selection="(r: [number, number]) => (range = r)"
           :fullscreen-target="stage"
           :space-taken="hovering && zoom > 1"
           :arrow-keys-taken="mode === 'overlay' && !!overlayEdit.state.selectedId"
@@ -336,7 +338,7 @@
                 <USlider
                   v-model="range"
                   :min="0"
-                  :max="Math.max(durationMs, 1)"
+                  :max="Math.max(trimLimit, 1)"
                   :step="100"
                   :min-steps-between-thumbs="500"
                   :ui="{ thumb: 'size-5' }"
@@ -372,6 +374,12 @@
                   </div>
                 </div>
                 <p class="text-xs text-gray-500 dark:text-gray-400">Type a time like 1:23.5, or step by single frames with ← → under the video.</p>
+                <USwitch v-model="extendOn" size="xs" label="Extend past the end of the video" data-testid="trim-extend" />
+                <p v-if="extendOn" class="text-xs text-gray-500 dark:text-gray-400">
+                  Set the end later than the video ({{ formatMsShort(durationMs) }}) — up to {{ MAX_EXTEND_MS / 60000 }} min more. The extra time holds the last
+                  frame, with silence.
+                  <span v-if="extension" class="font-medium text-gray-700 dark:text-gray-300">Adds {{ formatMsShort(extension) }}.</span>
+                </p>
               </section>
 
               <!-- Output -->
@@ -696,6 +704,19 @@
                   </p>
                 </div>
               </section>
+
+              <TrimAudioPanel v-model="trimAudio" />
+
+              <CutOutPanel
+                v-model="cuts"
+                :current-ms="currentMs"
+                :duration-ms="durationMs"
+                :can-write="canWrite"
+                :busy="busy"
+                :starting="cutStarting"
+                @seek="(ms: number) => preview?.seek(ms, false)"
+                @start="onStartCut"
+              />
 
               <!-- Action: says what will be made before it is made -->
               <section class="sticky bottom-0 z-10 space-y-2 border-t bg-default pb-3 pt-4" :class="TAB_ACCENTS.trim.divider" aria-label="Start trim">
@@ -1228,6 +1249,8 @@ import {
 import { isMutedAt } from '#shared/utils/audioEdit'
 import { formatTimecode, parseTimecode } from '#shared/utils/transport'
 import { presetFromSettings, ratioLabel } from '#shared/utils/exportPreset'
+import { describeTrimAudio, trimAudioRequest, validateTrimAudio, type TrimAudioSettings } from '#shared/utils/trimAudio'
+import { cutSkipTarget, mergeCutRanges, validateCutOut, type CutRange } from '#shared/utils/cutOut'
 import { TAB_ACCENTS } from '#shared/utils/tabAccent'
 import { audioDifferences, describeRecipe, fullAudio, isRecipeEmpty, type EditRecipe, type RecipeLayer } from '#shared/utils/editRecipe'
 import { MAX_NAMED_ENTRIES, uniqueName } from '#shared/utils/namedList'
@@ -1238,7 +1261,7 @@ const props = defineProps<{ video: Video; canWrite: boolean }>()
 const emit = defineEmits<{ replaced: []; created: [videoId: number] }>()
 
 const toast = useToast()
-const { overview, startTrim, startSplit, autoCrop, promote, remove } = useVideoEdits()
+const { overview, startTrim, startSplit, startCut, autoCrop, promote, remove } = useVideoEdits()
 
 const data = ref<EditOverview | null>(null)
 const error = ref('')
@@ -1341,6 +1364,12 @@ const naturalWidth = ref(props.video.width ?? 0)
 const naturalHeight = ref(props.video.height ?? 0)
 function onTime(ms: number) {
   currentMs.value = ms
+  // Playing through a cut-out range jumps over it, as the result will.
+  if (mode.value === 'trim' && cuts.value.length) {
+    const target = cutSkipTarget(cuts.value, ms)
+    const el = preview.value?.videoEl
+    if (target != null && el && !el.paused) el.currentTime = target / 1000
+  }
 }
 function onDuration(seconds: number) {
   durationMs.value = seconds * 1000
@@ -1557,6 +1586,13 @@ onBeforeUnmount(() => {
 
 // ── Trim & crop ────────────────────────────────────────────────────────────
 const range = ref<[number, number]>([0, durationMs.value])
+/** Let the trim's end run past the end of the video (the last frame is held, the sound is silent). */
+const extendOn = ref(false)
+const trimLimit = computed(() => trimLimitMs(durationMs.value, extendOn.value))
+const extension = computed(() => (extendOn.value ? extensionMs(range.value[1], durationMs.value) : 0))
+watch(extendOn, (on) => {
+  if (!on && range.value[1] > durationMs.value) range.value = [Math.min(range.value[0], Math.max(0, durationMs.value - MIN_TRIM_MS)), durationMs.value]
+})
 // Starts with no selection: the first drag on the video draws it. (A
 // pre-made box covering most of the frame meant almost every press landed
 // inside it and moved it instead.)
@@ -1852,6 +1888,7 @@ const orientSampleTransform = computed(() => `scaleX(${orient.value.flipH ? -1 :
 
 function resetTrim() {
   orient.value = { ...NO_ORIENTATION }
+  extendOn.value = false
   range.value = [0, durationMs.value]
   cropOn.value = false
   onCropToggle(false)
@@ -1864,7 +1901,7 @@ const TRIM_EDGES = [
   { key: 'end' as const, label: 'End' }
 ]
 function setEdge(edge: 'start' | 'end', ms: number) {
-  range.value = withTrimEdge(range.value, edge, ms, durationMs.value)
+  range.value = withTrimEdge(range.value, edge, ms, edge === 'end' ? trimLimit.value : durationMs.value)
 }
 function nudgeEdge(edge: 'start' | 'end', deltaMs: number) {
   setEdge(edge, range.value[edge === 'start' ? 0 : 1] + deltaMs)
@@ -1915,15 +1952,18 @@ function onScaleToggle(on: boolean) {
 }
 
 const trimError = computed(() => {
-  const err = validateTrim(Math.round(range.value[0]), Math.round(range.value[1]), Math.round(durationMs.value) || null)
+  const err = validateTrim(Math.round(range.value[0]), Math.round(range.value[1]), Math.round(durationMs.value) || null, extendOn.value)
   if (err) return err
   if (cropOn.value) {
     if (!crop.w || !crop.h) return 'Drag on the video to choose the area to keep'
     const e = validateCrop(crop.x, crop.y, crop.w, crop.h, naturalWidth.value || null, naturalHeight.value || null)
     if (e) return e
   }
-  if (scaleOn.value) return validateScale(scale.w, scale.h)
-  return null
+  if (scaleOn.value) {
+    const e = validateScale(scale.w, scale.h)
+    if (e) return e
+  }
+  return validateTrimAudio(trimAudio.value, Math.round(range.value[1] - range.value[0]))
 })
 
 const starting = ref(false)
@@ -1936,7 +1976,9 @@ async function onStartTrim() {
       endMs: Math.round(range.value[1]),
       crop: cropOn.value ? { x: crop.x, y: crop.y, w: crop.w, h: crop.h } : null,
       scale: scaleOn.value ? { w: scale.w, h: scale.h } : null,
-      ...orientationRequest(orient.value)
+      ...orientationRequest(orient.value),
+      audio: trimAudioRequest(trimAudio.value),
+      extend: extension.value > 0 || undefined
     })
     toast.add({ title: `Trim queued — job #${job.id}`, color: 'success' })
     await load()
@@ -1945,6 +1987,28 @@ async function onStartTrim() {
     toast.add({ title: 'Could not start the trim', description: apiErrorMessage(err), color: 'error' })
   } finally {
     starting.value = false
+  }
+}
+
+// ── Cut out ranges ───────────────────────────────────────────────────────────
+const cuts = ref<CutRange[]>([])
+const trimAudio = ref<TrimAudioSettings | null>(null)
+const cutStarting = ref(false)
+async function onStartCut() {
+  if (validateCutOut(cuts.value, Math.round(durationMs.value) || null)) return
+  cutStarting.value = true
+  try {
+    const job = await startCut(
+      props.video.id,
+      mergeCutRanges(cuts.value).map((c) => ({ startMs: Math.round(c.startMs), endMs: Math.round(c.endMs) }))
+    )
+    toast.add({ title: `Cut queued — job #${job.id}`, color: 'success' })
+    await load()
+    scrollToResults()
+  } catch (err) {
+    toast.add({ title: 'Could not start the cut', description: apiErrorMessage(err), color: 'error' })
+  } finally {
+    cutStarting.value = false
   }
 }
 
@@ -2230,7 +2294,9 @@ watch(() => [props.video.title, props.video.durationSeconds, props.video.videoUr
 
 // A dot on a tab means it has pending settings — easy to miss otherwise,
 // since switching tabs doesn't reset or hide what's already set there.
-const trimDirty = computed(() => cropOn.value || scaleOn.value || orientActive.value || range.value[0] !== 0 || range.value[1] !== durationMs.value)
+const trimDirty = computed(
+  () => !!trimAudio.value || cropOn.value || scaleOn.value || orientActive.value || range.value[0] !== 0 || range.value[1] !== durationMs.value
+)
 const splitDirty = computed(() => segments.value.length > 1 || segments.value[0]?.startMsSeconds !== 0 || segments.value[0]?.endMsSeconds != null)
 const DIRTY_BADGE = { color: 'warning' as const, size: 'xs' as const }
 
@@ -2258,6 +2324,9 @@ const trimSummary = computed(() => {
     if (scaleOn.value && scale.w && scale.h) parts.push(`resize ${scale.w}×${scale.h}`)
   }
   if (orientActive.value) parts.push(describeOrientation(orient.value))
+  if (extension.value) parts.push(`${formatMsShort(extension.value)} past the end (last frame held)`)
+  const audioLine = describeTrimAudio(trimAudio.value)
+  if (audioLine) parts.push(audioLine)
   return parts.join(' · ')
 })
 // Each tab has its own colour: the selected tab is a filled pill in it with white text and icon (the 700
@@ -2354,7 +2423,10 @@ function takeState() {
       cropAspect: cropAspect.value,
       scaleOn: scaleOn.value,
       scale: { ...scale },
-      orient: { ...orient.value }
+      orient: { ...orient.value },
+      cuts: cuts.value.map((c) => ({ ...c })),
+      audio: trimAudio.value ? { ...trimAudio.value } : null,
+      extend: extendOn.value
     },
     split: segments.value,
     audio,
@@ -2371,6 +2443,11 @@ async function applyState(st: ReturnType<typeof takeState>) {
   // Drafts saved before turning existed have no `orient`.
   orient.value = st.trim.orient ? { ...st.trim.orient } : { ...NO_ORIENTATION }
   Object.assign(scale, st.trim.scale)
+  // Drafts saved before Cut out existed have no `cuts`.
+  cuts.value = (st.trim.cuts ?? []).map((c) => ({ ...c }))
+  // Same for added audio.
+  trimAudio.value = st.trim.audio ? { ...st.trim.audio } : null
+  extendOn.value = !!st.trim.extend
   segments.value = st.split
   const { clips, ...audio } = st.audio
   Object.assign(audioEdit.state, audio)

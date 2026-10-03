@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
+  MAX_EXTEND_MS,
+  extensionMs,
+  trimLimitMs,
   findSplitTarget,
   MAX_VIDEO_TITLE,
   replacesOriginal,
@@ -381,5 +384,24 @@ describe('turning and flipping', () => {
   it('sends only what is set', () => {
     expect(orientationRequest(none)).toEqual({})
     expect(orientationRequest({ rotate: 180, flipH: false, flipV: true })).toEqual({ rotate: 180, flipV: true })
+  })
+})
+
+describe('extending a trim past the video', () => {
+  it('is refused unless asked for, and limited when it is', () => {
+    expect(validateTrim(0, 70000, 60000)).toMatch(/past the end/)
+    expect(validateTrim(0, 70000, 60000, true)).toBeNull()
+    expect(validateTrim(0, 60000 + MAX_EXTEND_MS + 1, 60000, true)).toMatch(/at most/)
+  })
+  it('works out the limit and the extension', () => {
+    expect(trimLimitMs(60000, false)).toBe(60000)
+    expect(trimLimitMs(60000, true)).toBe(60000 + MAX_EXTEND_MS)
+    expect(extensionMs(70000, 60000)).toBe(10000)
+    expect(extensionMs(50000, 60000)).toBe(0)
+    expect(extensionMs(null, 60000)).toBe(0)
+  })
+  it('lets the end edge move past the video up to the limit', () => {
+    expect(withTrimEdge([0, 60000], 'end', 90000, trimLimitMs(60000, true))).toEqual([0, 90000])
+    expect(withTrimEdge([0, 60000], 'end', 90000, 60000)).toEqual([0, 60000])
   })
 })

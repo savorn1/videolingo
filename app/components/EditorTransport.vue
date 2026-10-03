@@ -3,11 +3,43 @@
     <div class="relative">
       <!-- The trim selection, drawn along the seek bar. -->
       <div
-        v-if="selection && durationMs"
+        v-if="selection && durationMs && !selectionEditable"
         class="absolute -top-1 h-1 rounded-full bg-primary-500/50 pointer-events-none"
         :class="loopOn ? 'bg-primary-500' : ''"
-        :style="{ left: pct(selection[0]), width: pct(selection[1] - selection[0]) }"
+        :style="{ left: pct(selection[0]), width: pct(Math.min(selection[1], durationMs) - selection[0]) }"
       />
+      <!-- Trim tab: the same range with a handle on each end to drag (arrow keys nudge, Shift for 1 s). -->
+      <div
+        v-if="selection && durationMs && selectionEditable"
+        ref="track"
+        class="relative mb-1 h-5 rounded bg-gray-100 dark:bg-gray-800"
+        data-testid="range-track"
+      >
+        <div
+          class="absolute inset-y-0 bg-primary-500/40 pointer-events-none"
+          :class="loopOn ? 'bg-primary-500/60' : ''"
+          :style="{ left: pct(selection[0]), width: pct(Math.min(selection[1], durationMs) - selection[0]) }"
+        />
+        <div
+          v-for="edge in RANGE_EDGES"
+          :key="edge.key"
+          role="slider"
+          tabindex="0"
+          class="absolute inset-y-0 z-10 w-2 -translate-x-1/2 cursor-ew-resize touch-none rounded bg-primary-600 hover:bg-primary-500 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary-500"
+          :style="{ left: pct(selection[edge.index]) }"
+          :aria-label="edge.label"
+          :aria-valuemin="0"
+          :aria-valuemax="Math.round(durationMs)"
+          :aria-valuenow="Math.round(selection[edge.index]!)"
+          :aria-valuetext="formatTimecode(selection[edge.index]!)"
+          :title="`${edge.label} — ${formatTimecode(selection[edge.index]!)}`"
+          @pointerdown.prevent="startDrag(edge.key, $event)"
+          @pointermove="onDrag(edge.key, $event)"
+          @pointerup="endDrag"
+          @pointercancel="endDrag"
+          @keydown="onHandleKey(edge.key, $event)"
+        />
+      </div>
       <USlider
         :model-value="timeMs"
         :min="0"
@@ -96,6 +128,7 @@
 // Playback controls for the editor preview. The browser's own bar sits under
 // the crop layer while cropping, and has no frame stepping, looping or (in
 // most browsers) speed — so the editor drives the <video> from here.
+import { withTrimEdge } from '#shared/utils/videoEdit'
 import { EDITOR_RATES, FALLBACK_FPS, estimateFps, formatTimecode, loopedTime, stepFrameTime } from '#shared/utils/transport'
 
 interface PlayerHandle {
@@ -108,6 +141,8 @@ const props = defineProps<{
   player: PlayerHandle | null
   /** The trim selection in ms — what "Loop selection" keeps playback inside. */
   selection?: [number, number] | null
+  /** Draw handles on the selection that can be dragged (the Trim tab); changes go out as `update:selection`. */
+  selectionEditable?: boolean
   /** What goes full screen: the whole preview stage, so crop and zoom come along. */
   fullscreenTarget?: HTMLElement | null
   /** Space is busy elsewhere (panning the zoomed preview under the pointer). */
@@ -132,8 +167,41 @@ const fps = ref(FALLBACK_FPS)
 const fpsMeasured = ref(false)
 const frameNo = computed(() => Math.floor((timeMs.value / 1000) * fps.value + 1e-6))
 
+const emit = defineEmits<{ 'update:selection': [range: [number, number]] }>()
+
+const RANGE_EDGES = [
+  { key: 'start', index: 0, label: 'Trim start' },
+  { key: 'end', index: 1, label: 'Trim end' }
+] as const
+const track = useTemplateRef<HTMLElement>('track')
+const dragging = ref(false)
+
+function moveEdge(edge: 'start' | 'end', ms: number) {
+  if (!props.selection) return
+  emit('update:selection', withTrimEdge(props.selection, edge, ms, durationMs.value))
+}
+function startDrag(_edge: 'start' | 'end', e: PointerEvent) {
+  ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
+  dragging.value = true
+}
+function onDrag(edge: 'start' | 'end', e: PointerEvent) {
+  const box = track.value?.getBoundingClientRect()
+  if (!dragging.value || !box?.width) return
+  moveEdge(edge, ((e.clientX - box.left) / box.width) * durationMs.value)
+}
+function endDrag() {
+  dragging.value = false
+}
+function onHandleKey(edge: 'start' | 'end', e: KeyboardEvent) {
+  const dir = e.key === 'ArrowLeft' ? -1 : e.key === 'ArrowRight' ? 1 : 0
+  if (!dir || !props.selection) return
+  e.preventDefault()
+  e.stopPropagation()
+  moveEdge(edge, props.selection[edge === 'start' ? 0 : 1] + dir * (e.shiftKey ? 1000 : 100))
+}
+
 function pct(ms: number) {
-  return `${(Math.max(0, ms) / Math.max(durationMs.value, 1)) * 100}%`
+  return `${Math.min(1, Math.max(0, ms) / Math.max(durationMs.value, 1)) * 100}%`
 }
 function selectionSeconds(): [number, number] | null {
   return props.selection ? [props.selection[0] / 1000, props.selection[1] / 1000] : null

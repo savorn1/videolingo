@@ -15,6 +15,8 @@
 </template>
 
 <script setup lang="ts">
+import { tagTone } from '#shared/utils/tagColor'
+
 const props = defineProps<{ name: string; removable?: boolean; busy?: boolean }>()
 // Each tag has its own colour, worked out from its name (see shared/utils/tagColor.ts).
 const tone = computed(() => tagTone(props.name))

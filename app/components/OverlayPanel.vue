@@ -13,6 +13,53 @@
         :progress="uploading === 'image' ? uploadProgress : null"
         @pick="(f) => onUpload(f, false)"
       />
+      <UPopover v-model:open="stickersOpen">
+        <UButton size="xs" color="neutral" variant="soft" icon="i-lucide-smile-plus" :loading="uploading === 'sticker'" data-testid="add-sticker"
+          >Sticker</UButton
+        >
+        <template #content>
+          <div class="w-72 max-h-80 overflow-y-auto p-2 space-y-2">
+            <UInput v-model="stickerQuery" size="xs" icon="i-lucide-search" placeholder="Search stickers" class="w-full" aria-label="Search stickers" />
+            <div v-if="!stickerQuery.trim() && recentStickers.length">
+              <p class="px-1 pb-1 text-xs text-gray-500 dark:text-gray-400">Recent</p>
+              <div class="grid grid-cols-8 gap-0.5">
+                <button
+                  v-for="s in recentStickers"
+                  :key="s.emoji"
+                  type="button"
+                  class="rounded p-1 text-xl leading-none hover:bg-gray-100 dark:hover:bg-gray-800"
+                  :aria-label="`Add ${s.name} sticker`"
+                  :title="s.name"
+                  @click="onSticker(s)"
+                >
+                  {{ s.emoji }}
+                </button>
+              </div>
+            </div>
+            <div v-for="g in shownStickerGroups" :key="g.label">
+              <p class="px-1 pb-1 text-xs text-gray-500 dark:text-gray-400">{{ g.label }}</p>
+              <div class="grid grid-cols-8 gap-0.5">
+                <button
+                  v-for="s in g.items"
+                  :key="s.emoji"
+                  type="button"
+                  class="rounded p-1 text-xl leading-none hover:bg-gray-100 dark:hover:bg-gray-800"
+                  :aria-label="`Add ${s.name} sticker`"
+                  :title="s.name"
+                  @click="onSticker(s)"
+                >
+                  {{ s.emoji }}
+                </button>
+              </div>
+            </div>
+            <p v-if="!shownStickerGroups.length" class="px-1 py-2 text-xs text-gray-500">No sticker matches. Paste your own emoji below.</p>
+            <form class="flex items-center gap-1 border-t border-gray-200 pt-2 dark:border-gray-800" @submit.prevent="onCustomSticker">
+              <UInput v-model="customEmoji" size="xs" placeholder="Your own emoji" class="flex-1" aria-label="Your own emoji" />
+              <UButton type="submit" size="xs" color="neutral" variant="soft" :disabled="!isSingleEmoji(customEmoji)">Add</UButton>
+            </form>
+          </div>
+        </template>
+      </UPopover>
       <UButton size="xs" color="neutral" variant="ghost" icon="i-lucide-copyright" @click="edit.addTextWatermark()">Text watermark</UButton>
       <UploadButton
         label="Logo watermark"
@@ -521,6 +568,7 @@
 
 <script setup lang="ts">
 import { TAB_ACCENTS } from '#shared/utils/tabAccent'
+import { STICKER_GROUPS, filterStickerGroups, isSingleEmoji, pushRecentSticker, renderSticker, sanitizeRecentStickers } from '#shared/utils/stickers'
 // The "Text" tab: titles, captions, logos and watermarks. Layers
 // are shown and dragged on the video (OverlayLayers); both work on the same
 // useOverlayEdit state. Rendering runs as an EDIT job; the result appears in
@@ -749,7 +797,7 @@ onMounted(async () => {
 })
 
 // ── Uploads ──────────────────────────────────────────────────────────────────
-const uploading = ref<'image' | 'watermark' | null>(null)
+const uploading = ref<'image' | 'watermark' | 'sticker' | null>(null)
 const uploadProgress = ref(0)
 async function onUpload(file: File, watermark: boolean) {
   uploading.value = watermark ? 'watermark' : 'image'
@@ -761,6 +809,54 @@ async function onUpload(file: File, watermark: boolean) {
     if (!watermark) added.startMs = Math.round(props.currentMs)
   } catch (err) {
     toast.add({ title: 'Could not upload the image', description: apiErrorMessage(err), color: 'error' })
+  } finally {
+    uploading.value = null
+  }
+}
+
+// ── Stickers ─────────────────────────────────────────────────────────────────
+const stickersOpen = ref(false)
+const stickerQuery = ref('')
+const customEmoji = ref('')
+const shownStickerGroups = computed(() => filterStickerGroups(STICKER_GROUPS, stickerQuery.value))
+
+const RECENT_STICKERS_KEY = 'videolingo.recentStickers'
+const recentStickers = ref<{ emoji: string; name: string }[]>([])
+onMounted(() => {
+  try {
+    recentStickers.value = sanitizeRecentStickers(JSON.parse(localStorage.getItem(RECENT_STICKERS_KEY) ?? '[]'))
+  } catch {
+    // No saved stickers is fine.
+  }
+})
+
+function onCustomSticker() {
+  const emoji = customEmoji.value.trim()
+  if (!isSingleEmoji(emoji)) return
+  customEmoji.value = ''
+  onSticker({ emoji, name: 'emoji' })
+}
+
+async function onSticker(sticker: { emoji: string; name: string }) {
+  stickersOpen.value = false
+  stickerQuery.value = ''
+  recentStickers.value = pushRecentSticker(recentStickers.value, sticker)
+  try {
+    localStorage.setItem(RECENT_STICKERS_KEY, JSON.stringify(recentStickers.value))
+  } catch {
+    // Recent stickers just won't be remembered.
+  }
+  uploading.value = 'sticker'
+  uploadProgress.value = 0
+  try {
+    const file = await renderSticker(sticker.emoji, sticker.name)
+    const ticket = await requestUpload('OVERLAY', file)
+    await uploadToStorage(ticket, file, (f) => (uploadProgress.value = f))
+    const added = props.edit.addImage({ key: ticket.key, url: ticket.publicUrl, name: `${sticker.emoji} ${sticker.name}` })
+    added.widthPct = 15
+    added.startMs = Math.round(props.currentMs)
+  } catch (err) {
+    toast.add({ title: 'Could not add the sticker', description: err instanceof Error ? err.message : apiErrorMessage(err), color: 'error' })
   } finally {
     uploading.value = null
   }

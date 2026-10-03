@@ -6,6 +6,7 @@
       size="xs"
       :color="action.color ?? 'neutral'"
       variant="soft"
+      :class="action.tone && !action.color ? ACTION_TONES[action.tone].button : ''"
       :icon="action.icon"
       :loading="action.loading"
       @click.stop="action.onClick"
@@ -21,6 +22,7 @@
 
 <script setup lang="ts">
 import type { RowAction } from '#shared/types'
+import { ACTION_TONES } from '#shared/utils/actionTone'
 
 // First `max` actions render as buttons; the rest collapse into a "…" menu —
 // keeps a row from growing a wall of buttons as more per-row actions get
@@ -30,5 +32,14 @@ const props = withDefaults(defineProps<{ actions: RowAction[]; max?: number }>()
 
 const visible = computed(() => props.actions.slice(0, props.max))
 const overflow = computed(() => props.actions.slice(props.max))
-const overflowItems = computed(() => overflow.value.map((a) => ({ label: a.label, icon: a.icon, onSelect: a.onClick })))
+// In the "…" menu the icon takes the action's colour (a danger action also turns its label red).
+const overflowItems = computed(() =>
+  overflow.value.map((a) => ({
+    label: a.label,
+    icon: a.icon,
+    onSelect: a.onClick,
+    ...(a.color === 'error' ? { color: 'error' as const } : {}),
+    ...(a.tone ? { ui: { itemLeadingIcon: ACTION_TONES[a.tone].icon } } : {})
+  }))
+)
 </script>

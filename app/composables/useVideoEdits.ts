@@ -135,6 +135,10 @@ export function useVideoEdits() {
       rotate?: 90 | 180 | 270
       flipH?: boolean
       flipV?: boolean
+      /** Let `endMs` run past the end of the video (up to MAX_EXTEND_MS): the last frame is held, the sound is silent. */
+      extend?: boolean
+      /** Sound added to the trimmed result: music mixed in, or a file used instead of the video's own sound. */
+      audio?: { replaceKey?: string; music?: { key: string; volume: number; loop: boolean; duck: boolean; startMs: number } } | null
     }
   ) {
     return (await api<ApiEnvelope<ProcessingJob>>(`${base(videoId)}/trim`, { method: 'POST', body })).data
@@ -142,6 +146,11 @@ export function useVideoEdits() {
 
   async function startSplit(videoId: number, segments: SegmentRange[]) {
     return (await api<ApiEnvelope<ProcessingJob>>(`${base(videoId)}/split`, { method: 'POST', body: { segments } })).data
+  }
+
+  /** Takes the given ranges out of the video; what is left plays on as one video (a TRIM-style result). */
+  async function startCut(videoId: number, cuts: { startMs: number; endMs: number }[]) {
+    return (await api<ApiEnvelope<ProcessingJob>>(`${base(videoId)}/cut`, { method: 'POST', body: { cuts } })).data
   }
 
   async function startAudio(videoId: number, body: AudioEditRequest) {
@@ -183,5 +192,5 @@ export function useVideoEdits() {
     await api(`${base(videoId)}/${clipId}`, { method: 'DELETE' })
   }
 
-  return { overview, startTrim, startSplit, startAudio, startExtract, startOverlay, fonts, waveform, autoCrop, promote, remove }
+  return { overview, startTrim, startSplit, startCut, startAudio, startExtract, startOverlay, fonts, waveform, autoCrop, promote, remove }
 }
