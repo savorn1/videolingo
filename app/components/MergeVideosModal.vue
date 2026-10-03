@@ -226,11 +226,18 @@ const starts = computed(() => mergeStarts(list.value))
 const shares = computed(() => mergeShares(list.value))
 // Same colours as the split tab's strip, so a part keeps its colour from the bar to its row.
 const SEGMENT_COLORS = ['bg-primary-500', 'bg-info-500', 'bg-success-500', 'bg-warning-500', 'bg-violet-500', 'bg-rose-500']
+// Dissolve, wipe and slide play the videos over each other, so the joined video is a little shorter than the sum.
+const overlapNote = computed(() => {
+  if (!overlapsVideos(transition.value)) return ''
+  const durations = list.value.map((it) => it.durationSeconds ?? 0)
+  const shorter = Math.round(joinedSeconds(durations, 'NONE') - joinedSeconds(durations, transition.value))
+  return shorter > 0 ? ` The videos play over each other at each joint, so the result is about ${shorter} s shorter than their total.` : ''
+})
 const expectText = computed(() => {
   const when = totals.value.seconds
     ? ` A rough guess for this one: ${describeEstimate(estimateMergeSeconds(totals.value.seconds, resolution.value))}, plus any wait behind other jobs.`
     : ''
-  return `Joining re-encodes every video, so it takes a while for long ones.${when} The new video is created hidden. Transcripts every video has in the same language are carried over; subtitles are not, and the originals keep theirs.`
+  return `Joining re-encodes every video, so it takes a while for long ones.${when} The new video is created hidden.${overlapNote.value} Transcripts every video has in the same language are carried over; subtitles are not, and the originals keep theirs.`
 })
 
 // ── Remember the size and the joint between videos ───────────────────────────

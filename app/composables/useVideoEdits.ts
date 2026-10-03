@@ -137,6 +137,8 @@ export function useVideoEdits() {
       flipV?: boolean
       /** Let `endMs` run past the end of the video (up to MAX_EXTEND_MS): the last frame is held, the sound is silent. */
       extend?: boolean
+      /** A picture look (brightness, contrast, colour, blur, tint, vignette); leave out for none. */
+      look?: { brightness: number; contrast: number; saturation: number; blur: number; grayscale: boolean; sepia: boolean; vignette: boolean } | null
       /** Sound added to the trimmed result: music mixed in, or a file used instead of the video's own sound. */
       audio?: { replaceKey?: string; music?: { key: string; volume: number; loop: boolean; duck: boolean; startMs: number } } | null
     }

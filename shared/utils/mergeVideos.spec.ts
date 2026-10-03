@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
   blockedReason,
+  joinedSeconds,
+  MERGE_TRANSITIONS,
+  overlapsVideos,
   defaultMergeTitle,
   describeEstimate,
   estimateMergeSeconds,
@@ -134,7 +137,24 @@ describe('sanitizeMergeLook', () => {
   })
   it('falls back for anything else', () => {
     expect(sanitizeMergeLook(null)).toEqual({ resolution: '720p', transition: 'NONE' })
-    expect(sanitizeMergeLook({ resolution: '4k', transition: 'WIPE' })).toEqual({ resolution: '720p', transition: 'NONE' })
+    expect(sanitizeMergeLook({ resolution: '4k', transition: 'SPIN' })).toEqual({ resolution: '720p', transition: 'NONE' })
     expect(sanitizeMergeLook('x')).toEqual({ resolution: '720p', transition: 'NONE' })
+  })
+})
+
+describe('joinedSeconds', () => {
+  it('is the total unless the videos overlap', () => {
+    expect(joinedSeconds([10, 20], 'NONE')).toBe(30)
+    expect(joinedSeconds([10, 20], 'FADE')).toBe(30)
+    expect(joinedSeconds([10, 20], 'FADE_WHITE')).toBe(30)
+  })
+  it('takes off the overlap at each joint, shortened for a short video', () => {
+    expect(joinedSeconds([10, 10, 10], 'DISSOLVE')).toBeCloseTo(28.8)
+    expect(joinedSeconds([10, 0.5], 'WIPE')).toBeCloseTo(10.25)
+    expect(overlapsVideos('SLIDE')).toBe(true)
+    expect(overlapsVideos('NONE')).toBe(false)
+  })
+  it('accepts every listed transition from storage', () => {
+    for (const t of MERGE_TRANSITIONS) expect(sanitizeMergeLook({ resolution: '720p', transition: t.value }).transition).toBe(t.value)
   })
 })

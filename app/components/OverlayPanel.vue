@@ -19,6 +19,28 @@
         >
         <template #content>
           <div class="w-72 max-h-80 overflow-y-auto p-2 space-y-2">
+            <div class="flex items-center gap-1" role="group" aria-label="Sticker look">
+              <UButton
+                size="xs"
+                color="neutral"
+                :variant="stickerLook.flip ? 'soft' : 'ghost'"
+                icon="i-lucide-flip-horizontal-2"
+                :aria-pressed="stickerLook.flip"
+                @click="stickerLook = { ...stickerLook, flip: !stickerLook.flip }"
+              >
+                Mirror
+              </UButton>
+              <UButton
+                size="xs"
+                color="neutral"
+                :variant="stickerLook.turn ? 'soft' : 'ghost'"
+                icon="i-lucide-rotate-cw"
+                title="Turn a quarter clockwise"
+                @click="stickerLook = { ...stickerLook, turn: nextTurn(stickerLook.turn) }"
+              >
+                Turn {{ stickerLook.turn }}°
+              </UButton>
+            </div>
             <UInput v-model="stickerQuery" size="xs" icon="i-lucide-search" placeholder="Search stickers" class="w-full" aria-label="Search stickers" />
             <div v-if="!stickerQuery.trim() && recentStickers.length">
               <p class="px-1 pb-1 text-xs text-gray-500 dark:text-gray-400">Recent</p>
@@ -568,7 +590,18 @@
 
 <script setup lang="ts">
 import { TAB_ACCENTS } from '#shared/utils/tabAccent'
-import { STICKER_GROUPS, filterStickerGroups, isSingleEmoji, pushRecentSticker, renderSticker, sanitizeRecentStickers } from '#shared/utils/stickers'
+import {
+  PLAIN_STICKER,
+  STICKER_GROUPS,
+  describeLook,
+  nextTurn,
+  type StickerLook,
+  filterStickerGroups,
+  isSingleEmoji,
+  pushRecentSticker,
+  renderSticker,
+  sanitizeRecentStickers
+} from '#shared/utils/stickers'
 // The "Text" tab: titles, captions, logos and watermarks. Layers
 // are shown and dragged on the video (OverlayLayers); both work on the same
 // useOverlayEdit state. Rendering runs as an EDIT job; the result appears in
@@ -817,6 +850,7 @@ async function onUpload(file: File, watermark: boolean) {
 // ── Stickers ─────────────────────────────────────────────────────────────────
 const stickersOpen = ref(false)
 const stickerQuery = ref('')
+const stickerLook = ref<StickerLook>({ ...PLAIN_STICKER })
 const customEmoji = ref('')
 const shownStickerGroups = computed(() => filterStickerGroups(STICKER_GROUPS, stickerQuery.value))
 
@@ -849,10 +883,10 @@ async function onSticker(sticker: { emoji: string; name: string }) {
   uploading.value = 'sticker'
   uploadProgress.value = 0
   try {
-    const file = await renderSticker(sticker.emoji, sticker.name)
+    const file = await renderSticker(sticker.emoji, sticker.name, stickerLook.value)
     const ticket = await requestUpload('OVERLAY', file)
     await uploadToStorage(ticket, file, (f) => (uploadProgress.value = f))
-    const added = props.edit.addImage({ key: ticket.key, url: ticket.publicUrl, name: `${sticker.emoji} ${sticker.name}` })
+    const added = props.edit.addImage({ key: ticket.key, url: ticket.publicUrl, name: `${sticker.emoji} ${sticker.name}${describeLook(stickerLook.value)}` })
     added.widthPct = 15
     added.startMs = Math.round(props.currentMs)
   } catch (err) {

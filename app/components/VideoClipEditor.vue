@@ -160,6 +160,8 @@
           :player="preview"
           :selection="mode === 'trim' ? range : mode === 'audio' ? audioEdit.state.range : null"
           :selection-editable="mode === 'trim'"
+          :cuts="mode === 'trim' ? cuts : []"
+          @update:cuts="(c: CutRange[]) => (cuts = c)"
           @update:selection="(r: [number, number]) => (range = r)"
           :fullscreen-target="stage"
           :space-taken="hovering && zoom > 1"
@@ -705,6 +707,8 @@
                 </div>
               </section>
 
+              <LookPanel v-model="look" />
+
               <TrimAudioPanel v-model="trimAudio" />
 
               <CutOutPanel
@@ -1031,6 +1035,20 @@
             >
               Cancel
             </UButton>
+            <UButton
+              v-if="canRetry && job.status === 'FAILED'"
+              size="xs"
+              color="neutral"
+              variant="soft"
+              icon="i-lucide-rotate-cw"
+              :loading="retryingId === job.id"
+              :disabled="busy"
+              :aria-label="`Retry ${jobLabel(job)}`"
+              data-testid="retry-job"
+              @click="onRetryJob(job)"
+            >
+              Retry
+            </UButton>
             <UButton size="xs" color="neutral" variant="link" :to="`/processing-jobs/${job.id}`" :padded="false">Job #{{ job.id }}</UButton>
           </div>
         </div>
@@ -1249,6 +1267,7 @@ import {
 import { isMutedAt } from '#shared/utils/audioEdit'
 import { formatTimecode, parseTimecode } from '#shared/utils/transport'
 import { presetFromSettings, ratioLabel } from '#shared/utils/exportPreset'
+import { PLAIN_LOOK, cssFilter, describeVideoLook, isPlainLook, lookRequest, validateLook, type VideoLook } from '#shared/utils/videoLook'
 import { describeTrimAudio, trimAudioRequest, validateTrimAudio, type TrimAudioSettings } from '#shared/utils/trimAudio'
 import { cutSkipTarget, mergeCutRanges, validateCutOut, type CutRange } from '#shared/utils/cutOut'
 import { TAB_ACCENTS } from '#shared/utils/tabAccent'
@@ -1717,7 +1736,11 @@ const multiError = computed(() => {
       : 'The queue is full — wait for an edit to finish.'
   }
   if (!naturalWidth.value || !naturalHeight.value) return 'Waiting for the video to load.'
-  return validateTrim(Math.round(range.value[0]), Math.round(range.value[1]), Math.round(durationMs.value) || null)
+  return (
+    validateLook(look.value) ??
+    validateTrimAudio(trimAudio.value, Math.round(range.value[1] - range.value[0])) ??
+    validateTrim(Math.round(range.value[0]), Math.round(range.value[1]), Math.round(durationMs.value) || null, extendOn.value)
+  )
 })
 const multiSummary = computed(() =>
   multiKeys.value.length
@@ -1734,7 +1757,10 @@ async function onStartMulti() {
         startMs: Math.round(range.value[0]),
         endMs: Math.round(range.value[1]),
         crop: centeredCrop(p.aspect, naturalWidth.value, naturalHeight.value),
-        scale: { w: p.w, h: p.h }
+        scale: { w: p.w, h: p.h },
+        audio: trimAudioRequest(trimAudio.value),
+        extend: extension.value > 0 || undefined,
+        look: lookRequest(look.value)
       })
       queued++
     }
@@ -1889,6 +1915,7 @@ const orientSampleTransform = computed(() => `scaleX(${orient.value.flipH ? -1 :
 function resetTrim() {
   orient.value = { ...NO_ORIENTATION }
   extendOn.value = false
+  look.value = { ...PLAIN_LOOK }
   range.value = [0, durationMs.value]
   cropOn.value = false
   onCropToggle(false)
@@ -1963,7 +1990,7 @@ const trimError = computed(() => {
     const e = validateScale(scale.w, scale.h)
     if (e) return e
   }
-  return validateTrimAudio(trimAudio.value, Math.round(range.value[1] - range.value[0]))
+  return validateLook(look.value) ?? validateTrimAudio(trimAudio.value, Math.round(range.value[1] - range.value[0]))
 })
 
 const starting = ref(false)
@@ -1978,7 +2005,8 @@ async function onStartTrim() {
       scale: scaleOn.value ? { w: scale.w, h: scale.h } : null,
       ...orientationRequest(orient.value),
       audio: trimAudioRequest(trimAudio.value),
-      extend: extension.value > 0 || undefined
+      extend: extension.value > 0 || undefined,
+      look: lookRequest(look.value)
     })
     toast.add({ title: `Trim queued — job #${job.id}`, color: 'success' })
     await load()
@@ -1993,6 +2021,7 @@ async function onStartTrim() {
 // ── Cut out ranges ───────────────────────────────────────────────────────────
 const cuts = ref<CutRange[]>([])
 const trimAudio = ref<TrimAudioSettings | null>(null)
+const look = ref<VideoLook>({ ...PLAIN_LOOK })
 const cutStarting = ref(false)
 async function onStartCut() {
   if (validateCutOut(cuts.value, Math.round(durationMs.value) || null)) return
@@ -2183,6 +2212,20 @@ const visibleJobs = computed<ProcessingJob[]>(() => {
 const { can } = useAuth()
 const jobsApi = useProcessingJobs()
 const canCancel = computed(() => can('processing-jobs', 'APPROVE'))
+const canRetry = computed(() => can('processing-jobs', 'WRITE'))
+const retryingId = ref<number | null>(null)
+async function onRetryJob(job: ProcessingJob) {
+  retryingId.value = job.id
+  try {
+    await jobsApi.retry(job.id)
+    toast.add({ title: `${jobLabel(job).replace(/ failed$/, '')} queued again`, color: 'success' })
+    await load()
+  } catch (err) {
+    toast.add({ title: 'Could not retry the job', description: apiErrorMessage(err), color: 'error' })
+  } finally {
+    retryingId.value = null
+  }
+}
 const cancellingId = ref<number | null>(null)
 async function onCancelJob(job: ProcessingJob) {
   cancellingId.value = job.id
@@ -2199,6 +2242,7 @@ async function onCancelJob(job: ProcessingJob) {
 const busy = computed(() => visibleJobs.value.some((j) => isActiveJobStatus(j.status)))
 const JOB_LABELS: Record<string, string> = {
   TRIM: 'Trim',
+  CUT: 'Cut out',
   SPLIT: 'Split',
   AUDIO: 'Video with new audio',
   EXTRACT: 'Audio extract',
@@ -2265,6 +2309,12 @@ watch(mode, (m) => {
   }
 })
 
+// The look shows on the preview while on the Trim tab (a close match to the render; dark corners aren't shown).
+watchEffect(() => {
+  const el = preview.value?.videoEl
+  if (el) el.style.filter = mode.value === 'trim' ? cssFilter(look.value) : ''
+})
+
 // ── Audio ────────────────────────────────────────────────────────────────────
 const audioEdit = useAudioEdit(durationMs)
 
@@ -2295,7 +2345,14 @@ watch(() => [props.video.title, props.video.durationSeconds, props.video.videoUr
 // A dot on a tab means it has pending settings — easy to miss otherwise,
 // since switching tabs doesn't reset or hide what's already set there.
 const trimDirty = computed(
-  () => !!trimAudio.value || cropOn.value || scaleOn.value || orientActive.value || range.value[0] !== 0 || range.value[1] !== durationMs.value
+  () =>
+    !isPlainLook(look.value) ||
+    !!trimAudio.value ||
+    cropOn.value ||
+    scaleOn.value ||
+    orientActive.value ||
+    range.value[0] !== 0 ||
+    range.value[1] !== durationMs.value
 )
 const splitDirty = computed(() => segments.value.length > 1 || segments.value[0]?.startMsSeconds !== 0 || segments.value[0]?.endMsSeconds != null)
 const DIRTY_BADGE = { color: 'warning' as const, size: 'xs' as const }
@@ -2325,6 +2382,8 @@ const trimSummary = computed(() => {
   }
   if (orientActive.value) parts.push(describeOrientation(orient.value))
   if (extension.value) parts.push(`${formatMsShort(extension.value)} past the end (last frame held)`)
+  const lookLine = describeVideoLook(look.value)
+  if (lookLine) parts.push(lookLine)
   const audioLine = describeTrimAudio(trimAudio.value)
   if (audioLine) parts.push(audioLine)
   return parts.join(' · ')
@@ -2355,7 +2414,7 @@ const TAB_TONES: Record<typeof mode.value, { indicator: string; ui: { trigger: s
 }
 // A tab whose edit is being made shows its progress on the tab, so it can be left
 // and checked on from anywhere (the Results card below has the detail).
-const JOB_TAB: Record<string, typeof mode.value> = { TRIM: 'trim', SPLIT: 'split', AUDIO: 'audio', OVERLAY: 'overlay' }
+const JOB_TAB: Record<string, typeof mode.value> = { TRIM: 'trim', CUT: 'trim', SPLIT: 'split', AUDIO: 'audio', OVERLAY: 'overlay' }
 function jobOperation(job: ProcessingJob): string {
   try {
     return JSON.parse(job.parameters ?? '{}').operation ?? ''
@@ -2426,7 +2485,8 @@ function takeState() {
       orient: { ...orient.value },
       cuts: cuts.value.map((c) => ({ ...c })),
       audio: trimAudio.value ? { ...trimAudio.value } : null,
-      extend: extendOn.value
+      extend: extendOn.value,
+      look: { ...look.value }
     },
     split: segments.value,
     audio,
@@ -2448,6 +2508,8 @@ async function applyState(st: ReturnType<typeof takeState>) {
   // Same for added audio.
   trimAudio.value = st.trim.audio ? { ...st.trim.audio } : null
   extendOn.value = !!st.trim.extend
+  // And a look.
+  look.value = st.trim.look ? { ...PLAIN_LOOK, ...st.trim.look } : { ...PLAIN_LOOK }
   segments.value = st.split
   const { clips, ...audio } = st.audio
   Object.assign(audioEdit.state, audio)

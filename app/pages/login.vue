@@ -78,15 +78,8 @@ const route = useRoute()
 const sessionExpired = computed(() => route.query.reason === 'expired')
 const passwordReset = computed(() => route.query.reset === '1')
 
-// Only ever return to an internal path. A `redirect` of "//evil.com" or
-// "https://evil.com" would otherwise turn the login form into an open redirect.
-const redirectTarget = computed(() => {
-  const target = route.query.redirect
-  if (typeof target !== 'string' || !target.startsWith('/') || target.startsWith('//') || target.startsWith('/\\')) {
-    return '/'
-  }
-  return target
-})
+// Only ever return to an internal path (see safeRedirectTarget): a `redirect` of "//evil.com" would be an open redirect.
+const redirectTarget = computed(() => safeRedirectTarget(route.query.redirect))
 const form = reactive<LoginRequest>({ username: '', password: '' })
 const loading = ref(false)
 const error = ref('')

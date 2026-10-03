@@ -467,26 +467,11 @@ const summary = computed(() => {
 const uploading = ref<'replacement' | 'music' | null>(null)
 const uploadProgress = ref(0)
 
-function readDuration(file: File): Promise<number | null> {
-  return new Promise((resolve) => {
-    const url = URL.createObjectURL(file)
-    const a = new Audio()
-    const done = (v: number | null) => {
-      URL.revokeObjectURL(url)
-      resolve(v)
-    }
-    a.preload = 'metadata'
-    a.onloadedmetadata = () => done(Number.isFinite(a.duration) ? Math.round(a.duration * 1000) : null)
-    a.onerror = () => done(null)
-    a.src = url
-  })
-}
-
 async function onUpload(file: File, what: 'replacement' | 'music') {
   uploading.value = what
   uploadProgress.value = 0
   try {
-    const [durationMs, ticket] = await Promise.all([readDuration(file), requestUpload('AUDIO', file)])
+    const [durationMs, ticket] = await Promise.all([readAudioDuration(file), requestUpload('AUDIO', file)])
     await uploadToStorage(ticket, file, (f) => (uploadProgress.value = f))
     const uploaded = { key: ticket.key, name: file.name, durationMs }
     if (what === 'replacement') s.replacement = uploaded

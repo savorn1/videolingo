@@ -1,6 +1,5 @@
 <template>
-  <section class="space-y-3" aria-labelledby="trim-audio-h" data-testid="trim-audio">
-    <h3 id="trim-audio-h" class="text-xs font-semibold uppercase tracking-wide" :class="TAB_ACCENTS.trim.heading">Add audio</h3>
+  <EditorSection v-model:open="open" title="Add audio" :changed="!!audio" :hint="audio?.name ?? ''" data-testid="trim-audio">
     <template v-if="audio">
       <div class="flex items-center gap-2 rounded-md bg-gray-50 px-2 py-1.5 dark:bg-gray-800">
         <UIcon name="i-lucide-music" class="h-4 w-4 shrink-0" :class="TAB_ACCENTS.trim.icon" />
@@ -46,7 +45,7 @@
     </template>
     <UploadButton v-else label="Add audio file" icon="i-lucide-music" :progress="uploading ? progress : null" @pick="onPick" />
     <p class="text-xs text-gray-500 dark:text-gray-400">It is added to the trimmed result, so times here start at 0:00 of the trim.</p>
-  </section>
+  </EditorSection>
 </template>
 
 <script setup lang="ts">
@@ -58,29 +57,23 @@ const audio = defineModel<TrimAudioSettings | null>({ required: true })
 const { requestUpload } = useVideos()
 const toast = useToast()
 
+const open = ref(false)
+watch(
+  audio,
+  (a, old) => {
+    if (a && !old) open.value = true
+  },
+  { immediate: true }
+)
+
 const uploading = ref(false)
 const progress = ref(0)
-
-function readDuration(file: File): Promise<number | null> {
-  return new Promise((resolve) => {
-    const url = URL.createObjectURL(file)
-    const a = new Audio()
-    const done = (v: number | null) => {
-      URL.revokeObjectURL(url)
-      resolve(v)
-    }
-    a.preload = 'metadata'
-    a.onloadedmetadata = () => done(Number.isFinite(a.duration) ? Math.round(a.duration * 1000) : null)
-    a.onerror = () => done(null)
-    a.src = url
-  })
-}
 
 async function onPick(file: File) {
   uploading.value = true
   progress.value = 0
   try {
-    const [durationMs, ticket] = await Promise.all([readDuration(file), requestUpload('AUDIO', file)])
+    const [durationMs, ticket] = await Promise.all([readAudioDuration(file), requestUpload('AUDIO', file)])
     await uploadToStorage(ticket, file, (f) => (progress.value = f))
     audio.value = newTrimAudio({ key: ticket.key, name: file.name, durationMs })
   } catch (err) {

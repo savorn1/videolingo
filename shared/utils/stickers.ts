@@ -120,17 +120,40 @@ export const STICKER_GROUPS: StickerGroup[] = [
 /** Side of the PNG a sticker is drawn at; layers are scaled by width %, so this only sets sharpness. */
 export const STICKER_PX = 256
 
-/** Upload name for a sticker, e.g. `sticker-fire.png`. */
-export function stickerFileName(name: string) {
+export type StickerTurn = 0 | 90 | 180 | 270
+
+export interface StickerLook {
+  /** Mirrored left–right. */
+  flip: boolean
+  /** Clockwise quarter turns, in degrees. */
+  turn: StickerTurn
+}
+
+export const PLAIN_STICKER: StickerLook = { flip: false, turn: 0 }
+
+/** The next clockwise quarter turn: 0 → 90 → 180 → 270 → 0. */
+export function nextTurn(turn: StickerTurn): StickerTurn {
+  return ((turn + 90) % 360) as StickerTurn
+}
+
+/** " (mirrored, turned 90°)" for a look that isn't plain; "" otherwise. */
+export function describeLook(look: StickerLook): string {
+  const parts = [look.flip ? 'mirrored' : '', look.turn ? `turned ${look.turn}°` : ''].filter(Boolean)
+  return parts.length ? ` (${parts.join(', ')})` : ''
+}
+
+/** Upload name for a sticker, e.g. `sticker-fire.png`; a changed look is part of the name so it isn't mistaken for the plain one. */
+export function stickerFileName(name: string, look: StickerLook = PLAIN_STICKER) {
   const slug = name
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
-  return `sticker-${slug || 'emoji'}.png`
+  const suffix = (look.flip ? '-mirrored' : '') + (look.turn ? `-${look.turn}` : '')
+  return `sticker-${slug || 'emoji'}${suffix}.png`
 }
 
 /** Draws an emoji centred on a transparent square canvas and returns it as a PNG file. */
-export async function renderSticker(emoji: string, name: string): Promise<File> {
+export async function renderSticker(emoji: string, name: string, look: StickerLook = PLAIN_STICKER): Promise<File> {
   const canvas = document.createElement('canvas')
   canvas.width = canvas.height = STICKER_PX
   const ctx = canvas.getContext('2d')
@@ -138,10 +161,14 @@ export async function renderSticker(emoji: string, name: string): Promise<File> 
   ctx.font = `${Math.round(STICKER_PX * 0.8)}px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif`
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
-  ctx.fillText(emoji, STICKER_PX / 2, STICKER_PX / 2 + STICKER_PX * 0.04)
+  // Turn and mirror around the centre of the square, then draw.
+  ctx.translate(STICKER_PX / 2, STICKER_PX / 2)
+  ctx.rotate((look.turn * Math.PI) / 180)
+  if (look.flip) ctx.scale(-1, 1)
+  ctx.fillText(emoji, 0, STICKER_PX * 0.04)
   const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'))
   if (!blob) throw new Error('Could not draw the sticker')
-  return new File([blob], stickerFileName(name), { type: 'image/png' })
+  return new File([blob], stickerFileName(name, look), { type: 'image/png' })
 }
 
 export const MAX_RECENT_STICKERS = 8

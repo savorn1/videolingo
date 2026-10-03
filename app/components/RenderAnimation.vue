@@ -31,9 +31,10 @@ import { TAB_ACCENTS, type EditorTab } from '#shared/utils/tabAccent'
 
 const props = defineProps<{ operation: string; status: string }>()
 
-const TABS: Record<string, EditorTab> = { TRIM: 'trim', SPLIT: 'split', AUDIO: 'audio', OVERLAY: 'overlay', EXTRACT: 'audio' }
+const TABS: Record<string, EditorTab> = { TRIM: 'trim', CUT: 'trim', SPLIT: 'split', AUDIO: 'audio', OVERLAY: 'overlay', EXTRACT: 'audio' }
 const LABELS: Record<string, string> = {
   TRIM: 'Cutting the picture',
+  CUT: 'Cutting out the ranges',
   SPLIT: 'Cutting the segments',
   AUDIO: 'Mixing the sound',
   OVERLAY: 'Drawing the layers',

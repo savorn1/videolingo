@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { MAX_CUTS, cutBetween, cutSkipTarget, keptAfterCuts, lengthAfterCuts, mergeCutRanges, validateCutOut } from './cutOut'
+import { MAX_CUTS, MIN_CUT_MS, moveCutEdge, cutBetween, snapCut, cutSkipTarget, keptAfterCuts, lengthAfterCuts, mergeCutRanges, validateCutOut } from './cutOut'
 
 const r = (startMs: number, endMs: number) => ({ startMs, endMs })
 
@@ -73,5 +73,36 @@ describe('cutBetween', () => {
     expect(cutBetween(30000, 20000, 60000)).toEqual(r(20000, 30000))
     expect(cutBetween(-5, 70000, 60000)).toEqual(r(0, 60000))
     expect(cutBetween(5000, 5000, 60000)).toBeNull()
+  })
+})
+
+describe('snapCut', () => {
+  it('reaches the end or the beginning instead of leaving a sliver', () => {
+    expect(snapCut(r(10000, 59800), 60000)).toEqual(r(10000, 60000))
+    expect(snapCut(r(200, 30000), 60000)).toEqual(r(0, 30000))
+  })
+  it('leaves proper pieces alone', () => {
+    expect(snapCut(r(10000, 59000), 60000)).toEqual(r(10000, 59000))
+    expect(snapCut(r(0, 30000), 60000)).toEqual(r(0, 30000))
+  })
+  it('is used when marking a range near the end', () => {
+    expect(cutBetween(10000, 59700, 60000)).toEqual(r(10000, 60000))
+  })
+})
+
+describe('moveCutEdge', () => {
+  const cuts = [r(20000, 30000), r(40000, 45000)]
+  it('moves one edge and leaves the other cuts alone', () => {
+    expect(moveCutEdge(cuts, 0, 'startMs', 15000, 60000)).toEqual([r(15000, 30000), r(40000, 45000)])
+    expect(moveCutEdge(cuts, 1, 'endMs', 50000, 60000)).toEqual([r(20000, 30000), r(40000, 50000)])
+  })
+  it('stays inside the video and keeps a minimum length', () => {
+    expect(moveCutEdge(cuts, 0, 'startMs', -5, 60000)[0]).toEqual(r(0, 30000))
+    expect(moveCutEdge(cuts, 0, 'endMs', 99999, 60000)[0]).toEqual(r(20000, 60000))
+    expect(moveCutEdge(cuts, 0, 'startMs', 40000, 60000)[0]).toEqual(r(30000 - MIN_CUT_MS, 30000))
+    expect(moveCutEdge(cuts, 0, 'endMs', 1000, 60000)[0]).toEqual(r(20000, 20000 + MIN_CUT_MS))
+  })
+  it('ignores a missing cut', () => {
+    expect(moveCutEdge(cuts, 5, 'startMs', 1, 60000)).toBe(cuts)
   })
 })

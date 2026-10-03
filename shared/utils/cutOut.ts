@@ -67,9 +67,33 @@ export function cutSkipTarget(cuts: CutRange[], ms: number): number | null {
   return null
 }
 
+/** A cut that stops (or starts) within MIN_KEPT_MS of the video's end (or beginning) reaches it: no sliver is left to render. */
+export function snapCut(cut: CutRange, durationMs: number): CutRange {
+  if (!durationMs) return cut
+  return {
+    startMs: cut.startMs > 0 && cut.startMs < MIN_KEPT_MS ? 0 : cut.startMs,
+    endMs: cut.endMs < durationMs && durationMs - cut.endMs < MIN_KEPT_MS ? Math.round(durationMs) : cut.endMs
+  }
+}
+
 /** Adds a range between two marks (in either order), clamped into the video. Null when they are the same moment. */
 export function cutBetween(aMs: number, bMs: number, durationMs: number): CutRange | null {
   const startMs = Math.max(0, Math.min(aMs, bMs))
   const endMs = Math.min(durationMs, Math.max(aMs, bMs))
-  return endMs > startMs ? { startMs: Math.round(startMs), endMs: Math.round(endMs) } : null
+  return endMs > startMs ? snapCut({ startMs: Math.round(startMs), endMs: Math.round(endMs) }, durationMs) : null
+}
+
+/** The shortest cut a handle can be dragged down to. */
+export const MIN_CUT_MS = 100
+
+/** Moves one edge of cut `index`, keeping it inside the video and at least MIN_CUT_MS long. Out-of-range indexes give the list back. */
+export function moveCutEdge(cuts: CutRange[], index: number, edge: 'startMs' | 'endMs', ms: number, durationMs: number): CutRange[] {
+  const c = cuts[index]
+  if (!c) return cuts
+  const at = Math.round(ms)
+  const next: CutRange =
+    edge === 'startMs'
+      ? { startMs: Math.min(Math.max(0, at), c.endMs - MIN_CUT_MS), endMs: c.endMs }
+      : { startMs: c.startMs, endMs: Math.max(Math.min(durationMs || at, at), c.startMs + MIN_CUT_MS) }
+  return cuts.map((x, i) => (i === index ? next : x))
 }

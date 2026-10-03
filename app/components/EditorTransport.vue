@@ -20,6 +20,33 @@
           :class="loopOn ? 'bg-primary-500/60' : ''"
           :style="{ left: pct(selection[0]), width: pct(Math.min(selection[1], durationMs) - selection[0]) }"
         />
+        <template v-for="(c, i) in cuts ?? []" :key="`cut${i}`">
+          <div
+            class="absolute inset-y-0 bg-error-500/50 pointer-events-none"
+            :style="{ left: pct(c.startMs), width: pct(Math.min(c.endMs, durationMs) - c.startMs) }"
+            :title="`Cut out ${formatTimecode(c.startMs)} – ${formatTimecode(c.endMs)}`"
+            data-testid="range-cut"
+          />
+          <div
+            v-for="edge in CUT_EDGES"
+            :key="edge.key"
+            role="slider"
+            tabindex="0"
+            class="absolute inset-y-0 z-10 w-1.5 -translate-x-1/2 cursor-ew-resize touch-none rounded bg-error-600 hover:bg-error-500 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-error-500"
+            :style="{ left: pct(c[edge.key]) }"
+            :aria-label="`Cut ${i + 1} ${edge.label}`"
+            :aria-valuemin="0"
+            :aria-valuemax="Math.round(durationMs)"
+            :aria-valuenow="Math.round(c[edge.key])"
+            :aria-valuetext="formatTimecode(c[edge.key])"
+            :title="`Cut ${i + 1} ${edge.label} — ${formatTimecode(c[edge.key])}`"
+            @pointerdown.prevent="startDrag($event)"
+            @pointermove="onCutDrag(i, edge.key, $event)"
+            @pointerup="endDrag"
+            @pointercancel="endDrag"
+            @keydown="onCutKey(i, edge.key, $event)"
+          />
+        </template>
         <div
           v-for="edge in RANGE_EDGES"
           :key="edge.key"
@@ -33,7 +60,7 @@
           :aria-valuenow="Math.round(selection[edge.index]!)"
           :aria-valuetext="formatTimecode(selection[edge.index]!)"
           :title="`${edge.label} — ${formatTimecode(selection[edge.index]!)}`"
-          @pointerdown.prevent="startDrag(edge.key, $event)"
+          @pointerdown.prevent="startDrag($event)"
           @pointermove="onDrag(edge.key, $event)"
           @pointerup="endDrag"
           @pointercancel="endDrag"
@@ -83,6 +110,18 @@
         <UButton
           v-if="selection"
           size="xs"
+          color="neutral"
+          variant="ghost"
+          icon="i-lucide-play-circle"
+          title="Play just the trim selection, once"
+          data-testid="play-range"
+          @click="playRange"
+        >
+          Play range
+        </UButton>
+        <UButton
+          v-if="selection"
+          size="xs"
           :color="loopOn ? 'primary' : 'neutral'"
           :variant="loopOn ? 'soft' : 'ghost'"
           icon="i-lucide-repeat"
@@ -129,6 +168,7 @@
 // the crop layer while cropping, and has no frame stepping, looping or (in
 // most browsers) speed — so the editor drives the <video> from here.
 import { withTrimEdge } from '#shared/utils/videoEdit'
+import { moveCutEdge } from '#shared/utils/cutOut'
 import { EDITOR_RATES, FALLBACK_FPS, estimateFps, formatTimecode, loopedTime, stepFrameTime } from '#shared/utils/transport'
 
 interface PlayerHandle {
@@ -143,6 +183,8 @@ const props = defineProps<{
   selection?: [number, number] | null
   /** Draw handles on the selection that can be dragged (the Trim tab); changes go out as `update:selection`. */
   selectionEditable?: boolean
+  /** Ranges being cut out (the Trim tab), drawn in red on the range track. */
+  cuts?: { startMs: number; endMs: number }[]
   /** What goes full screen: the whole preview stage, so crop and zoom come along. */
   fullscreenTarget?: HTMLElement | null
   /** Space is busy elsewhere (panning the zoomed preview under the pointer). */
@@ -167,7 +209,7 @@ const fps = ref(FALLBACK_FPS)
 const fpsMeasured = ref(false)
 const frameNo = computed(() => Math.floor((timeMs.value / 1000) * fps.value + 1e-6))
 
-const emit = defineEmits<{ 'update:selection': [range: [number, number]] }>()
+const emit = defineEmits<{ 'update:selection': [range: [number, number]]; 'update:cuts': [cuts: { startMs: number; endMs: number }[]] }>()
 
 const RANGE_EDGES = [
   { key: 'start', index: 0, label: 'Trim start' },
@@ -180,7 +222,7 @@ function moveEdge(edge: 'start' | 'end', ms: number) {
   if (!props.selection) return
   emit('update:selection', withTrimEdge(props.selection, edge, ms, durationMs.value))
 }
-function startDrag(_edge: 'start' | 'end', e: PointerEvent) {
+function startDrag(e: PointerEvent) {
   ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
   dragging.value = true
 }
@@ -188,6 +230,26 @@ function onDrag(edge: 'start' | 'end', e: PointerEvent) {
   const box = track.value?.getBoundingClientRect()
   if (!dragging.value || !box?.width) return
   moveEdge(edge, ((e.clientX - box.left) / box.width) * durationMs.value)
+}
+const CUT_EDGES = [
+  { key: 'startMs', label: 'start' },
+  { key: 'endMs', label: 'end' }
+] as const
+function moveCut(index: number, edge: 'startMs' | 'endMs', ms: number) {
+  if (props.cuts) emit('update:cuts', moveCutEdge(props.cuts, index, edge, ms, durationMs.value))
+}
+function onCutDrag(index: number, edge: 'startMs' | 'endMs', e: PointerEvent) {
+  const box = track.value?.getBoundingClientRect()
+  if (!dragging.value || !box?.width) return
+  moveCut(index, edge, ((e.clientX - box.left) / box.width) * durationMs.value)
+}
+function onCutKey(index: number, edge: 'startMs' | 'endMs', e: KeyboardEvent) {
+  const dir = e.key === 'ArrowLeft' ? -1 : e.key === 'ArrowRight' ? 1 : 0
+  const cut = props.cuts?.[index]
+  if (!dir || !cut) return
+  e.preventDefault()
+  e.stopPropagation()
+  moveCut(index, edge, cut[edge] + dir * (e.shiftKey ? 1000 : 100))
 }
 function endDrag() {
   dragging.value = false
@@ -223,8 +285,28 @@ function tick() {
   raf = 0
   if (!v) return
   enforceLoop(v)
+  enforceStopAt(v)
   timeMs.value = v.currentTime * 1000
   if (!v.paused) raf = requestAnimationFrame(tick)
+}
+/** "Play range": plays the selection once and pauses at its end. */
+let stopAtMs: number | null = null
+function playRange() {
+  const v = el.value
+  const sel = props.selection
+  if (!v || !sel) return
+  stopAtMs = sel[1]
+  v.currentTime = sel[0] / 1000
+  v.play().catch(() => {})
+}
+function enforceStopAt(v: HTMLVideoElement) {
+  if (stopAtMs == null) return
+  if (v.currentTime * 1000 >= stopAtMs) {
+    const at = stopAtMs
+    stopAtMs = null
+    v.pause()
+    v.currentTime = at / 1000
+  }
 }
 function enforceLoop(v: HTMLVideoElement) {
   const sel = selectionSeconds()
@@ -265,7 +347,10 @@ watch(
       if (!raf) raf = requestAnimationFrame(tick)
       measureFps(v)
     }
-    const onPause = () => (playing.value = false)
+    const onPause = () => {
+      playing.value = false
+      if (stopAtMs != null && v.currentTime * 1000 < stopAtMs - 50) stopAtMs = null
+    }
     const onTime = () => (timeMs.value = v.currentTime * 1000)
     const onMeta = () => syncFrom(v)
     const onRate = () => (rate.value = v.playbackRate)

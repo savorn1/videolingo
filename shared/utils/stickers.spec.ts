@@ -1,5 +1,16 @@
 import { describe, expect, it } from 'vitest'
-import { MAX_RECENT_STICKERS, STICKER_GROUPS, filterStickerGroups, isSingleEmoji, pushRecentSticker, sanitizeRecentStickers, stickerFileName } from './stickers'
+import {
+  MAX_RECENT_STICKERS,
+  PLAIN_STICKER,
+  describeLook,
+  nextTurn,
+  STICKER_GROUPS,
+  filterStickerGroups,
+  isSingleEmoji,
+  pushRecentSticker,
+  sanitizeRecentStickers,
+  stickerFileName
+} from './stickers'
 
 describe('stickerFileName', () => {
   it('slugs the name', () => {
@@ -57,5 +68,21 @@ describe('isSingleEmoji', () => {
     expect(isSingleEmoji('')).toBe(false)
     expect(isSingleEmoji('abc')).toBe(false)
     expect(isSingleEmoji('🔥🔥')).toBe(false)
+  })
+})
+
+describe('sticker look', () => {
+  it('turns a quarter at a time and comes back round', () => {
+    expect(nextTurn(0)).toBe(90)
+    expect(nextTurn(270)).toBe(0)
+  })
+  it('describes only what changed', () => {
+    expect(describeLook(PLAIN_STICKER)).toBe('')
+    expect(describeLook({ flip: true, turn: 0 })).toBe(' (mirrored)')
+    expect(describeLook({ flip: true, turn: 90 })).toBe(' (mirrored, turned 90°)')
+  })
+  it('puts a changed look in the file name', () => {
+    expect(stickerFileName('fire')).toBe('sticker-fire.png')
+    expect(stickerFileName('fire', { flip: true, turn: 180 })).toBe('sticker-fire-mirrored-180.png')
   })
 })
