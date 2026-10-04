@@ -75,10 +75,29 @@ const visibility = computed(() => VIDEO_VISIBILITIES.find((v) => v.value === pro
 
 const warning = computed(() => {
   const v = props.video
-  if (v.deleted) return { color: 'error' as const, icon: 'i-lucide-trash-2', title: 'This video is in the trash', description: 'The link will not work until you restore it.' }
-  if (v.archived) return { color: 'warning' as const, icon: 'i-lucide-archive', title: 'This video is archived', description: 'Learners can’t open it until you unarchive it.' }
-  if (!v.enabled) return { color: 'warning' as const, icon: 'i-lucide-eye-off', title: 'This video is disabled', description: 'Learners can’t open it until you enable it.' }
-  if (v.visibility === 'PRIVATE') return { color: 'warning' as const, icon: 'i-lucide-lock', title: 'This video is private', description: 'Only its owner can open the link. Change the visibility to Unlisted or Public to share it.' }
+  if (v.deleted)
+    return {
+      color: 'error' as const,
+      icon: 'i-lucide-trash-2',
+      title: 'This video is in the trash',
+      description: 'The link will not work until you restore it.'
+    }
+  if (v.archived)
+    return {
+      color: 'warning' as const,
+      icon: 'i-lucide-archive',
+      title: 'This video is archived',
+      description: 'Learners can’t open it until you unarchive it.'
+    }
+  if (!v.enabled)
+    return { color: 'warning' as const, icon: 'i-lucide-eye-off', title: 'This video is disabled', description: 'Learners can’t open it until you enable it.' }
+  if (v.visibility === 'PRIVATE')
+    return {
+      color: 'warning' as const,
+      icon: 'i-lucide-lock',
+      title: 'This video is private',
+      description: 'Only its owner can open the link. Change the visibility to Unlisted or Public to share it.'
+    }
   return null
 })
 

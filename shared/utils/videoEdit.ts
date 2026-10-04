@@ -104,6 +104,31 @@ export function splitRowAt(rows: SegmentRow[], index: number, seconds: number): 
   ]
 }
 
+/**
+ * The row "Add segment" appends: from where the last row ends to the end of the video,
+ * or — when the last row already runs to (nearly) the end — from the playhead. Never
+ * starts less than MIN_TRIM_MS before the end, so the new row is valid as added.
+ */
+export function nextSegmentRow(rows: SegmentRow[], playheadSeconds: number, durationSeconds: number): SegmentRow {
+  const latest = Math.max(0, durationSeconds - MIN_TRIM_MS / 1000)
+  const lastEnd = rows.at(-1)?.endMsSeconds
+  const from = lastEnd != null && lastEnd <= latest ? lastEnd : rows.length ? playheadSeconds : 0
+  return { startMsSeconds: Math.round(Math.min(latest, Math.max(0, from)) * 100) / 100, endMsSeconds: null }
+}
+
+/** Shown under a render button while another edit on this video is running (the single-edit buttons wait for it). */
+export const BUSY_NOTE = 'Another edit is being made — this unlocks when it finishes (see Results).'
+
+/**
+ * The line under a render button: what is wrong first, then why it is waiting, then
+ * what to do to make anything at all. `ready` means there is something to render.
+ */
+export function renderHint(error: string | null | undefined, ready: boolean, busy: boolean, idle = ''): { text: string; isError: boolean } {
+  if (error) return { text: error, isError: true }
+  if (!ready) return { text: idle, isError: false }
+  return { text: busy ? BUSY_NOTE : '', isError: false }
+}
+
 /** The most equal parts a video can be cut into: each at least MIN_TRIM_MS long, and no more than MAX_SEGMENTS. */
 export function maxEvenParts(durationMs: number): number {
   if (!durationMs || durationMs <= 0) return 0

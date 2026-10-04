@@ -546,7 +546,9 @@
       <p class="text-xs text-gray-500 dark:text-gray-400">
         The server draws the text with its own copy of the font, so it can differ slightly from this preview.
       </p>
-      <p class="text-xs text-error-600 dark:text-error-400 min-h-4">{{ edit.error.value }}</p>
+      <p class="text-xs min-h-4" :class="hint.isError ? 'text-error-600 dark:text-error-400' : 'text-gray-500 dark:text-gray-400'" data-testid="overlay-hint">
+        {{ hint.text }}
+      </p>
       <div class="flex gap-2">
         <UButton
           v-if="canWrite"
@@ -609,10 +611,12 @@ import {
 import { LAYER_ANIMATIONS, LAYER_SPOTS, LAYER_WEIGHTS, fontCss, type OverlayEdit } from '~/composables/useOverlayEdit'
 import { uploadToStorage } from '~/composables/useVideos'
 import { formatTimecode } from '#shared/utils/transport'
+import { renderHint } from '#shared/utils/videoEdit'
 import { dropIndex } from '#shared/utils/reorder'
 import { useOverlayTemplates, type OverlayTemplate } from '~/composables/useOverlayTemplates'
 
 const props = defineProps<{ edit: OverlayEdit; videoId: number; durationMs: number; currentMs: number; canWrite: boolean; busy: boolean }>()
+const hint = computed(() => renderHint(props.edit.error.value, true, props.busy))
 const emit = defineEmits<{ queued: []; preview: [ms: number, play?: boolean] }>()
 
 const SECTION = `space-y-2 border-t pt-3 ${TAB_ACCENTS.overlay.divider}`

@@ -58,7 +58,14 @@ These are what a change to the editor must not break. The backend re-checks ever
 
 - Range in ms, at least `MIN_TRIM_MS` (500) long, start ≥ 0, end ≤ duration; `endMs: null` means "to the end".
 - Optional crop (inside the frame, positive size, from a chosen shape such as 16:9) and optional resize (both sides positive). "Export for" presets set crop shape and output size together; a preset counts as chosen only while both still match.
+- Extend (`extend` in the trim request, `MAX_EXTEND_MS` = 5 min): with the switch on, the end may run past the video's end; the result holds the last frame and is silent there. Needs an end time. Multi-format export passes it on to every trim.
+- Optional look (`videoLook.ts`, `LookPanel.vue`; backend `VideoEditRules.Look`): brightness −100…100 %, contrast 0…200 %, colour 0…300 %, blur 0…20, black & white / sepia (not both), dark corners. Applied after crop, turn and resize. The preview is a CSS filter (close, not exact; no dark corners). A plain look is not sent. Multi-format export applies it to every trim.
+- Optional added audio (`trimAudio.ts`, `TrimAudioPanel.vue`): an uploaded file mixed into the trimmed result (volume 0–200 %, start, loop, duck) or used instead of its sound. The backend renders the trim, then the audio pass on the result (`audio` in the trim request); times are on the trimmed result's timeline. Multi-format export carries it on every trim.
 - Multi-format export queues one trim per ticked preset, each with `centeredCrop` of that shape and the preset's size, using the current range.
+
+**Cut out** (Trim tab, `shared/utils/cutOut.ts`, `CutOutPanel.vue`; backend `VideoEditRules.validateCuts`, `POST /edits/cut`)
+
+- Up to `MAX_CUTS` (20) ranges taken out of the video (ms); overlapping or touching ranges are merged. What is left must not be empty, and no piece around or between cuts may be shorter than `MIN_KEPT_MS` (500). The result is a single TRIM-style clip (replace the original or add as a new video); picture and sound are cut together. The preview skips cut ranges while playing.
 
 **Split**
 
@@ -78,7 +85,7 @@ These are what a change to the editor must not break. The backend re-checks ever
 
 **Join (merge)** (`shared/utils/mergeVideos.ts`)
 
-- 2–`MAX_MERGE_VIDEOS` (10) videos, total ≤ `MAX_MERGE_SECONDS` (3 h). Only stored files not in the trash: links (YouTube/Vimeo/Facebook/URL) and deleted videos are blocked with a reason. Output resolution and a transition (`NONE` straight cut, `FADE` through black); the result is a new, hidden video.
+- 2–`MAX_MERGE_VIDEOS` (10) videos, total ≤ `MAX_MERGE_SECONDS` (3 h). Only stored files not in the trash: links (YouTube/Vimeo/Facebook/URL) and deleted videos are blocked with a reason. Output resolution and a transition (`NONE` straight cut, `FADE` through black, `FADE_WHITE` through white, `DISSOLVE`/`WIPE`/`SLIDE` playing the videos over each other for ~0.6 s per joint, so the result is shorter by that much — `joinedSeconds`, `MergeRules.totalMs`); the result is a new, hidden video.
 
 **Video from audio** (`from-audio.vue`, `shared/utils/audioVideo.ts`)
 

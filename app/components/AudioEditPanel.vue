@@ -282,8 +282,8 @@
           Nothing changes until you choose: replace the original (kept under Versions) or add it as a new video.
         </li>
       </ul>
-      <p class="text-xs min-h-4" :class="edit.error.value ? 'text-error-500' : 'text-gray-500 dark:text-gray-400'">
-        {{ edit.error.value || (edit.changed.value ? '' : 'Change something above to make an audio edit.') }}
+      <p class="text-xs min-h-4" :class="hint.isError ? 'text-error-500' : 'text-gray-500 dark:text-gray-400'" data-testid="audio-hint">
+        {{ hint.text }}
       </p>
       <div class="flex gap-2">
         <UButton
@@ -326,8 +326,10 @@ import type { AudioEdit, Channels, Denoise } from '~/composables/useAudioEdit'
 import { uploadToStorage } from '~/composables/useVideos'
 import { addMute, clipAt, clipEnd, deleteRange, duplicate, MAX_AUDIO_CLIPS, MIN_CLIP_MS, mergeWithNext, splitAt, type AudioClip } from '#shared/utils/audioEdit'
 import { formatTimecode } from '#shared/utils/transport'
+import { renderHint } from '#shared/utils/videoEdit'
 
 const props = defineProps<{ edit: AudioEdit; videoId: number; durationMs: number; currentMs: number; canWrite: boolean; busy: boolean }>()
+const hint = computed(() => renderHint(props.edit.error.value, props.edit.changed.value, props.busy, 'Change something above to make an audio edit.'))
 const emit = defineEmits<{ queued: [] }>()
 
 const SECTION = `space-y-2 border-t pt-3 ${TAB_ACCENTS.audio.divider}`

@@ -28,7 +28,10 @@ import {
   validateScale,
   validateSegments,
   validateTrim,
-  withTrimEdge
+  withTrimEdge,
+  nextSegmentRow,
+  renderHint,
+  BUSY_NOTE
 } from './videoEdit'
 
 describe('validateTrim', () => {
@@ -403,5 +406,35 @@ describe('extending a trim past the video', () => {
   it('lets the end edge move past the video up to the limit', () => {
     expect(withTrimEdge([0, 60000], 'end', 90000, trimLimitMs(60000, true))).toEqual([0, 90000])
     expect(withTrimEdge([0, 60000], 'end', 90000, 60000)).toEqual([0, 60000])
+  })
+})
+
+describe('nextSegmentRow', () => {
+  it('starts a first row at the beginning', () => {
+    expect(nextSegmentRow([], 30, 60)).toEqual({ startMsSeconds: 0, endMsSeconds: null })
+  })
+  it('carries on from where the last row ends', () => {
+    expect(nextSegmentRow([{ startMsSeconds: 0, endMsSeconds: 20 }], 5, 60)).toEqual({ startMsSeconds: 20, endMsSeconds: null })
+  })
+  it('starts at the playhead when the last row already runs to the end', () => {
+    expect(nextSegmentRow([{ startMsSeconds: 0, endMsSeconds: null }], 12.345, 60)).toEqual({ startMsSeconds: 12.35, endMsSeconds: null })
+    expect(nextSegmentRow([{ startMsSeconds: 0, endMsSeconds: 59.8 }], 12, 60)).toEqual({ startMsSeconds: 12, endMsSeconds: null })
+  })
+  it('never starts too close to the end to be a valid segment', () => {
+    expect(nextSegmentRow([{ startMsSeconds: 0, endMsSeconds: null }], 59.9, 60)).toEqual({ startMsSeconds: 60 - MIN_TRIM_MS / 1000, endMsSeconds: null })
+    expect(validateTrim(nextSegmentRow([{ startMsSeconds: 0, endMsSeconds: null }], 60, 60).startMsSeconds * 1000, null, 60000)).toBeNull()
+  })
+})
+
+describe('renderHint', () => {
+  it('names the problem first, even while busy', () => {
+    expect(renderHint('Bad range', true, true, 'Change something')).toEqual({ text: 'Bad range', isError: true })
+  })
+  it('says what to do when there is nothing to render', () => {
+    expect(renderHint(null, false, true, 'Change something')).toEqual({ text: 'Change something', isError: false })
+  })
+  it('explains the wait when it would otherwise be ready', () => {
+    expect(renderHint(null, true, true)).toEqual({ text: BUSY_NOTE, isError: false })
+    expect(renderHint(undefined, true, false)).toEqual({ text: '', isError: false })
   })
 })

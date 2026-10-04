@@ -49,7 +49,12 @@ export function useJobActivity(options: { onVideosFinished?: (videoIds: number[]
         if (job.type !== 'EDIT') continue
         const operation = makingOperation(job.parameters)
         if (operation) {
-          nextMaking.set(job.videoId, { operation, status: job.status, progress: job.progress, label: makingLabel(operation, job.status, job.progress, job.queuePosition) })
+          nextMaking.set(job.videoId, {
+            operation,
+            status: job.status,
+            progress: job.progress,
+            label: makingLabel(operation, job.status, job.progress, job.queuePosition)
+          })
         }
       }
       const endedJobs = running.value.filter((j) => !runningPage.data.some((r) => r.id === j.id)).map((j) => j.id)

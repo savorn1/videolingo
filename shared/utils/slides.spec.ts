@@ -43,7 +43,12 @@ describe('spreadEvenly', () => {
     expect(spreadEvenly(5, 5)).toEqual([0, 1000, 2000, 3000, 4000])
   })
   it('always satisfies the rule it exists to help with', () => {
-    for (const [count, seconds] of [[7, 70], [3, 100], [10, 17], [30, 45]] as const) {
+    for (const [count, seconds] of [
+      [7, 70],
+      [3, 100],
+      [10, 17],
+      [30, 45]
+    ] as const) {
       const starts = spreadEvenly(count, seconds)!
       expect(slideProblem(starts)).toBeNull()
       expect(slidesBeyond(starts, seconds)).toBe(0)

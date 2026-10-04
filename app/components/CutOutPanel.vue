@@ -85,10 +85,9 @@
       <p v-if="durationMs > LONG_VIDEO_MS" class="text-xs text-gray-500 dark:text-gray-400" data-testid="cut-long-note">
         This is a long video: the cut re-encodes all of it, so it can take a while to finish. It runs in the background.
       </p>
-      <p v-if="durationMs > LONG_VIDEO_MS" class="text-xs text-gray-500 dark:text-gray-400" data-testid="cut-long-note">
-        This is a long video: the cut re-encodes all of it, so it can take a while to finish. It runs in the background.
+      <p class="min-h-4 text-xs" :class="hint.isError ? 'text-error-600 dark:text-error-400' : 'text-gray-500 dark:text-gray-400'" role="alert">
+        {{ hint.text }}
       </p>
-      <p class="min-h-4 text-xs text-error-600 dark:text-error-400" role="alert">{{ error }}</p>
       <UButton
         v-if="canWrite"
         block
@@ -110,6 +109,7 @@
 import { TAB_ACCENTS } from '#shared/utils/tabAccent'
 import { cutBetween, snapCut, lengthAfterCuts, mergeCutRanges, validateCutOut, type CutRange } from '#shared/utils/cutOut'
 import { formatTimecode, parseTimecode } from '#shared/utils/transport'
+import { renderHint } from '#shared/utils/videoEdit'
 
 const cuts = defineModel<CutRange[]>({ required: true })
 const props = defineProps<{ currentMs: number; durationMs: number; canWrite: boolean; busy: boolean; starting: boolean }>()
@@ -131,6 +131,7 @@ const markStart = ref<number | null>(null)
 const merged = computed(() => mergeCutRanges(cuts.value))
 const resultMs = computed(() => lengthAfterCuts(cuts.value, props.durationMs))
 const error = computed(() => validateCutOut(cuts.value, Math.round(props.durationMs) || null))
+const hint = computed(() => renderHint(error.value, true, props.busy))
 const summary = computed(() => {
   const removed = Math.max(0, props.durationMs - resultMs.value)
   return `${cuts.value.length} cut${cuts.value.length === 1 ? '' : 's'} take out ${formatTimecode(removed)}; the result is ${formatTimecode(resultMs.value)} long.`

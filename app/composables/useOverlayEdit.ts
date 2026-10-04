@@ -207,7 +207,17 @@ export function useOverlayEdit(durationMs: Ref<number>) {
   function addFromCues(cues: { startMs: number; endMs: number; text: string }[]) {
     const usable = cues.filter((c) => c.text.trim() && c.endMs > c.startMs)
     for (const c of usable) {
-      state.layers.push({ ...base(), kind: 'TEXT', text: c.text.trim(), startMs: c.startMs, endMs: c.endMs, y: 0.9, sizePct: 5, weight: 600, animation: 'NONE' })
+      state.layers.push({
+        ...base(),
+        kind: 'TEXT',
+        text: c.text.trim(),
+        startMs: c.startMs,
+        endMs: c.endMs,
+        y: 0.9,
+        sizePct: 5,
+        weight: 600,
+        animation: 'NONE'
+      })
     }
     if (usable.length) state.selectedId = state.layers[state.layers.length - 1]!.id
     return usable.length
@@ -299,7 +309,33 @@ export function useOverlayEdit(durationMs: Ref<number>) {
     return null
   })
 
-  return { state, selected, group, isPicked, toggleMulti, select, removeGroup, duplicateGroup, alignGroup, matchStyleInGroup, addText, addImage, addTextWatermark, addPreset, addFromCues, applyStyleToAll, keepInSafeArea, addTemplate, remove, duplicate, reorder, moveTo, reset, request, error }
+  return {
+    state,
+    selected,
+    group,
+    isPicked,
+    toggleMulti,
+    select,
+    removeGroup,
+    duplicateGroup,
+    alignGroup,
+    matchStyleInGroup,
+    addText,
+    addImage,
+    addTextWatermark,
+    addPreset,
+    addFromCues,
+    applyStyleToAll,
+    keepInSafeArea,
+    addTemplate,
+    remove,
+    duplicate,
+    reorder,
+    moveTo,
+    reset,
+    request,
+    error
+  }
 }
 
 export type OverlayEdit = ReturnType<typeof useOverlayEdit>

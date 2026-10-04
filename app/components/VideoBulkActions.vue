@@ -105,14 +105,7 @@
 
           <div class="flex justify-end gap-2">
             <UButton color="neutral" variant="ghost" @click="show = false">{{ results.length ? 'Close' : 'Cancel' }}</UButton>
-            <UButton
-              v-if="!results.length"
-              :color="action === 'purge' ? 'error' : 'primary'"
-              :icon="icon"
-              :loading="running"
-              :disabled="!ready"
-              @click="run"
-            >
+            <UButton v-if="!results.length" :color="action === 'purge' ? 'error' : 'primary'" :icon="icon" :loading="running" :disabled="!ready" @click="run">
               {{ title }}
             </UButton>
           </div>

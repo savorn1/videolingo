@@ -639,15 +639,15 @@
                   <UFormField label="Height"><UInput v-model.number="scale.h" type="number" size="sm" /></UFormField>
                 </div>
 
-                <!-- Turn and flip: done after the crop, before the resize -->
-                <div class="space-y-1.5" role="group" aria-label="Turn and flip">
-                  <div class="flex items-center justify-between gap-2">
-                    <p class="text-xs text-gray-500 dark:text-gray-400">Turn and flip</p>
-                    <UButton v-if="orientActive" size="xs" color="neutral" variant="ghost" icon="i-lucide-rotate-ccw" @click="orient = { ...NO_ORIENTATION }"
-                      >Reset</UButton
-                    >
-                  </div>
-                  <div class="flex flex-wrap items-center gap-1.5">
+                <!-- Turn and flip: done after the crop, before the resize. Folded by default — most videos don't need it. -->
+                <EditorSection
+                  v-model:open="orientOpen"
+                  title="Turn and flip"
+                  :changed="orientActive"
+                  :hint="orientActive ? describeOrientation(orient) : ''"
+                  data-testid="turn-flip"
+                >
+                  <div class="flex flex-wrap items-center gap-1.5" role="group" aria-label="Turn and flip">
                     <UButton
                       size="xs"
                       color="neutral"
@@ -697,14 +697,19 @@
                       <span class="inline-block transition-transform motion-reduce:transition-none" :style="{ transform: orientSampleTransform }">F</span>
                     </span>
                   </div>
-                  <p class="text-xs text-gray-500 dark:text-gray-400">
-                    {{
-                      orientActive
-                        ? `${describeOrientation(orient)}. The crop is drawn on the picture as it is now.`
-                        : 'For a video filmed sideways or a mirrored webcam.'
-                    }}
-                  </p>
-                </div>
+                  <div class="flex items-center justify-between gap-2">
+                    <p class="text-xs text-gray-500 dark:text-gray-400">
+                      {{
+                        orientActive
+                          ? `${describeOrientation(orient)}. The crop is drawn on the picture as it is now.`
+                          : 'For a video filmed sideways or a mirrored webcam.'
+                      }}
+                    </p>
+                    <UButton v-if="orientActive" size="xs" color="neutral" variant="ghost" icon="i-lucide-rotate-ccw" @click="orient = { ...NO_ORIENTATION }"
+                      >Reset</UButton
+                    >
+                  </div>
+                </EditorSection>
               </section>
 
               <LookPanel v-model="look" />
@@ -727,8 +732,8 @@
                 <p class="text-sm text-gray-700 dark:text-gray-300" data-testid="trim-summary">{{ trimSummary }}</p>
                 <p v-if="trimSizeHint" class="text-xs text-gray-500 dark:text-gray-400" data-testid="trim-size-hint">{{ trimSizeHint }}</p>
                 <!-- Always takes its line, so the layout (and the video) don't jump while a crop is being drawn. -->
-                <p class="text-xs min-h-4" :class="trimError ? 'text-error-500' : 'text-gray-500 dark:text-gray-400'">
-                  {{ trimError ?? (trimDirty ? '' : 'Change the range, or turn on crop or resize, to make a trim.') }}
+                <p class="text-xs min-h-4" :class="trimHint.isError ? 'text-error-500' : 'text-gray-500 dark:text-gray-400'" data-testid="trim-hint">
+                  {{ trimHint.text }}
                 </p>
                 <UButton
                   v-if="canWrite"
@@ -876,7 +881,9 @@
                     variant="soft"
                     :class="TAB_ACCENTS.split.soft"
                     icon="i-lucide-plus"
-                    @click="segments.push({ startMsSeconds: 0, endMsSeconds: null })"
+                    :disabled="segments.length >= MAX_SEGMENTS"
+                    :title="segments.length >= MAX_SEGMENTS ? `At most ${MAX_SEGMENTS} segments` : 'Adds a segment from where the last one ends'"
+                    @click="addSegment"
                   >
                     Add segment
                   </UButton>
@@ -949,8 +956,8 @@
               <section class="sticky bottom-0 z-10 space-y-2 border-t bg-default pb-3 pt-4" :class="TAB_ACCENTS.split.divider" aria-label="Start split">
                 <p class="text-sm text-gray-700 dark:text-gray-300" data-testid="split-summary">{{ splitSummary }}</p>
                 <p v-if="splitSizeHint" class="text-xs text-gray-500 dark:text-gray-400">{{ splitSizeHint }}</p>
-                <p class="text-xs min-h-4" :class="splitError ? 'text-error-500' : 'text-gray-500 dark:text-gray-400'">
-                  {{ splitError ?? (splitDirty ? '' : 'Add a split point, or use “Split evenly”, to make more than one segment.') }}
+                <p class="text-xs min-h-4" :class="splitHint.isError ? 'text-error-500' : 'text-gray-500 dark:text-gray-400'" data-testid="split-hint">
+                  {{ splitHint.text }}
                 </p>
                 <UButton
                   v-if="canWrite"
@@ -1081,7 +1088,12 @@
       </div>
 
       <ul v-if="data?.clips.length" class="divide-y divide-gray-100 dark:divide-gray-800 rounded-lg border border-gray-200 dark:border-gray-800">
-        <li v-for="clip in data.clips" :key="clip.id" class="flex items-center gap-3 px-3 py-2" :class="freshClipIds.includes(clip.id) ? 'result-in' : ''">
+        <li
+          v-for="clip in data.clips"
+          :key="clip.id"
+          class="flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2"
+          :class="freshClipIds.includes(clip.id) ? 'result-in' : ''"
+        >
           <UCheckbox
             v-if="canWrite && selectableClips.length > 1 && clip.operation !== 'EXTRACT'"
             :model-value="pickedClipIds.includes(clip.id)"
@@ -1093,7 +1105,7 @@
           >
             <UIcon :name="CLIP_ICONS[clip.operation]" class="w-4 h-4" />
           </span>
-          <div class="min-w-0 flex-1">
+          <div class="min-w-48 flex-1">
             <p class="text-sm font-medium text-gray-900 dark:text-white truncate">{{ clipTitle(clip) }}</p>
             <p class="text-xs text-gray-500 dark:text-gray-400">
               <template v-if="clip.summary">{{ clip.summary }} · </template>
@@ -1104,32 +1116,35 @@
             </p>
             <audio v-if="clip.operation === 'EXTRACT'" :src="clip.url" controls preload="none" class="mt-1 h-8 w-full max-w-sm" />
           </div>
-          <template v-if="clip.operation === 'EXTRACT'">
-            <UButton size="xs" color="primary" variant="soft" icon="i-lucide-download" :href="clip.url" download>Download</UButton>
-          </template>
-          <template v-else>
-            <UButton size="xs" color="neutral" variant="soft" icon="i-lucide-play" @click="previewClip = clip">Preview</UButton>
-            <UButton v-if="video.videoUrl" size="xs" color="neutral" variant="ghost" icon="i-lucide-columns-2" @click="compareClip = clip">Compare</UButton>
-            <template v-if="canWrite">
-              <!-- A trim, audio or overlay result can be kept as a separate video, leaving the original as it is -->
-              <!-- The safe choice is the solid button; replacing (which asks to confirm) is the quieter one. -->
-              <UButton v-if="replaces(clip)" size="xs" color="neutral" :class="TAB_ACCENTS.audio.button" icon="i-lucide-copy-plus" @click="openAsNew(clip)"
-                >Add as new video</UButton
-              >
-              <UButton size="xs" :color="replaces(clip) ? 'warning' : 'primary'" :variant="replaces(clip) ? 'soft' : 'solid'" @click="confirmPromote = clip">
-                {{ replaces(clip) ? 'Replace original' : 'Add as new video' }}
-              </UButton>
+          <!-- On a narrow screen the buttons drop under the title as one group, instead of squeezing it -->
+          <div class="ml-auto flex flex-wrap items-center justify-end gap-2">
+            <template v-if="clip.operation === 'EXTRACT'">
+              <UButton size="xs" color="primary" variant="soft" icon="i-lucide-download" :href="clip.url" download>Download</UButton>
             </template>
-          </template>
-          <UButton
-            v-if="canWrite"
-            size="xs"
-            color="error"
-            variant="ghost"
-            icon="i-lucide-trash-2"
-            aria-label="Discard clip"
-            @click="confirmDiscardClip = clip"
-          />
+            <template v-else>
+              <UButton size="xs" color="neutral" variant="soft" icon="i-lucide-play" @click="previewClip = clip">Preview</UButton>
+              <UButton v-if="video.videoUrl" size="xs" color="neutral" variant="ghost" icon="i-lucide-columns-2" @click="compareClip = clip">Compare</UButton>
+              <template v-if="canWrite">
+                <!-- A trim, audio or overlay result can be kept as a separate video, leaving the original as it is -->
+                <!-- The safe choice is the solid button; replacing (which asks to confirm) is the quieter one. -->
+                <UButton v-if="replaces(clip)" size="xs" color="neutral" :class="TAB_ACCENTS.audio.button" icon="i-lucide-copy-plus" @click="openAsNew(clip)"
+                  >Add as new video</UButton
+                >
+                <UButton size="xs" :color="replaces(clip) ? 'warning' : 'primary'" :variant="replaces(clip) ? 'soft' : 'solid'" @click="confirmPromote = clip">
+                  {{ replaces(clip) ? 'Replace original' : 'Add as new video' }}
+                </UButton>
+              </template>
+            </template>
+            <UButton
+              v-if="canWrite"
+              size="xs"
+              color="error"
+              variant="ghost"
+              icon="i-lucide-trash-2"
+              aria-label="Discard clip"
+              @click="confirmDiscardClip = clip"
+            />
+          </div>
         </li>
       </ul>
     </UCard>
@@ -1241,6 +1256,8 @@ import {
   centeredCrop,
   findSplitTarget,
   MAX_QUEUED_EDITS,
+  nextSegmentRow,
+  renderHint,
   NO_ORIENTATION,
   swapsSides,
   describeOrientation,
@@ -1901,6 +1918,9 @@ const cropFieldsOpen = ref(false)
 // Turn and flip (applied after the crop, before the resize).
 const orient = ref<Orientation>({ ...NO_ORIENTATION })
 const orientActive = computed(() => hasOrientation(orient.value))
+// Opens by itself when a turn arrives from elsewhere (a recipe, a draft, undo), so it is never set out of sight.
+const orientOpen = ref(false)
+watch(orientActive, (on) => on && (orientOpen.value = true))
 // The sample "F" shows the result: turn clockwise, then flip (CSS lists the last step first).
 // The preview does the same to the whole player; after a quarter turn it is shrunk to stay inside the 16:9 box.
 const previewOriented = computed(() => orientActive.value && !cropActive.value)
@@ -1993,6 +2013,8 @@ const trimError = computed(() => {
   return validateLook(look.value) ?? validateTrimAudio(trimAudio.value, Math.round(range.value[1] - range.value[0]))
 })
 
+const trimHint = computed(() => renderHint(trimError.value, trimDirty.value, busy.value, 'Change the range, or turn on crop or resize, to make a trim.'))
+
 const starting = ref(false)
 async function onStartTrim() {
   if (trimError.value) return
@@ -2072,6 +2094,11 @@ function selectSegment(i: number) {
   selectedSegment.value = i
   const seg = segments.value[i]
   if (seg) preview.value?.seek(seg.startMsSeconds * 1000, false)
+}
+function addSegment() {
+  if (segments.value.length >= MAX_SEGMENTS) return
+  segments.value = [...segments.value, nextSegmentRow(segments.value, currentMs.value / 1000, durationMs.value / 1000)]
+  selectSegment(segments.value.length - 1)
 }
 function removeSegment(i: number) {
   segments.value.splice(i, 1)
@@ -2182,6 +2209,9 @@ const splitError = computed(() =>
     segments.value.map((s) => ({ startMs: Math.round(s.startMsSeconds * 1000), endMs: s.endMsSeconds == null ? null : Math.round(s.endMsSeconds * 1000) })),
     Math.round(durationMs.value) || null
   )
+)
+const splitHint = computed(() =>
+  renderHint(splitError.value, splitDirty.value, busy.value, 'Add a split point, or use “Split evenly”, to make more than one segment.')
 )
 async function onStartSplit() {
   if (splitError.value) return
