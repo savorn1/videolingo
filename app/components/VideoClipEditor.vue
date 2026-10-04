@@ -785,7 +785,8 @@
                     class="absolute inset-y-0 flex items-center justify-center text-[11px] font-medium text-white border-r border-white dark:border-gray-900 last:border-r-0 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-white"
                     :class="[bar.valid ? bar.color : 'bg-error-500', selectedSegment === i ? 'ring-2 ring-inset ring-white' : 'opacity-80 hover:opacity-100']"
                     :style="{ left: bar.leftPct + '%', width: bar.widthPct + '%' }"
-                    :aria-label="`Segment ${i + 1}`"
+                    :aria-label="`Segment ${i + 1}: ${segmentRangeLabel(segments[i]!)}`"
+                    :title="`Segment ${i + 1}: ${segmentRangeLabel(segments[i]!)}`"
                     @click="selectSegment(i)"
                   >
                     {{ i + 1 }}
@@ -856,7 +857,7 @@
                     color="error"
                     variant="ghost"
                     icon="i-lucide-x"
-                    aria-label="Remove segment"
+                    :aria-label="`Remove segment ${i + 1}`"
                     :disabled="segments.length <= 1"
                     @click="removeSegment(i)"
                   />
@@ -1100,9 +1101,7 @@
             :aria-label="`Select ${clipTitle(clip)}`"
             @update:model-value="(v: boolean | 'indeterminate') => pickClip(clip.id, v === true)"
           />
-          <span
-            class="flex items-center justify-center w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300 shrink-0"
-          >
+          <span class="flex items-center justify-center w-8 h-8 rounded-full shrink-0" :class="TAB_ACCENTS[RESULT_TAB[clip.operation]].soft">
             <UIcon :name="CLIP_ICONS[clip.operation]" class="w-4 h-4" />
           </span>
           <div class="min-w-48 flex-1">
@@ -1112,7 +1111,15 @@
               {{ formatFileSize(clip.sizeBytes) }}
               <template v-if="clip.crop"> · cropped {{ clip.crop.w }}×{{ clip.crop.h }}</template>
               <template v-if="clip.scale"> · resized {{ clip.scale.w }}×{{ clip.scale.h }}</template>
-              · expires {{ formatTimeUntil(clip.expiresAt) }}
+              ·
+              <span
+                v-if="expiresSoon(clip.expiresAt)"
+                class="font-medium text-warning-700 dark:text-warning-400"
+                title="Results are deleted 72 hours after rendering — keep it as a video before then"
+                data-testid="expires-soon"
+                ><UIcon name="i-lucide-clock-alert" class="size-3 inline align-text-top" /> expires {{ formatTimeUntil(clip.expiresAt) }}</span
+              >
+              <template v-else>expires {{ formatTimeUntil(clip.expiresAt) }}</template>
             </p>
             <audio v-if="clip.operation === 'EXTRACT'" :src="clip.url" controls preload="none" class="mt-1 h-8 w-full max-w-sm" />
           </div>
@@ -1141,7 +1148,7 @@
               color="error"
               variant="ghost"
               icon="i-lucide-trash-2"
-              aria-label="Discard clip"
+              :aria-label="`Discard ${clipTitle(clip)}`"
               @click="confirmDiscardClip = clip"
             />
           </div>
@@ -1258,6 +1265,9 @@ import {
   MAX_QUEUED_EDITS,
   nextSegmentRow,
   renderHint,
+  RESULT_TAB,
+  resultsReadyTitle,
+  expiresSoon,
   NO_ORIENTATION,
   swapsSides,
   describeOrientation,
@@ -1302,18 +1312,31 @@ const { overview, startTrim, startSplit, startCut, autoCrop, promote, remove } =
 const data = ref<EditOverview | null>(null)
 const error = ref('')
 
-// When a render with new audio finishes, say so and offer the next step right there.
-function announceNewAudioClips(before: VideoClip[] | undefined, after: VideoClip[]) {
+// When a render finishes, say so wherever the page is scrolled, and offer the next step right there.
+function announceNewClips(before: VideoClip[] | undefined, after: VideoClip[]) {
   if (!before) return
   const known = new Set(before.map((c) => c.id))
-  const fresh = after.find((c) => c.operation === 'AUDIO' && !known.has(c.id))
-  if (!fresh) return
+  const fresh = after.filter((c) => !known.has(c.id))
+  if (!fresh.length) return
+  const one = fresh.length === 1 ? fresh[0]! : null
+  const actions: { label: string; onClick: () => void }[] = []
+  if (one && one.operation !== 'EXTRACT') {
+    actions.push({ label: 'Preview', onClick: () => (previewClip.value = one) })
+    if (props.canWrite && replaces(one)) actions.push({ label: 'Add as new video', onClick: () => openAsNew(one) })
+  } else {
+    actions.push({ label: 'Show results', onClick: scrollToResults })
+  }
   toast.add({
-    title: 'Your video with the new audio is ready',
-    description: 'Preview it under Results, then replace the original or add it as a new video.',
+    title: resultsReadyTitle(fresh),
+    description:
+      one?.operation === 'EXTRACT'
+        ? 'Listen to it or download it under Results.'
+        : one && replaces(one)
+          ? 'Preview it, then replace the original or add it as a new video.'
+          : 'Preview them under Results, then add them as new videos.',
     color: 'success',
     duration: 10000,
-    actions: props.canWrite ? [{ label: 'Add as new video', onClick: () => openAsNew(fresh) }] : []
+    actions
   })
 }
 // A finished result slides in with a brief glow, then settles.
@@ -1335,7 +1358,7 @@ async function load() {
     const before = data.value?.clips
     data.value = await overview(props.video.id)
     markFreshClips(before, data.value.clips)
-    announceNewAudioClips(before, data.value.clips)
+    announceNewClips(before, data.value.clips)
   } catch (err) {
     error.value = apiErrorMessage(err)
   }
@@ -2116,6 +2139,9 @@ function rowProblem(seg: SegmentInput): string | null {
 function segmentEndSeconds(seg: SegmentInput) {
   return seg.endMsSeconds ?? durationMs.value / 1000
 }
+function segmentRangeLabel(seg: SegmentInput) {
+  return `${formatMsShort(seg.startMsSeconds * 1000)} – ${seg.endMsSeconds == null ? 'end' : formatMsShort(seg.endMsSeconds * 1000)} (${segmentLength(seg)})`
+}
 function segmentLength(seg: SegmentInput) {
   return formatMsShort(Math.max(0, (segmentEndSeconds(seg) - seg.startMsSeconds) * 1000))
 }
@@ -2280,12 +2306,7 @@ const JOB_LABELS: Record<string, string> = {
   AUDIO_TO_VIDEO: 'Audio to video'
 }
 function jobLabel(job: ProcessingJob) {
-  let operation = 'Edit'
-  try {
-    operation = JOB_LABELS[JSON.parse(job.parameters ?? '{}').operation] ?? 'Edit'
-  } catch {
-    // Default label above.
-  }
+  const operation = JOB_LABELS[jobOperation(job)] ?? 'Edit'
   if (job.status === 'FAILED') return `${operation} failed`
   return job.status === 'QUEUED' ? `${operation} — waiting` : `${operation} in progress`
 }
@@ -2456,13 +2477,7 @@ const runningByTab = computed(() => {
   const out: Partial<Record<typeof mode.value, { label: string }>> = {}
   for (const job of visibleJobs.value) {
     if (!isActiveJobStatus(job.status)) continue
-    let op = ''
-    try {
-      op = JSON.parse(job.parameters ?? '{}').operation ?? ''
-    } catch {
-      // No tab to show it on.
-    }
-    const tab = JOB_TAB[op]
+    const tab = JOB_TAB[jobOperation(job)]
     if (tab && !out[tab]) out[tab] = { label: job.status === 'QUEUED' ? 'queued' : `${Math.round(job.progress)}%` }
   }
   return out

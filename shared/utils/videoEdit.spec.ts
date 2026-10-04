@@ -31,7 +31,10 @@ import {
   withTrimEdge,
   nextSegmentRow,
   renderHint,
-  BUSY_NOTE
+  BUSY_NOTE,
+  resultsReadyTitle,
+  expiresSoon,
+  EXPIRY_WARN_MS
 } from './videoEdit'
 
 describe('validateTrim', () => {
@@ -436,5 +439,32 @@ describe('renderHint', () => {
   it('explains the wait when it would otherwise be ready', () => {
     expect(renderHint(null, true, true)).toEqual({ text: BUSY_NOTE, isError: false })
     expect(renderHint(undefined, true, false)).toEqual({ text: '', isError: false })
+  })
+})
+
+describe('resultsReadyTitle', () => {
+  it('names a single result by what made it', () => {
+    expect(resultsReadyTitle([{ operation: 'TRIM' }])).toBe('Your trimmed clip is ready')
+    expect(resultsReadyTitle([{ operation: 'AUDIO' }])).toBe('Your video with the new audio is ready')
+    expect(resultsReadyTitle([{ operation: 'SPLIT', segmentIndex: 2 }])).toBe('Segment 3 is ready')
+  })
+  it('counts several at once', () => {
+    expect(resultsReadyTitle([{ operation: 'SPLIT' }, { operation: 'SPLIT' }])).toBe('2 segments are ready')
+    expect(resultsReadyTitle([{ operation: 'TRIM' }, { operation: 'TRIM' }, { operation: 'SPLIT' }])).toBe('3 results are ready')
+  })
+  it('says nothing for nothing', () => {
+    expect(resultsReadyTitle([])).toBe('')
+  })
+})
+
+describe('expiresSoon', () => {
+  const now = Date.parse('2026-10-04T12:00:00Z')
+  it('flags results close to expiry', () => {
+    expect(expiresSoon(new Date(now + EXPIRY_WARN_MS - 60_000).toISOString(), now)).toBe(true)
+    expect(expiresSoon(new Date(now + EXPIRY_WARN_MS + 60_000).toISOString(), now)).toBe(false)
+  })
+  it('ignores missing or unreadable times', () => {
+    expect(expiresSoon(null, now)).toBe(false)
+    expect(expiresSoon('not a date', now)).toBe(false)
   })
 })

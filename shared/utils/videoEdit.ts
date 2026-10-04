@@ -298,3 +298,42 @@ export function suggestedNewTitle(sourceTitle: string | null | undefined, operat
   const room = MAX_VIDEO_TITLE - suffix.length
   return (base.length > room ? `${base.slice(0, Math.max(0, room - 1))}…` : base) + suffix
 }
+
+/** The editor tab whose colour a result takes (extracted audio comes from the sound, so Audio). */
+export const RESULT_TAB: Record<ClipOperation, 'trim' | 'split' | 'audio' | 'overlay'> = {
+  TRIM: 'trim',
+  SPLIT: 'split',
+  AUDIO: 'audio',
+  EXTRACT: 'audio',
+  OVERLAY: 'overlay'
+}
+
+/** The toast title when results finish rendering — one line whatever arrived together (e.g. all of a split's segments). */
+export function resultsReadyTitle(clips: { operation: ClipOperation; segmentIndex?: number | null }[]): string {
+  if (!clips.length) return ''
+  if (clips.length > 1) return clips.every((c) => c.operation === 'SPLIT') ? `${clips.length} segments are ready` : `${clips.length} results are ready`
+  const c = clips[0]!
+  switch (c.operation) {
+    case 'SPLIT':
+      return `Segment ${(c.segmentIndex ?? 0) + 1} is ready`
+    case 'AUDIO':
+      return 'Your video with the new audio is ready'
+    case 'OVERLAY':
+      return 'Your video with text & overlays is ready'
+    case 'EXTRACT':
+      return 'Your extracted audio is ready'
+    default:
+      return 'Your trimmed clip is ready'
+  }
+}
+
+/** Results are deleted 72 h after rendering; within this long of that they are flagged. */
+export const EXPIRY_WARN_MS = 6 * 60 * 60 * 1000
+
+/** Whether a result expires within EXPIRY_WARN_MS. Timestamps without a zone are read as local time (as formatTimeUntil does). */
+export function expiresSoon(expiresAt: string | null | undefined, now = Date.now()): boolean {
+  if (!expiresAt) return false
+  const zoned = /(Z|[+-]\d{2}:?\d{2})$/.test(expiresAt)
+  const at = new Date(zoned ? expiresAt : expiresAt.replace(' ', 'T')).getTime()
+  return !Number.isNaN(at) && at - now < EXPIRY_WARN_MS
+}
