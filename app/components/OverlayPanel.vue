@@ -541,6 +541,8 @@
       </ul>
     </EditorSection>
 
+    <CaptionsSection :edit="edit" :source="captionSource" :video-language="videoLanguage" />
+
     <!-- ── Render ──────────────────────────────────────────────────────── -->
     <section :class="ACTION_SECTION">
       <p class="text-xs text-gray-500 dark:text-gray-400">
@@ -614,8 +616,18 @@ import { formatTimecode } from '#shared/utils/transport'
 import { renderHint } from '#shared/utils/videoEdit'
 import { dropIndex } from '#shared/utils/reorder'
 import { useOverlayTemplates, type OverlayTemplate } from '~/composables/useOverlayTemplates'
+import type { CaptionSource } from '~/composables/useCaptionSource'
 
-const props = defineProps<{ edit: OverlayEdit; videoId: number; durationMs: number; currentMs: number; canWrite: boolean; busy: boolean }>()
+const props = defineProps<{
+  edit: OverlayEdit
+  videoId: number
+  durationMs: number
+  currentMs: number
+  canWrite: boolean
+  busy: boolean
+  captionSource: CaptionSource
+  videoLanguage: string | null
+}>()
 const hint = computed(() => renderHint(props.edit.error.value, true, props.busy))
 const emit = defineEmits<{ queued: []; preview: [ms: number, play?: boolean] }>()
 

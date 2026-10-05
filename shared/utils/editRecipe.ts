@@ -1,11 +1,14 @@
 // Saved "recipes": the settings of an edit that make sense on any video — the
-// crop shape and output size, the sound settings, and the text & image layers —
+// crop shape and output size, the filter, effect and fades, the sound settings,
+// and the text & image layers —
 // so a look worked out once can be applied to the next video. What belongs to one
 // video's timeline (the trim range, split points, audio clips, muted ranges, an
 // uploaded replacement sound) is left out. Pure helpers, so it's testable.
 
 import type { NamedEntry } from './namedList'
 import { isPresetData, ratioLabel } from './exportPreset'
+import { PLAIN_LOOK, isPlainLook, validateLook, type VideoLook } from './videoLook'
+import { VIDEO_EFFECTS, isNoFade, validateFade, type ClipFade, type VideoEffect } from './videoEffects'
 
 export interface RecipeAudio {
   volume: number
@@ -44,6 +47,10 @@ export interface EditRecipe {
   frame: { aspect: number; w: number; h: number } | null
   /** Turn and flip; absent = leave the picture's direction alone. */
   orient?: { rotate: 90 | 180 | 270 | 0; flipH: boolean; flipV: boolean }
+  /** The Trim tab's filter, effect and fades; each absent = leave it alone (recipes saved before them have none). */
+  look?: VideoLook
+  effect?: Exclude<VideoEffect, 'NONE'>
+  fade?: ClipFade
   /** Only the settings that differ from the defaults. */
   audio: Partial<RecipeAudio>
   layers: RecipeLayer[]
@@ -66,7 +73,7 @@ export function fullAudio(recipe: EditRecipe): RecipeAudio {
 }
 
 export function isRecipeEmpty(r: EditRecipe): boolean {
-  return !r.frame && !r.orient && !Object.keys(r.audio).length && !r.layers.length
+  return !r.frame && !r.orient && !r.look && !r.effect && !r.fade && !Object.keys(r.audio).length && !r.layers.length
 }
 
 /** One line on what a recipe holds: "Crop 9:16 · 1080×1920 · 3 sound settings · 2 text layers". */
@@ -74,6 +81,9 @@ export function describeRecipe(r: EditRecipe): string {
   const parts: string[] = []
   if (r.frame) parts.push(`Crop ${ratioLabel(r.frame.aspect)} · ${r.frame.w}×${r.frame.h}`)
   if (r.orient) parts.push('Turn / flip')
+  if (r.look) parts.push('Filter')
+  if (r.effect) parts.push(VIDEO_EFFECTS.find((e) => e.value === r.effect)?.label ?? 'Effect')
+  if (r.fade) parts.push('Fade')
   const n = Object.keys(r.audio).length
   if (n) parts.push(`${n} sound setting${n === 1 ? '' : 's'}`)
   if (r.layers.length) parts.push(`${r.layers.length} layer${r.layers.length === 1 ? '' : 's'}`)
@@ -108,8 +118,42 @@ export function sanitizeRecipe(raw: unknown): EditRecipe | null {
     (o.rotate !== 0 || o.flipH || o.flipV)
       ? { rotate: o.rotate as 0 | 90 | 180 | 270, flipH: o.flipH, flipV: o.flipV }
       : undefined
-  const recipe: EditRecipe = { frame, ...(orient ? { orient } : {}), audio: audioDifferences(audio as Partial<RecipeAudio>), layers }
+  const look = sanitizeLook(r.look)
+  const effect = VIDEO_EFFECTS.some((e) => e.value === r.effect && e.value !== 'NONE') ? (r.effect as Exclude<VideoEffect, 'NONE'>) : undefined
+  const fade = sanitizeFade(r.fade)
+  const recipe: EditRecipe = {
+    frame,
+    ...(orient ? { orient } : {}),
+    ...(look ? { look } : {}),
+    ...(effect ? { effect } : {}),
+    ...(fade ? { fade } : {}),
+    audio: audioDifferences(audio as Partial<RecipeAudio>),
+    layers
+  }
   return isRecipeEmpty(recipe) ? null : recipe
+}
+
+/** A stored filter: every field of the right type and in range, or undefined (also for a plain one). */
+function sanitizeLook(raw: unknown): VideoLook | undefined {
+  if (!raw || typeof raw !== 'object') return undefined
+  const r = raw as Record<string, unknown>
+  const look: Record<string, unknown> = { ...PLAIN_LOOK }
+  for (const k of Object.keys(PLAIN_LOOK) as (keyof VideoLook)[]) {
+    const v = r[k]
+    if (v === undefined) continue
+    if (typeof v !== typeof PLAIN_LOOK[k] || (typeof v === 'number' && !Number.isFinite(v))) return undefined
+    look[k] = v
+  }
+  const out = look as unknown as VideoLook
+  return validateLook(out) || isPlainLook(out) ? undefined : out
+}
+
+function sanitizeFade(raw: unknown): ClipFade | undefined {
+  if (!raw || typeof raw !== 'object') return undefined
+  const r = raw as Record<string, unknown>
+  if (typeof r.inMs !== 'number' || typeof r.outMs !== 'number' || (r.color !== 'BLACK' && r.color !== 'WHITE')) return undefined
+  const fade: ClipFade = { inMs: r.inMs, outMs: r.outMs, color: r.color }
+  return isNoFade(fade) || validateFade(fade, null) ? undefined : fade
 }
 
 export function sanitizeRecipes(raw: unknown): SavedRecipe[] {

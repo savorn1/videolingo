@@ -158,18 +158,6 @@ watch(open, (value) => {
 })
 watch(unreadOnly, () => load())
 
-// Poll gently; also refresh when the tab regains focus.
-let timer: ReturnType<typeof setInterval> | undefined
-function onFocus() {
-  refreshCount()
-}
-onMounted(() => {
-  refreshCount()
-  timer = setInterval(refreshCount, 60_000)
-  window.addEventListener('focus', onFocus)
-})
-onBeforeUnmount(() => {
-  clearInterval(timer)
-  window.removeEventListener('focus', onFocus)
-})
+// Poll gently, not while the tab is hidden, and at once when it's back.
+usePolling(refreshCount, { intervalMs: 60_000, immediate: true })
 </script>

@@ -271,7 +271,12 @@ export function uncoveredMs(rows: SegmentRow[], durationMs: number): number {
 
 export const MAX_VIDEO_TITLE = 200
 
-export type ClipOperation = 'TRIM' | 'SPLIT' | 'AUDIO' | 'EXTRACT' | 'OVERLAY'
+export type ClipOperation = 'TRIM' | 'SPLIT' | 'AUDIO' | 'EXTRACT' | 'OVERLAY' | 'GIF' | 'STILL'
+
+/** Results that are files to download (audio, a GIF, a picture), not videos to keep or replace the original with. */
+export function isDownloadOnly(operation: ClipOperation): boolean {
+  return operation === 'EXTRACT' || operation === 'GIF' || operation === 'STILL'
+}
 
 /** Whether applying this result would replace the video's own file (so a separate video is the alternative). */
 export function replacesOriginal(operation: ClipOperation): boolean {
@@ -305,7 +310,9 @@ export const RESULT_TAB: Record<ClipOperation, 'trim' | 'split' | 'audio' | 'ove
   SPLIT: 'split',
   AUDIO: 'audio',
   EXTRACT: 'audio',
-  OVERLAY: 'overlay'
+  OVERLAY: 'overlay',
+  GIF: 'trim',
+  STILL: 'trim'
 }
 
 /** The toast title when results finish rendering — one line whatever arrived together (e.g. all of a split's segments). */
@@ -322,6 +329,10 @@ export function resultsReadyTitle(clips: { operation: ClipOperation; segmentInde
       return 'Your video with text & overlays is ready'
     case 'EXTRACT':
       return 'Your extracted audio is ready'
+    case 'GIF':
+      return 'Your GIF is ready'
+    case 'STILL':
+      return 'Your picture is ready'
     default:
       return 'Your trimmed clip is ready'
   }
@@ -336,4 +347,40 @@ export function expiresSoon(expiresAt: string | null | undefined, now = Date.now
   const zoned = /(Z|[+-]\d{2}:?\d{2})$/.test(expiresAt)
   const at = new Date(zoned ? expiresAt : expiresAt.replace(' ', 'T')).getTime()
   return !Number.isNaN(at) && at - now < EXPIRY_WARN_MS
+}
+
+// ── Freeze frame, GIF and still picture (mirror VideoEditRules) ───────────────
+
+export const MIN_FREEZE_MS = 500
+export const MAX_FREEZE_MS = 10_000
+
+/** Hold the frame at atMs (on the trimmed result's timeline, from its start) for durationMs; the sound pauses there. */
+export interface ClipFreeze {
+  atMs: number
+  durationMs: number
+}
+
+/** Null = fine (or none). `clipMs` is the trimmed result's length. */
+export function validateFreeze(freeze: ClipFreeze | null, clipMs: number | null): string | null {
+  if (!freeze) return null
+  if (!(freeze.durationMs >= MIN_FREEZE_MS && freeze.durationMs <= MAX_FREEZE_MS))
+    return `A freeze lasts between ${MIN_FREEZE_MS / 1000} and ${MAX_FREEZE_MS / 1000} s`
+  if (!(freeze.atMs > 0)) return 'Freeze a frame after the start of the clip'
+  if (clipMs != null && freeze.atMs >= clipMs) return 'Freeze a frame before the end of the clip'
+  return null
+}
+
+/** "frame held 2 s"; null for none (same words as the server's summary). */
+export function describeFreeze(freeze: ClipFreeze | null): string | null {
+  return freeze ? `frame held ${+(freeze.durationMs / 1000).toFixed(1)} s` : null
+}
+
+export const MAX_GIF_MS = 15_000
+export const GIF_WIDTHS = [320, 480, 640]
+
+/** Null = the range can be made into a GIF. */
+export function validateGif(startMs: number, endMs: number, durationMs: number | null): string | null {
+  return (
+    validateTrim(startMs, endMs, durationMs) ?? (endMs - startMs > MAX_GIF_MS ? `A GIF can be at most ${MAX_GIF_MS / 1000} s long — shorten the range` : null)
+  )
 }

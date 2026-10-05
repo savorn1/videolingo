@@ -71,7 +71,7 @@ export const JOB_TYPES: { value: JobType; label: string; icon: string; tone: str
   { value: 'GENERATE_THUMBNAIL', label: 'Generate thumbnail', icon: 'i-lucide-image', tone: 'bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300' },
   { value: 'DUB', label: 'Voice-over', icon: 'i-lucide-mic', tone: 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300' },
   { value: 'DOWNLOAD', label: 'Download / import', icon: 'i-lucide-download', tone: 'bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-300' },
-  { value: 'EDIT', label: 'Trim / crop / split', icon: 'i-lucide-scissors', tone: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300' }
+  { value: 'EDIT', label: 'Video edits', icon: 'i-lucide-scissors', tone: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300' }
 ]
 
 export function jobTypeMeta(type: string): { label: string; icon: string; tone: string } {

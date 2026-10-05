@@ -48,12 +48,12 @@
     <template v-else-if="!playbackError">
       <video
         ref="videoEl"
-        :key="videoUrl ?? ''"
+        :key="mediaKey(videoUrl)"
         :src="videoUrl ?? undefined"
         :poster="poster ?? undefined"
         controls
         playsinline
-        :controlslist="ownFullscreen ? 'nofullscreen' : undefined"
+        :controlslist="ownFullscreen ? 'nodownload nofullscreen' : 'nodownload'"
         preload="metadata"
         class="w-full h-full"
         @error="playbackError = true"

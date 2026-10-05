@@ -34,7 +34,11 @@ import {
   BUSY_NOTE,
   resultsReadyTitle,
   expiresSoon,
-  EXPIRY_WARN_MS
+  EXPIRY_WARN_MS,
+  isDownloadOnly,
+  validateFreeze,
+  describeFreeze,
+  validateGif
 } from './videoEdit'
 
 describe('validateTrim', () => {
@@ -466,5 +470,26 @@ describe('expiresSoon', () => {
   it('ignores missing or unreadable times', () => {
     expect(expiresSoon(null, now)).toBe(false)
     expect(expiresSoon('not a date', now)).toBe(false)
+  })
+})
+
+describe('freeze frame, GIF and still', () => {
+  it('keeps a freeze short and inside the clip', () => {
+    expect(validateFreeze(null, 5000)).toBeNull()
+    expect(validateFreeze({ atMs: 1000, durationMs: 2000 }, 5000)).toBeNull()
+    expect(validateFreeze({ atMs: 1000, durationMs: 200 }, 5000)).toMatch(/between 0.5 and 10 s/)
+    expect(validateFreeze({ atMs: 0, durationMs: 2000 }, 5000)).toMatch(/after the start/)
+    expect(validateFreeze({ atMs: 5000, durationMs: 2000 }, 5000)).toMatch(/before the end/)
+    expect(describeFreeze({ atMs: 1000, durationMs: 2500 })).toBe('frame held 2.5 s')
+  })
+  it('allows a GIF of up to 15 s of a valid range', () => {
+    expect(validateGif(1000, 5000, 10_000)).toBeNull()
+    expect(validateGif(0, 20_000, 60_000)).toMatch(/at most 15 s/)
+    expect(validateGif(5000, 4000, 10_000)).toBeTruthy()
+  })
+  it('knows which results are downloads, and names them', () => {
+    expect(isDownloadOnly('GIF') && isDownloadOnly('STILL') && isDownloadOnly('EXTRACT')).toBe(true)
+    expect(isDownloadOnly('TRIM')).toBe(false)
+    expect(resultsReadyTitle([{ operation: 'GIF' }])).toBe('Your GIF is ready')
   })
 })
