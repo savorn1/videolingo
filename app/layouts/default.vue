@@ -71,6 +71,7 @@
       </template>
 
       <template #body>
+        <ConnectionBanner />
         <slot />
       </template>
     </UDashboardPanel>

@@ -34,7 +34,6 @@ const { overview } = useVideoEdits()
 const job = ref<(ProcessingJob & { operation: 'AUDIO_TO_VIDEO' | 'MERGE' }) | null>(null)
 const active = computed(() => !!job.value && isActiveJobStatus(job.value.status))
 
-let timer: ReturnType<typeof setInterval> | undefined
 async function refresh() {
   try {
     const before = job.value
@@ -46,15 +45,7 @@ async function refresh() {
   }
 }
 
-watch(
-  active,
-  (isActive) => {
-    clearInterval(timer)
-    if (isActive) timer = setInterval(refresh, 3000)
-  },
-  { immediate: true }
-)
+usePolling(refresh, { intervalMs: 3000, active: () => active.value })
 onMounted(refresh)
-onBeforeUnmount(() => clearInterval(timer))
 watch(() => props.videoId, refresh)
 </script>

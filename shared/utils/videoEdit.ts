@@ -104,6 +104,31 @@ export function splitRowAt(rows: SegmentRow[], index: number, seconds: number): 
   ]
 }
 
+/**
+ * The row "Add segment" appends: from where the last row ends to the end of the video,
+ * or — when the last row already runs to (nearly) the end — from the playhead. Never
+ * starts less than MIN_TRIM_MS before the end, so the new row is valid as added.
+ */
+export function nextSegmentRow(rows: SegmentRow[], playheadSeconds: number, durationSeconds: number): SegmentRow {
+  const latest = Math.max(0, durationSeconds - MIN_TRIM_MS / 1000)
+  const lastEnd = rows.at(-1)?.endMsSeconds
+  const from = lastEnd != null && lastEnd <= latest ? lastEnd : rows.length ? playheadSeconds : 0
+  return { startMsSeconds: Math.round(Math.min(latest, Math.max(0, from)) * 100) / 100, endMsSeconds: null }
+}
+
+/** Shown under a render button while another edit on this video is running (the single-edit buttons wait for it). */
+export const BUSY_NOTE = 'Another edit is being made — this unlocks when it finishes (see Results).'
+
+/**
+ * The line under a render button: what is wrong first, then why it is waiting, then
+ * what to do to make anything at all. `ready` means there is something to render.
+ */
+export function renderHint(error: string | null | undefined, ready: boolean, busy: boolean, idle = ''): { text: string; isError: boolean } {
+  if (error) return { text: error, isError: true }
+  if (!ready) return { text: idle, isError: false }
+  return { text: busy ? BUSY_NOTE : '', isError: false }
+}
+
 /** The most equal parts a video can be cut into: each at least MIN_TRIM_MS long, and no more than MAX_SEGMENTS. */
 export function maxEvenParts(durationMs: number): number {
   if (!durationMs || durationMs <= 0) return 0
@@ -246,7 +271,12 @@ export function uncoveredMs(rows: SegmentRow[], durationMs: number): number {
 
 export const MAX_VIDEO_TITLE = 200
 
-export type ClipOperation = 'TRIM' | 'SPLIT' | 'AUDIO' | 'EXTRACT' | 'OVERLAY'
+export type ClipOperation = 'TRIM' | 'SPLIT' | 'AUDIO' | 'EXTRACT' | 'OVERLAY' | 'GIF' | 'STILL'
+
+/** Results that are files to download (audio, a GIF, a picture), not videos to keep or replace the original with. */
+export function isDownloadOnly(operation: ClipOperation): boolean {
+  return operation === 'EXTRACT' || operation === 'GIF' || operation === 'STILL'
+}
 
 /** Whether applying this result would replace the video's own file (so a separate video is the alternative). */
 export function replacesOriginal(operation: ClipOperation): boolean {
@@ -272,4 +302,85 @@ export function suggestedNewTitle(sourceTitle: string | null | undefined, operat
   const base = (sourceTitle ?? '').trim() || 'Video'
   const room = MAX_VIDEO_TITLE - suffix.length
   return (base.length > room ? `${base.slice(0, Math.max(0, room - 1))}…` : base) + suffix
+}
+
+/** The editor tab whose colour a result takes (extracted audio comes from the sound, so Audio). */
+export const RESULT_TAB: Record<ClipOperation, 'trim' | 'split' | 'audio' | 'overlay'> = {
+  TRIM: 'trim',
+  SPLIT: 'split',
+  AUDIO: 'audio',
+  EXTRACT: 'audio',
+  OVERLAY: 'overlay',
+  GIF: 'trim',
+  STILL: 'trim'
+}
+
+/** The toast title when results finish rendering — one line whatever arrived together (e.g. all of a split's segments). */
+export function resultsReadyTitle(clips: { operation: ClipOperation; segmentIndex?: number | null }[]): string {
+  if (!clips.length) return ''
+  if (clips.length > 1) return clips.every((c) => c.operation === 'SPLIT') ? `${clips.length} segments are ready` : `${clips.length} results are ready`
+  const c = clips[0]!
+  switch (c.operation) {
+    case 'SPLIT':
+      return `Segment ${(c.segmentIndex ?? 0) + 1} is ready`
+    case 'AUDIO':
+      return 'Your video with the new audio is ready'
+    case 'OVERLAY':
+      return 'Your video with text & overlays is ready'
+    case 'EXTRACT':
+      return 'Your extracted audio is ready'
+    case 'GIF':
+      return 'Your GIF is ready'
+    case 'STILL':
+      return 'Your picture is ready'
+    default:
+      return 'Your trimmed clip is ready'
+  }
+}
+
+/** Results are deleted 72 h after rendering; within this long of that they are flagged. */
+export const EXPIRY_WARN_MS = 6 * 60 * 60 * 1000
+
+/** Whether a result expires within EXPIRY_WARN_MS. Timestamps without a zone are read as local time (as formatTimeUntil does). */
+export function expiresSoon(expiresAt: string | null | undefined, now = Date.now()): boolean {
+  if (!expiresAt) return false
+  const zoned = /(Z|[+-]\d{2}:?\d{2})$/.test(expiresAt)
+  const at = new Date(zoned ? expiresAt : expiresAt.replace(' ', 'T')).getTime()
+  return !Number.isNaN(at) && at - now < EXPIRY_WARN_MS
+}
+
+// ── Freeze frame, GIF and still picture (mirror VideoEditRules) ───────────────
+
+export const MIN_FREEZE_MS = 500
+export const MAX_FREEZE_MS = 10_000
+
+/** Hold the frame at atMs (on the trimmed result's timeline, from its start) for durationMs; the sound pauses there. */
+export interface ClipFreeze {
+  atMs: number
+  durationMs: number
+}
+
+/** Null = fine (or none). `clipMs` is the trimmed result's length. */
+export function validateFreeze(freeze: ClipFreeze | null, clipMs: number | null): string | null {
+  if (!freeze) return null
+  if (!(freeze.durationMs >= MIN_FREEZE_MS && freeze.durationMs <= MAX_FREEZE_MS))
+    return `A freeze lasts between ${MIN_FREEZE_MS / 1000} and ${MAX_FREEZE_MS / 1000} s`
+  if (!(freeze.atMs > 0)) return 'Freeze a frame after the start of the clip'
+  if (clipMs != null && freeze.atMs >= clipMs) return 'Freeze a frame before the end of the clip'
+  return null
+}
+
+/** "frame held 2 s"; null for none (same words as the server's summary). */
+export function describeFreeze(freeze: ClipFreeze | null): string | null {
+  return freeze ? `frame held ${+(freeze.durationMs / 1000).toFixed(1)} s` : null
+}
+
+export const MAX_GIF_MS = 15_000
+export const GIF_WIDTHS = [320, 480, 640]
+
+/** Null = the range can be made into a GIF. */
+export function validateGif(startMs: number, endMs: number, durationMs: number | null): string | null {
+  return (
+    validateTrim(startMs, endMs, durationMs) ?? (endMs - startMs > MAX_GIF_MS ? `A GIF can be at most ${MAX_GIF_MS / 1000} s long — shorten the range` : null)
+  )
 }

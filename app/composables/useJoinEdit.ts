@@ -14,7 +14,9 @@ export interface JoinClip extends MergeItem {
   height: number | null
 }
 
-export function joinClipFrom(v: Pick<Video, 'id' | 'title' | 'thumbnailUrl' | 'videoUrl' | 'durationSeconds' | 'width' | 'height' | 'deleted' | 'storageKey' | 'source'>): JoinClip {
+export function joinClipFrom(
+  v: Pick<Video, 'id' | 'title' | 'thumbnailUrl' | 'videoUrl' | 'durationSeconds' | 'width' | 'height' | 'deleted' | 'storageKey' | 'source'>
+): JoinClip {
   return {
     id: v.id,
     title: v.title,

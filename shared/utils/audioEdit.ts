@@ -192,3 +192,11 @@ export function validateClips(clips: AudioClip[], durationMs: number): string | 
 export function isMutedAt(mutes: TimeRange[], ms: number) {
   return mutes.some((r) => ms >= r.startMs && ms < r.endMs)
 }
+
+/** One-click slower versions for learners (Audio tab › Speed & pitch). Pitch goes back to normal with them, so the voice sounds natural. */
+export const LEARNER_SPEEDS: { speed: number; label: string }[] = [
+  { speed: 1, label: 'Normal' },
+  { speed: 0.85, label: 'A bit slower' },
+  { speed: 0.75, label: 'Slow' },
+  { speed: 0.5, label: 'Very slow' }
+]

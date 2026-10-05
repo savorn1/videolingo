@@ -234,11 +234,8 @@ function jobLabel(job: ProcessingJob) {
   return job.status === 'QUEUED' ? `${what} — waiting` : `${what} in progress`
 }
 
-let pollTimer: ReturnType<typeof setInterval> | undefined
-watch([busy, open], ([isBusy, isOpen]) => {
-  clearInterval(pollTimer)
-  if (!isBusy || !isOpen) return
-  pollTimer = setInterval(async () => {
+usePolling(
+  async () => {
     const running = visibleJobs.value.filter((j) => isActiveJobStatus(j.status))
     await load()
     for (const was of running) {
@@ -251,9 +248,9 @@ watch([busy, open], ([isBusy, isOpen]) => {
         toast.add({ title: 'Download ready', description: 'Click Save to download it.', color: 'success' })
       }
     }
-  }, 3000)
-})
-onBeforeUnmount(() => clearInterval(pollTimer))
+  },
+  { intervalMs: 3000, active: () => busy.value && open.value }
+)
 
 // ── Actions ────────────────────────────────────────────────────────────────
 const starting = ref<DownloadMode | null>(null)

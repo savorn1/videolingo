@@ -28,7 +28,17 @@ import {
   validateScale,
   validateSegments,
   validateTrim,
-  withTrimEdge
+  withTrimEdge,
+  nextSegmentRow,
+  renderHint,
+  BUSY_NOTE,
+  resultsReadyTitle,
+  expiresSoon,
+  EXPIRY_WARN_MS,
+  isDownloadOnly,
+  validateFreeze,
+  describeFreeze,
+  validateGif
 } from './videoEdit'
 
 describe('validateTrim', () => {
@@ -403,5 +413,83 @@ describe('extending a trim past the video', () => {
   it('lets the end edge move past the video up to the limit', () => {
     expect(withTrimEdge([0, 60000], 'end', 90000, trimLimitMs(60000, true))).toEqual([0, 90000])
     expect(withTrimEdge([0, 60000], 'end', 90000, 60000)).toEqual([0, 60000])
+  })
+})
+
+describe('nextSegmentRow', () => {
+  it('starts a first row at the beginning', () => {
+    expect(nextSegmentRow([], 30, 60)).toEqual({ startMsSeconds: 0, endMsSeconds: null })
+  })
+  it('carries on from where the last row ends', () => {
+    expect(nextSegmentRow([{ startMsSeconds: 0, endMsSeconds: 20 }], 5, 60)).toEqual({ startMsSeconds: 20, endMsSeconds: null })
+  })
+  it('starts at the playhead when the last row already runs to the end', () => {
+    expect(nextSegmentRow([{ startMsSeconds: 0, endMsSeconds: null }], 12.345, 60)).toEqual({ startMsSeconds: 12.35, endMsSeconds: null })
+    expect(nextSegmentRow([{ startMsSeconds: 0, endMsSeconds: 59.8 }], 12, 60)).toEqual({ startMsSeconds: 12, endMsSeconds: null })
+  })
+  it('never starts too close to the end to be a valid segment', () => {
+    expect(nextSegmentRow([{ startMsSeconds: 0, endMsSeconds: null }], 59.9, 60)).toEqual({ startMsSeconds: 60 - MIN_TRIM_MS / 1000, endMsSeconds: null })
+    expect(validateTrim(nextSegmentRow([{ startMsSeconds: 0, endMsSeconds: null }], 60, 60).startMsSeconds * 1000, null, 60000)).toBeNull()
+  })
+})
+
+describe('renderHint', () => {
+  it('names the problem first, even while busy', () => {
+    expect(renderHint('Bad range', true, true, 'Change something')).toEqual({ text: 'Bad range', isError: true })
+  })
+  it('says what to do when there is nothing to render', () => {
+    expect(renderHint(null, false, true, 'Change something')).toEqual({ text: 'Change something', isError: false })
+  })
+  it('explains the wait when it would otherwise be ready', () => {
+    expect(renderHint(null, true, true)).toEqual({ text: BUSY_NOTE, isError: false })
+    expect(renderHint(undefined, true, false)).toEqual({ text: '', isError: false })
+  })
+})
+
+describe('resultsReadyTitle', () => {
+  it('names a single result by what made it', () => {
+    expect(resultsReadyTitle([{ operation: 'TRIM' }])).toBe('Your trimmed clip is ready')
+    expect(resultsReadyTitle([{ operation: 'AUDIO' }])).toBe('Your video with the new audio is ready')
+    expect(resultsReadyTitle([{ operation: 'SPLIT', segmentIndex: 2 }])).toBe('Segment 3 is ready')
+  })
+  it('counts several at once', () => {
+    expect(resultsReadyTitle([{ operation: 'SPLIT' }, { operation: 'SPLIT' }])).toBe('2 segments are ready')
+    expect(resultsReadyTitle([{ operation: 'TRIM' }, { operation: 'TRIM' }, { operation: 'SPLIT' }])).toBe('3 results are ready')
+  })
+  it('says nothing for nothing', () => {
+    expect(resultsReadyTitle([])).toBe('')
+  })
+})
+
+describe('expiresSoon', () => {
+  const now = Date.parse('2026-10-04T12:00:00Z')
+  it('flags results close to expiry', () => {
+    expect(expiresSoon(new Date(now + EXPIRY_WARN_MS - 60_000).toISOString(), now)).toBe(true)
+    expect(expiresSoon(new Date(now + EXPIRY_WARN_MS + 60_000).toISOString(), now)).toBe(false)
+  })
+  it('ignores missing or unreadable times', () => {
+    expect(expiresSoon(null, now)).toBe(false)
+    expect(expiresSoon('not a date', now)).toBe(false)
+  })
+})
+
+describe('freeze frame, GIF and still', () => {
+  it('keeps a freeze short and inside the clip', () => {
+    expect(validateFreeze(null, 5000)).toBeNull()
+    expect(validateFreeze({ atMs: 1000, durationMs: 2000 }, 5000)).toBeNull()
+    expect(validateFreeze({ atMs: 1000, durationMs: 200 }, 5000)).toMatch(/between 0.5 and 10 s/)
+    expect(validateFreeze({ atMs: 0, durationMs: 2000 }, 5000)).toMatch(/after the start/)
+    expect(validateFreeze({ atMs: 5000, durationMs: 2000 }, 5000)).toMatch(/before the end/)
+    expect(describeFreeze({ atMs: 1000, durationMs: 2500 })).toBe('frame held 2.5 s')
+  })
+  it('allows a GIF of up to 15 s of a valid range', () => {
+    expect(validateGif(1000, 5000, 10_000)).toBeNull()
+    expect(validateGif(0, 20_000, 60_000)).toMatch(/at most 15 s/)
+    expect(validateGif(5000, 4000, 10_000)).toBeTruthy()
+  })
+  it('knows which results are downloads, and names them', () => {
+    expect(isDownloadOnly('GIF') && isDownloadOnly('STILL') && isDownloadOnly('EXTRACT')).toBe(true)
+    expect(isDownloadOnly('TRIM')).toBe(false)
+    expect(resultsReadyTitle([{ operation: 'GIF' }])).toBe('Your GIF is ready')
   })
 })

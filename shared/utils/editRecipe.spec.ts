@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { audioDifferences, describeRecipe, fullAudio, isRecipeEmpty, sanitizeRecipe, sanitizeRecipes, type EditRecipe } from './editRecipe'
+import { PLAIN_LOOK } from './videoLook'
 
 const layer = { id: 'a', kind: 'TEXT' as const, text: 'Hi' }
 
@@ -71,5 +72,29 @@ describe('turn and flip in a recipe', () => {
       layers: []
     })
     expect(sanitizeRecipe({ frame: null, orient: { rotate: 45, flipH: false, flipV: false }, audio: { normalize: true }, layers: [] })?.orient).toBeUndefined()
+  })
+})
+
+describe('filter, effect and fade in a recipe', () => {
+  const look = { ...PLAIN_LOOK, warmth: 0.5, sharpen: true }
+  const fade = { inMs: 1000, outMs: 500, color: 'WHITE' as const }
+  it('are kept, counted as content, and described', () => {
+    const r = sanitizeRecipe({ frame: null, look, effect: 'ZOOM_IN', fade, audio: {}, layers: [] })
+    expect(r).toEqual({ frame: null, look, effect: 'ZOOM_IN', fade, audio: {}, layers: [] })
+    expect(isRecipeEmpty(r!)).toBe(false)
+    expect(describeRecipe(r!)).toBe('Filter · Zoom in · Fade')
+  })
+  it('fills in filter fields saved before they existed', () => {
+    expect(sanitizeRecipe({ frame: null, look: { brightness: 0.1 }, audio: {}, layers: [] })?.look).toEqual({ ...PLAIN_LOOK, brightness: 0.1 })
+  })
+  it('drops a plain, out-of-range or malformed filter, an unknown effect and a bad fade', () => {
+    const base = { frame: { aspect: 1, w: 1080, h: 1080 }, audio: {}, layers: [] }
+    const r = sanitizeRecipe({ ...base, look: { ...PLAIN_LOOK }, effect: 'NONE', fade: { inMs: 0, outMs: 0, color: 'BLACK' } })
+    expect(r).toEqual(base)
+    expect(sanitizeRecipe({ ...base, look: { ...PLAIN_LOOK, warmth: 3 } })?.look).toBeUndefined()
+    expect(sanitizeRecipe({ ...base, look: { ...PLAIN_LOOK, sepia: 'yes' } })?.look).toBeUndefined()
+    expect(sanitizeRecipe({ ...base, effect: 'EXPLODE' })?.effect).toBeUndefined()
+    expect(sanitizeRecipe({ ...base, fade: { inMs: 9000, outMs: 0, color: 'BLACK' } })?.fade).toBeUndefined()
+    expect(sanitizeRecipe({ ...base, fade: { inMs: 1000, outMs: 0, color: 'PINK' } })?.fade).toBeUndefined()
   })
 })

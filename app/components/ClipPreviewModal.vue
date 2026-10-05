@@ -82,7 +82,9 @@ const OPERATIONS: Record<VideoClip['operation'], string> = {
   SPLIT: 'Split segment',
   AUDIO: 'Video with new audio',
   EXTRACT: 'Extracted audio',
-  OVERLAY: 'Text & overlays'
+  OVERLAY: 'Text & overlays',
+  GIF: 'GIF',
+  STILL: 'Still picture'
 }
 const subtitle = computed(() => (props.clip ? OPERATIONS[props.clip.operation] : ''))
 const expires = computed(() => (props.clip ? formatTimeUntil(props.clip.expiresAt) : ''))

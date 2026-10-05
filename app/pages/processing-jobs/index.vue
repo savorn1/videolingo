@@ -283,17 +283,8 @@ function clearFilters() {
 // running job anywhere), and never while the browser tab is hidden.
 const POLL_MS = 4000
 const live = computed(() => !!counts.value && (counts.value.QUEUED > 0 || counts.value.RUNNING > 0))
-let pollTimer: ReturnType<typeof setInterval> | undefined
-
-onMounted(() => {
-  refreshAll()
-  pollTimer = setInterval(() => {
-    if (!live.value || document.visibilityState !== 'visible') return
-    load(true)
-    loadSummary()
-  }, POLL_MS)
-})
-onBeforeUnmount(() => clearInterval(pollTimer))
+onMounted(refreshAll)
+usePolling(() => Promise.all([load(true), loadSummary()]), { intervalMs: POLL_MS, active: () => live.value })
 
 // ── Actions ────────────────────────────────────────────────────────────────
 const { busy, dialog, request, close, confirm } = useJobActions(() => refreshAll())

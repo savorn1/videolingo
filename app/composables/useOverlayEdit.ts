@@ -5,6 +5,7 @@
 
 import type { OverlayLayer } from '~/composables/useVideoEdits'
 import { moveItem } from '#shared/utils/reorder'
+import { captionRequest, validateCaptions, type CaptionSettings } from '#shared/utils/burnedCaptions'
 
 export interface EditorLayer extends OverlayLayer {
   id: string
@@ -77,6 +78,8 @@ function base(): Omit<EditorLayer, 'kind' | 'text'> {
 export function useOverlayEdit(durationMs: Ref<number>) {
   const state = reactive({
     layers: [] as EditorLayer[],
+    /** Subtitles burned in from a transcript; null = off. */
+    captions: null as CaptionSettings | null,
     selectedId: null as string | null,
     /** Layers picked along with `selectedId` (shift/ctrl-click); they move, copy and go together. */
     multi: [] as string[]
@@ -207,7 +210,17 @@ export function useOverlayEdit(durationMs: Ref<number>) {
   function addFromCues(cues: { startMs: number; endMs: number; text: string }[]) {
     const usable = cues.filter((c) => c.text.trim() && c.endMs > c.startMs)
     for (const c of usable) {
-      state.layers.push({ ...base(), kind: 'TEXT', text: c.text.trim(), startMs: c.startMs, endMs: c.endMs, y: 0.9, sizePct: 5, weight: 600, animation: 'NONE' })
+      state.layers.push({
+        ...base(),
+        kind: 'TEXT',
+        text: c.text.trim(),
+        startMs: c.startMs,
+        endMs: c.endMs,
+        y: 0.9,
+        sizePct: 5,
+        weight: 600,
+        animation: 'NONE'
+      })
     }
     if (usable.length) state.selectedId = state.layers[state.layers.length - 1]!.id
     return usable.length
@@ -281,14 +294,20 @@ export function useOverlayEdit(durationMs: Ref<number>) {
 
   function reset() {
     state.layers = []
+    state.captions = null
     state.selectedId = null
     state.multi = []
   }
 
-  const request = computed<OverlayLayer[]>(() => state.layers.map(({ id: _id, imageUrl: _url, imageName: _name, ...layer }) => layer))
+  const request = computed(() => ({
+    layers: state.layers.map(({ id: _id, imageUrl: _url, imageName: _name, ...layer }) => layer) as OverlayLayer[],
+    captions: captionRequest(state.captions)
+  }))
 
   const error = computed(() => {
-    if (!state.layers.length) return 'Add a text or image layer first'
+    if (!state.layers.length && !state.captions) return 'Add a text or image layer, or subtitles, first'
+    const captionError = validateCaptions(state.captions)
+    if (captionError) return captionError
     for (const [i, l] of state.layers.entries()) {
       const at = `Layer ${i + 1}: `
       if (l.kind === 'TEXT' && !l.text?.trim()) return `${at}the text is empty`
@@ -299,7 +318,33 @@ export function useOverlayEdit(durationMs: Ref<number>) {
     return null
   })
 
-  return { state, selected, group, isPicked, toggleMulti, select, removeGroup, duplicateGroup, alignGroup, matchStyleInGroup, addText, addImage, addTextWatermark, addPreset, addFromCues, applyStyleToAll, keepInSafeArea, addTemplate, remove, duplicate, reorder, moveTo, reset, request, error }
+  return {
+    state,
+    selected,
+    group,
+    isPicked,
+    toggleMulti,
+    select,
+    removeGroup,
+    duplicateGroup,
+    alignGroup,
+    matchStyleInGroup,
+    addText,
+    addImage,
+    addTextWatermark,
+    addPreset,
+    addFromCues,
+    applyStyleToAll,
+    keepInSafeArea,
+    addTemplate,
+    remove,
+    duplicate,
+    reorder,
+    moveTo,
+    reset,
+    request,
+    error
+  }
 }
 
 export type OverlayEdit = ReturnType<typeof useOverlayEdit>

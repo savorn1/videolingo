@@ -7,8 +7,9 @@
 
 import type { ApiEnvelope } from '#shared/types'
 import type { ProcessingJob } from '~/composables/useProcessingJobs'
+import type { CaptionSettings } from '#shared/utils/burnedCaptions'
 
-export type ClipOperation = 'TRIM' | 'SPLIT' | 'AUDIO' | 'EXTRACT' | 'OVERLAY'
+export type ClipOperation = 'TRIM' | 'SPLIT' | 'AUDIO' | 'EXTRACT' | 'OVERLAY' | 'GIF' | 'STILL'
 
 export interface CropRect {
   x: number
@@ -138,7 +139,37 @@ export function useVideoEdits() {
       /** Let `endMs` run past the end of the video (up to MAX_EXTEND_MS): the last frame is held, the sound is silent. */
       extend?: boolean
       /** A picture look (brightness, contrast, colour, blur, tint, vignette); leave out for none. */
-      look?: { brightness: number; contrast: number; saturation: number; blur: number; grayscale: boolean; sepia: boolean; vignette: boolean } | null
+      look?: {
+        brightness: number
+        contrast: number
+        saturation: number
+        blur: number
+        grayscale: boolean
+        sepia: boolean
+        vignette: boolean
+        warmth: number
+        sharpen: boolean
+      } | null
+      /** One effect (ZOOM_IN, ZOOM_OUT, GLITCH, OLD_FILM); leave out for none. */
+      effect?: 'ZOOM_IN' | 'ZOOM_OUT' | 'GLITCH' | 'OLD_FILM'
+      /** Fade in at the start / out at the end (ms, at most 5 s each), through black or white; leave out for none. */
+      fade?: { inMs: number; outMs: number; color: 'BLACK' | 'WHITE' } | null
+      /** Hold one frame mid-clip (on the trimmed result's timeline); leave out for none. */
+      freeze?: { atMs: number; durationMs: number } | null
+      /** Areas blurred for the whole clip, in the original picture's pixels. */
+      blurs?: { x: number; y: number; w: number; h: number }[] | null
+      /** One part (on the trimmed clip's timeline) played at another speed. */
+      speed?: { startMs: number; endMs: number; speed: number } | null
+      /** Another stored video in a corner. */
+      pip?: { videoId: number; corner: string; sizePct: number } | null
+      /** Intro and/or outro title cards. */
+      cards?: {
+        intro: { text: string; durationMs: number } | null
+        outro: { text: string; durationMs: number } | null
+        background: string
+        color: string
+        logoKey: string | null
+      } | null
       /** Sound added to the trimmed result: music mixed in, or a file used instead of the video's own sound. */
       audio?: { replaceKey?: string; music?: { key: string; volume: number; loop: boolean; duck: boolean; startMs: number } } | null
     }
@@ -163,8 +194,9 @@ export function useVideoEdits() {
     return (await api<ApiEnvelope<ProcessingJob>>(`${base(videoId)}/extract-audio`, { method: 'POST', body: { format } })).data
   }
 
-  async function startOverlay(videoId: number, layers: OverlayLayer[]) {
-    return (await api<ApiEnvelope<ProcessingJob>>(`${base(videoId)}/overlay`, { method: 'POST', body: { layers } })).data
+  /** Layers and/or subtitles burned in from a transcript (`captions`, null for none). */
+  async function startOverlay(videoId: number, request: { layers: OverlayLayer[]; captions?: CaptionSettings | null }) {
+    return (await api<ApiEnvelope<ProcessingJob>>(`${base(videoId)}/overlay`, { method: 'POST', body: request })).data
   }
 
   /** Font families the server can draw text with. */
@@ -194,5 +226,30 @@ export function useVideoEdits() {
     await api(`${base(videoId)}/${clipId}`, { method: 'DELETE' })
   }
 
-  return { overview, startTrim, startSplit, startCut, startAudio, startExtract, startOverlay, fonts, waveform, autoCrop, promote, remove }
+  /** A looping GIF of a short range (at most 15 s), 320/480/640 px wide — a download-only result. */
+  async function startGif(videoId: number, request: { startMs: number; endMs: number; width: number }) {
+    return (await api<ApiEnvelope<ProcessingJob>>(`${base(videoId)}/gif`, { method: 'POST', body: request })).data
+  }
+
+  /** The frame at `atMs` as a JPG — a download-only result. */
+  async function startStill(videoId: number, atMs: number) {
+    return (await api<ApiEnvelope<ProcessingJob>>(`${base(videoId)}/still`, { method: 'POST', body: { atMs } })).data
+  }
+
+  return {
+    overview,
+    startTrim,
+    startSplit,
+    startCut,
+    startAudio,
+    startExtract,
+    startOverlay,
+    startGif,
+    startStill,
+    fonts,
+    waveform,
+    autoCrop,
+    promote,
+    remove
+  }
 }

@@ -594,11 +594,11 @@ async function onRegenerate() {
   }
 }
 
+// While regenerating: a failed look is retried after a longer wait (usePolling).
 const POLL_MS = 3000
-let pollTimer: ReturnType<typeof setInterval> | undefined
-async function pollJob() {
-  if (!job.value || !regenerating.value || document.visibilityState !== 'visible') return
-  try {
+usePolling(
+  async () => {
+    if (!job.value) return
     const p = await jobProgress(job.value.id)
     const wasActive = regenerating.value
     job.value = p
@@ -606,10 +606,9 @@ async function pollJob() {
       toast.add({ title: 'Transcript regenerated', color: 'success' })
       await load()
     }
-  } catch {
-    // transient — next tick retries
-  }
-}
+  },
+  { intervalMs: POLL_MS, active: () => !!job.value && regenerating.value }
+)
 
 // ── Delete ─────────────────────────────────────────────────────────────────
 const confirmDelete = ref(false)
@@ -641,7 +640,5 @@ onMounted(async () => {
     scrollToSegment(matches.value[0]!)
   }
   if (route.query.edit === '1' && !regenerating.value) startEditing()
-  pollTimer = setInterval(pollJob, POLL_MS)
 })
-onBeforeUnmount(() => clearInterval(pollTimer))
 </script>

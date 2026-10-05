@@ -138,7 +138,11 @@ describe('parseLog', () => {
     expect(parseLog('null')).toEqual({})
   })
   it('drops bad days and clamps negatives', () => {
-    const raw = JSON.stringify({ '2026-05-10': { watchSeconds: -5, cards: 2 }, tomorrow: { watchSeconds: 1, cards: 1 }, '2026-05-11': { watchSeconds: 'x', cards: 1 } })
+    const raw = JSON.stringify({
+      '2026-05-10': { watchSeconds: -5, cards: 2 },
+      tomorrow: { watchSeconds: 1, cards: 1 },
+      '2026-05-11': { watchSeconds: 'x', cards: 1 }
+    })
     expect(parseLog(raw)).toEqual({ '2026-05-10': { watchSeconds: 0, cards: 2 } })
   })
 })

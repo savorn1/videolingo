@@ -212,9 +212,27 @@
 
     <!-- ── Speed & pitch ───────────────────────────────────────────────── -->
     <EditorSection v-model:open="open.speed" title="Speed & pitch" :changed="changed.speed" :hint="`${+s.speed.toFixed(2)}×`">
+      <!-- For learners: a slower version with the voice at its natural pitch -->
+      <div class="flex flex-wrap items-center gap-1" role="radiogroup" aria-label="Speed for learners" data-testid="learner-speeds">
+        <span class="mr-1 text-xs text-gray-500 dark:text-gray-400">For learners</span>
+        <UButton
+          v-for="ls in LEARNER_SPEEDS"
+          :key="ls.speed"
+          size="xs"
+          color="neutral"
+          role="radio"
+          :aria-checked="s.speed === ls.speed && s.pitchSemitones === 0"
+          :variant="s.speed === ls.speed && s.pitchSemitones === 0 ? 'soft' : 'ghost'"
+          :class="s.speed === ls.speed && s.pitchSemitones === 0 ? TAB_ACCENTS.audio.soft : ''"
+          @click="setLearnerSpeed(ls.speed)"
+        >
+          {{ ls.label }}<span v-if="ls.speed !== 1" class="opacity-70 tabular-nums">{{ ls.speed }}×</span>
+        </UButton>
+      </div>
       <SliderRow v-model="s.speed" label="Speed" :min="0.5" :max="2" :step="0.05" :default-value="1" unit="×" />
       <p v-if="s.speed !== 1" class="text-xs text-gray-500 dark:text-gray-400">
-        The picture speeds up too, so they stay in sync — the video becomes {{ formatTimecode(durationMs / s.speed) }} long.
+        The picture {{ s.speed < 1 ? 'slows down' : 'speeds up' }} too, so they stay in sync — the video becomes {{ formatTimecode(durationMs / s.speed) }}
+        long. The voice keeps its pitch.
       </p>
       <SliderRow v-model="s.pitchSemitones" label="Pitch" :min="-12" :max="12" :step="1" :default-value="0" unit="st" />
     </EditorSection>
@@ -282,8 +300,8 @@
           Nothing changes until you choose: replace the original (kept under Versions) or add it as a new video.
         </li>
       </ul>
-      <p class="text-xs min-h-4" :class="edit.error.value ? 'text-error-500' : 'text-gray-500 dark:text-gray-400'">
-        {{ edit.error.value || (edit.changed.value ? '' : 'Change something above to make an audio edit.') }}
+      <p class="text-xs min-h-4" :class="hint.isError ? 'text-error-500' : 'text-gray-500 dark:text-gray-400'" data-testid="audio-hint">
+        {{ hint.text }}
       </p>
       <div class="flex gap-2">
         <UButton
@@ -324,10 +342,28 @@ import { TAB_ACCENTS } from '#shared/utils/tabAccent'
 // jobs, whose results appear in the editor's Results list.
 import type { AudioEdit, Channels, Denoise } from '~/composables/useAudioEdit'
 import { uploadToStorage } from '~/composables/useVideos'
-import { addMute, clipAt, clipEnd, deleteRange, duplicate, MAX_AUDIO_CLIPS, MIN_CLIP_MS, mergeWithNext, splitAt, type AudioClip } from '#shared/utils/audioEdit'
+import {
+  addMute,
+  clipAt,
+  clipEnd,
+  deleteRange,
+  duplicate,
+  LEARNER_SPEEDS,
+  MAX_AUDIO_CLIPS,
+  MIN_CLIP_MS,
+  mergeWithNext,
+  splitAt,
+  type AudioClip
+} from '#shared/utils/audioEdit'
 import { formatTimecode } from '#shared/utils/transport'
+import { renderHint } from '#shared/utils/videoEdit'
 
 const props = defineProps<{ edit: AudioEdit; videoId: number; durationMs: number; currentMs: number; canWrite: boolean; busy: boolean }>()
+function setLearnerSpeed(speed: number) {
+  s.speed = speed
+  s.pitchSemitones = 0
+}
+const hint = computed(() => renderHint(props.edit.error.value, props.edit.changed.value, props.busy, 'Change something above to make an audio edit.'))
 const emit = defineEmits<{ queued: [] }>()
 
 const SECTION = `space-y-2 border-t pt-3 ${TAB_ACCENTS.audio.divider}`

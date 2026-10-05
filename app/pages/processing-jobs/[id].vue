@@ -279,40 +279,31 @@ function downloadLogs() {
 // While the job is active, poll the lightweight /progress endpoint and pull
 // only new log lines. When it settles, re-fetch the full job once so the
 // allowed actions and timings are final.
+// A failed look is retried after a longer wait (usePolling).
 const POLL_MS = 2000
-let pollTimer: ReturnType<typeof setInterval> | undefined
-let polling = false
 
 async function poll() {
-  if (!job.value || !active.value || polling || document.visibilityState !== 'visible') return
-  polling = true
-  try {
-    const p = await getProgress(id.value)
-    const settled = !isActiveJobStatus(p.status)
-    job.value = {
-      ...job.value,
-      status: p.status,
-      progress: p.progress,
-      currentStep: p.currentStep,
-      errorMessage: p.errorMessage,
-      durationSeconds: p.durationSeconds,
-      updatedAt: p.updatedAt
-    }
-    if (p.lastLogId !== null && p.lastLogId > lastLogId.value) await fetchNewLogs()
-    if (settled) job.value = await get(id.value)
-  } catch {
-    // Transient — try again next tick.
-  } finally {
-    polling = false
+  if (!job.value) return
+  const p = await getProgress(id.value)
+  const settled = !isActiveJobStatus(p.status)
+  job.value = {
+    ...job.value,
+    status: p.status,
+    progress: p.progress,
+    currentStep: p.currentStep,
+    errorMessage: p.errorMessage,
+    durationSeconds: p.durationSeconds,
+    updatedAt: p.updatedAt
   }
+  if (p.lastLogId !== null && p.lastLogId > lastLogId.value) await fetchNewLogs()
+  if (settled) job.value = await get(id.value)
 }
+usePolling(poll, { intervalMs: POLL_MS, active: () => !!job.value && active.value })
 
 onMounted(async () => {
   await Promise.all([loadJob(), fetchNewLogs()])
   if (route.hash === '#logs') nextTick(() => document.getElementById('logs')?.scrollIntoView({ behavior: 'smooth' }))
-  pollTimer = setInterval(poll, POLL_MS)
 })
-onBeforeUnmount(() => clearInterval(pollTimer))
 
 // ── Actions ────────────────────────────────────────────────────────────────
 const { busy, dialog, request, close, confirm } = useJobActions(async (action, _job, result) => {

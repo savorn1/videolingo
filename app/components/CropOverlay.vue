@@ -3,12 +3,13 @@
     <!-- The huge shadow dims everything outside the crop, so the kept area stands out. -->
     <div
       v-if="hasBox"
-      class="absolute border-white shadow-[0_0_0_9999px_rgba(0,0,0,0.55)] cursor-move"
+      class="absolute border-white cursor-move"
+      :class="variant === 'blur' ? 'border-dashed backdrop-blur-md' : 'shadow-[0_0_0_9999px_rgba(0,0,0,0.55)]'"
       :style="{ ...boxStyle, borderWidth: `${2 / zoomLevel}px` }"
       @pointerdown.stop="startMove"
     >
-      <!-- Rule-of-thirds guides -->
-      <div class="absolute inset-0 pointer-events-none grid grid-cols-3 grid-rows-3">
+      <!-- Rule-of-thirds guides (crop only) -->
+      <div v-if="variant !== 'blur'" class="absolute inset-0 pointer-events-none grid grid-cols-3 grid-rows-3">
         <div v-for="n in 9" :key="n" class="border-white/20" :style="{ borderWidth: `${0.5 / zoomLevel}px` }" />
       </div>
       <!-- Label and handles are counter-scaled so they stay the same size on screen at any zoom. -->
@@ -16,7 +17,7 @@
         class="absolute left-0 bottom-full mb-1 origin-bottom-left rounded bg-black/75 px-1.5 py-0.5 text-[11px] font-medium text-white tabular-nums whitespace-nowrap"
         :style="{ scale: `${1 / zoomLevel}` }"
       >
-        {{ model.w }} × {{ model.h }}
+        {{ variant === 'blur' ? 'Blur · ' : '' }}{{ model.w }} × {{ model.h }}
       </span>
       <div
         v-for="h in HANDLES"
@@ -36,8 +37,9 @@
 // move it, drag a handle to resize. Works in native video pixels
 // (0..naturalWidth/Height), mapped onto the letterboxed picture area.
 // `zoom`: how much the preview around this overlay is scaled (CSS transform),
-// so handles can stay a constant size on screen.
-const props = defineProps<{ naturalWidth: number; naturalHeight: number; aspect?: number | null; zoom?: number }>()
+// so handles can stay a constant size on screen. `variant: 'blur'` draws the box
+// blurred, without dimming the rest (the Trim tab's blurred areas).
+const props = defineProps<{ naturalWidth: number; naturalHeight: number; aspect?: number | null; zoom?: number; variant?: 'crop' | 'blur' }>()
 const zoomLevel = computed(() => props.zoom || 1)
 const model = defineModel<{ x: number; y: number; w: number; h: number }>({ required: true })
 

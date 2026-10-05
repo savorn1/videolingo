@@ -25,8 +25,8 @@
           readonly
             ? ''
             : l.id === edit.state.selectedId
-            ? 'pointer-events-auto cursor-move outline-2 outline-dashed outline-primary-400 outline-offset-2'
-            : 'pointer-events-auto cursor-move hover:outline hover:outline-white/60 outline-offset-2'
+              ? 'pointer-events-auto cursor-move outline-2 outline-dashed outline-primary-400 outline-offset-2'
+              : 'pointer-events-auto cursor-move hover:outline hover:outline-white/60 outline-offset-2'
         "
         :style="layerStyle(l)"
         @pointerdown="onPointerDown(l, $event)"
@@ -43,8 +43,9 @@
           @keydown.esc.stop.prevent="editingId === l.id && endEdit(l, $event)"
           @keydown.enter.ctrl.stop.prevent="editingId === l.id && endEdit(l, $event)"
           @keydown.stop="editingId === l.id"
-          >{{ l.text }}</div
         >
+          {{ l.text }}
+        </div>
         <img v-else-if="l.imageUrl" :src="l.imageUrl" alt="" draggable="false" class="block w-full h-auto" />
       </div>
     </template>
@@ -59,7 +60,15 @@
 import { animationSeconds, fontCss, type EditorLayer, type OverlayEdit } from '~/composables/useOverlayEdit'
 import { snapAxis } from '#shared/utils/layerSnap'
 
-const props = defineProps<{ edit: OverlayEdit; naturalWidth: number; naturalHeight: number; currentMs: number; zoom?: number; durationMs: number; readonly?: boolean }>()
+const props = defineProps<{
+  edit: OverlayEdit
+  naturalWidth: number
+  naturalHeight: number
+  currentMs: number
+  zoom?: number
+  durationMs: number
+  readonly?: boolean
+}>()
 
 const root = useTemplateRef<HTMLDivElement>('root')
 const size = ref({ w: 0, h: 0 })
@@ -90,7 +99,9 @@ function endOf(l: EditorLayer) {
 
 // Layers on screen at the current time; the selected one always (so it can be edited), faded when it's off-screen then.
 const shown = computed(() =>
-  props.edit.state.layers.filter((l) => (!props.readonly && l.id === props.edit.state.selectedId) || (props.currentMs >= l.startMs && props.currentMs < endOf(l)))
+  props.edit.state.layers.filter(
+    (l) => (!props.readonly && l.id === props.edit.state.selectedId) || (props.currentMs >= l.startMs && props.currentMs < endOf(l))
+  )
 )
 
 // 0–1 through the entrance (and 1–0 through the exit), as the backend's fades and slides.

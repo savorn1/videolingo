@@ -13,6 +13,7 @@ import {
   splitAt,
   trimEdges,
   validateClips,
+  LEARNER_SPEEDS,
   type AudioClip
 } from './audioEdit'
 
@@ -149,5 +150,12 @@ describe('addMute / isMutedAt', () => {
     expect(m).toEqual([{ startMs: 1000, endMs: 4000 }])
     expect(isMutedAt(m, 3999)).toBe(true)
     expect(isMutedAt(m, 4000)).toBe(false)
+  })
+})
+
+describe('LEARNER_SPEEDS', () => {
+  it('starts at normal and stays within the speeds the server allows (0.5–2×)', () => {
+    expect(LEARNER_SPEEDS[0]).toEqual({ speed: 1, label: 'Normal' })
+    for (const s of LEARNER_SPEEDS) expect(s.speed >= 0.5 && s.speed <= 2).toBe(true)
   })
 })

@@ -34,6 +34,32 @@
       <UButton size="xs" color="neutral" variant="ghost" icon="i-lucide-plus" @click="addEmpty">Add by time</UButton>
     </div>
 
+    <!-- With a transcript: take out the long pauses between spoken lines in one go -->
+    <div v-if="spokenLines?.length" class="space-y-1 rounded-md bg-gray-50 p-2 dark:bg-gray-900/60" data-testid="cut-pauses">
+      <div class="flex flex-wrap items-center gap-1.5">
+        <span class="text-xs text-gray-600 dark:text-gray-300">Remove pauses longer than</span>
+        <USelect v-model="minPauseMs" :items="pauseItems" size="xs" class="w-20" aria-label="Shortest pause to remove" />
+        <UButton
+          size="xs"
+          color="neutral"
+          variant="soft"
+          :class="TAB_ACCENTS.trim.soft"
+          icon="i-lucide-audio-waveform"
+          :disabled="!suggestedPauses.length"
+          @click="applyPauses"
+        >
+          {{
+            suggestedPauses.length
+              ? `Cut ${suggestedPauses.length} pause${suggestedPauses.length === 1 ? '' : 's'} · saves ${formatTimecode(pauseSaving)}`
+              : 'No pauses that long'
+          }}
+        </UButton>
+      </div>
+      <p class="text-xs text-gray-500 dark:text-gray-400">
+        From the transcript; {{ PAUSE_KEEP_MS / 1000 }} s is kept next to speech so no words are clipped. Replaces the cuts above — Ctrl/⌘+Z brings them back.
+      </p>
+    </div>
+
     <!-- What stays (solid) and what goes (striped), over the whole video -->
     <div
       v-if="durationMs && cuts.length"
@@ -85,10 +111,9 @@
       <p v-if="durationMs > LONG_VIDEO_MS" class="text-xs text-gray-500 dark:text-gray-400" data-testid="cut-long-note">
         This is a long video: the cut re-encodes all of it, so it can take a while to finish. It runs in the background.
       </p>
-      <p v-if="durationMs > LONG_VIDEO_MS" class="text-xs text-gray-500 dark:text-gray-400" data-testid="cut-long-note">
-        This is a long video: the cut re-encodes all of it, so it can take a while to finish. It runs in the background.
+      <p class="min-h-4 text-xs" :class="hint.isError ? 'text-error-600 dark:text-error-400' : 'text-gray-500 dark:text-gray-400'" role="alert">
+        {{ hint.text }}
       </p>
-      <p class="min-h-4 text-xs text-error-600 dark:text-error-400" role="alert">{{ error }}</p>
       <UButton
         v-if="canWrite"
         block
@@ -110,9 +135,27 @@
 import { TAB_ACCENTS } from '#shared/utils/tabAccent'
 import { cutBetween, snapCut, lengthAfterCuts, mergeCutRanges, validateCutOut, type CutRange } from '#shared/utils/cutOut'
 import { formatTimecode, parseTimecode } from '#shared/utils/transport'
+import { renderHint } from '#shared/utils/videoEdit'
+import { PAUSE_CHOICES, PAUSE_KEEP_MS, pauseCuts, type SpokenLine } from '#shared/utils/transcriptCuts'
 
 const cuts = defineModel<CutRange[]>({ required: true })
-const props = defineProps<{ currentMs: number; durationMs: number; canWrite: boolean; busy: boolean; starting: boolean }>()
+const props = defineProps<{
+  currentMs: number
+  durationMs: number
+  canWrite: boolean
+  busy: boolean
+  starting: boolean
+  /** The video's spoken lines (from its transcript), for removing pauses; none = the option is hidden. */
+  spokenLines?: SpokenLine[] | null
+}>()
+
+const minPauseMs = ref(1000)
+const pauseItems = PAUSE_CHOICES.map((ms) => ({ label: `${ms / 1000} s`, value: ms }))
+const suggestedPauses = computed(() => (props.spokenLines?.length ? pauseCuts(props.spokenLines, props.durationMs, minPauseMs.value) : []))
+const pauseSaving = computed(() => suggestedPauses.value.reduce((sum, c) => sum + c.endMs - c.startMs, 0))
+function applyPauses() {
+  if (suggestedPauses.value.length) cuts.value = suggestedPauses.value.map((c) => ({ ...c }))
+}
 const emit = defineEmits<{ seek: [ms: number]; start: [] }>()
 
 const open = ref(false)
@@ -131,6 +174,7 @@ const markStart = ref<number | null>(null)
 const merged = computed(() => mergeCutRanges(cuts.value))
 const resultMs = computed(() => lengthAfterCuts(cuts.value, props.durationMs))
 const error = computed(() => validateCutOut(cuts.value, Math.round(props.durationMs) || null))
+const hint = computed(() => renderHint(error.value, true, props.busy))
 const summary = computed(() => {
   const removed = Math.max(0, props.durationMs - resultMs.value)
   return `${cuts.value.length} cut${cuts.value.length === 1 ? '' : 's'} take out ${formatTimecode(removed)}; the result is ${formatTimecode(resultMs.value)} long.`

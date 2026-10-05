@@ -16,6 +16,9 @@
       <UButton v-if="can('transcripts', 'WRITE')" size="xs" color="primary" variant="soft" icon="i-lucide-languages" @click="openAction('translate')">
         Translate…
       </UButton>
+      <UButton v-if="can('videos', 'WRITE')" size="xs" color="primary" variant="soft" icon="i-lucide-chef-hat" @click="openAction('recipe')">
+        Apply a recipe…
+      </UButton>
       <UButton v-if="can('videos', 'WRITE')" size="xs" color="neutral" variant="soft" icon="i-lucide-copy" @click="openAction('duplicate')">Duplicate</UButton>
       <UButton v-if="can('videos', 'WRITE')" size="xs" color="neutral" variant="soft" icon="i-lucide-archive" @click="openAction('archive')">Archive</UButton>
       <UButton v-if="can('videos', 'WRITE')" size="xs" color="neutral" variant="soft" icon="i-lucide-archive-restore" @click="openAction('unarchive')">
@@ -74,6 +77,20 @@
             </p>
           </template>
 
+          <template v-else-if="action === 'recipe'">
+            <UFormField label="Recipe" description="Saved in the editor (Edit › Recipes), in this browser.">
+              <USelect v-model="recipeId" :items="recipeItems" placeholder="Choose a recipe" class="w-full" aria-label="Recipe" />
+            </UFormField>
+            <p v-if="!recipeItems.length" class="text-xs text-gray-500 dark:text-gray-400">
+              No recipes with picture settings or layers yet — save one in the video editor first.
+            </p>
+            <p v-else class="text-xs text-gray-500 dark:text-gray-400">
+              For each video, the crop and size, turn, filter, effect and fades are rendered as one trim of the whole video, and the text &amp; image layers as
+              one overlay render. Sound settings are only applied in the editor. The results wait in each video's editor (Results) to be reviewed — nothing
+              replaces a video by itself. Links and videos in the trash are skipped.
+            </p>
+          </template>
+
           <p v-else-if="action === 'duplicate'" class="text-sm text-gray-600 dark:text-gray-300">
             Makes a full copy of each — same file, metadata, categories and tags — disabled until reviewed.
           </p>
@@ -105,14 +122,7 @@
 
           <div class="flex justify-end gap-2">
             <UButton color="neutral" variant="ghost" @click="show = false">{{ results.length ? 'Close' : 'Cancel' }}</UButton>
-            <UButton
-              v-if="!results.length"
-              :color="action === 'purge' ? 'error' : 'primary'"
-              :icon="icon"
-              :loading="running"
-              :disabled="!ready"
-              @click="run"
-            >
+            <UButton v-if="!results.length" :color="action === 'purge' ? 'error' : 'primary'" :icon="icon" :loading="running" :disabled="!ready" @click="run">
               {{ title }}
             </UButton>
           </div>
@@ -128,6 +138,9 @@
 // delete. Each runs per video (the API is per-video) and reports every
 // outcome, so a partial failure is visible.
 import type { Video } from '~/composables/useVideos'
+import type { OverlayLayer } from '~/composables/useVideoEdits'
+import { describeRecipe } from '#shared/utils/editRecipe'
+import { batchableRecipe, recipeJobs } from '#shared/utils/recipeBatch'
 
 const props = defineProps<{ videos: Video[]; trash?: boolean }>()
 const emit = defineEmits<{ done: [] }>()
@@ -138,9 +151,11 @@ const { list: listCollections, addVideos } = useCollections()
 const { list: listTranscripts, create: createTranscript, regenerate } = useTranscripts()
 const { duplicate, archive, unarchive, restore, purge } = useVideos()
 const { settings: clientSettings } = useClientSettings()
+const { startTrim, startOverlay } = useVideoEdits()
+const recipes = useEditRecipes()
 const toast = useToast()
 
-type Action = 'tags' | 'collection' | 'translate' | 'duplicate' | 'archive' | 'unarchive' | 'restore' | 'purge'
+type Action = 'tags' | 'collection' | 'translate' | 'recipe' | 'duplicate' | 'archive' | 'unarchive' | 'restore' | 'purge'
 const action = ref<Action>('tags')
 const show = ref(false)
 const running = ref(false)
@@ -153,6 +168,7 @@ const title = computed(
       tags: 'Add tags',
       collection: 'Add to collection',
       translate: 'Queue translations',
+      recipe: 'Apply recipe',
       duplicate: 'Duplicate videos',
       archive: 'Archive videos',
       unarchive: 'Unarchive videos',
@@ -166,6 +182,7 @@ const icon = computed(
       tags: 'i-lucide-hash',
       collection: 'i-lucide-library',
       translate: 'i-lucide-languages',
+      recipe: 'i-lucide-chef-hat',
       duplicate: 'i-lucide-copy',
       archive: 'i-lucide-archive',
       unarchive: 'i-lucide-archive-restore',
@@ -179,6 +196,11 @@ const tagOptions = ref<{ label: string; value: number }[]>([])
 const collectionId = ref<number | undefined>()
 const collectionOptions = ref<{ label: string; value: number }[]>([])
 const targetLanguages = ref<string[]>([])
+const recipeId = ref<string | undefined>()
+// Only recipes this batch can use (picture settings or layers).
+const recipeItems = computed(() =>
+  recipes.saved.value.filter((r) => batchableRecipe(r.data)).map((r) => ({ label: `${r.name} — ${describeRecipe(r.data)}`, value: r.id }))
+)
 
 const suggested = computed(() => clientSettings.value?.defaultTargetLanguages ?? [])
 const languageItems = computed(() =>
@@ -197,7 +219,9 @@ const ready = computed(() =>
       ? !!collectionId.value
       : action.value === 'translate'
         ? plannedJobs.value > 0
-        : true
+        : action.value === 'recipe'
+          ? !!recipeId.value
+          : true
 )
 
 async function openAction(a: Action) {
@@ -205,6 +229,7 @@ async function openAction(a: Action) {
   results.value = []
   tagIds.value = []
   collectionId.value = undefined
+  recipeId.value = undefined
   targetLanguages.value = [...suggested.value]
   show.value = true
   if (a !== 'tags' && a !== 'collection') return
@@ -244,6 +269,24 @@ async function run() {
         push(`${props.videos.length} video(s)`, 'ok', `added to “${collectionOptions.value.find((c) => c.value === collectionId.value)?.label}”`)
       } catch (err) {
         push(`${props.videos.length} video(s)`, 'failed', apiErrorMessage(err))
+      }
+    } else if (action.value === 'recipe') {
+      const recipe = recipes.saved.value.find((r) => r.id === recipeId.value)
+      for (const v of props.videos) {
+        if (!recipe) break
+        const jobs = recipeJobs(recipe.data, v)
+        if (jobs.skip) {
+          push(v.title, 'skipped', jobs.skip)
+          continue
+        }
+        const queued: string[] = []
+        try {
+          if (jobs.trim) queued.push(`trim #${(await startTrim(v.id, jobs.trim as Parameters<typeof startTrim>[1])).id}`)
+          if (jobs.layers) queued.push(`layers #${(await startOverlay(v.id, { layers: jobs.layers as unknown as OverlayLayer[] })).id}`)
+          push(v.title, 'ok', `queued ${queued.join(' and ')} — review it in the video's editor`)
+        } catch (err) {
+          push(v.title, 'failed', `${queued.length ? `queued ${queued.join(', ')}, then: ` : ''}${apiErrorMessage(err)}`)
+        }
       }
     } else if (action.value === 'duplicate') {
       for (const v of props.videos) {

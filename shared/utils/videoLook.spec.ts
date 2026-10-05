@@ -1,5 +1,16 @@
 import { describe, expect, it } from 'vitest'
-import { LOOK_PRESETS, MAX_LOOK_BLUR, PLAIN_LOOK, cssFilter, describeVideoLook, isPlainLook, lookRequest, matchingPreset, validateLook } from './videoLook'
+import {
+  LOOK_PRESETS,
+  MAX_LOOK_BLUR,
+  PLAIN_LOOK,
+  cssFilter,
+  describeVideoLook,
+  isPlainLook,
+  lookRequest,
+  matchingPreset,
+  validateLook,
+  warmthTint
+} from './videoLook'
 
 describe('isPlainLook / lookRequest', () => {
   it('treats null and the default as plain', () => {
@@ -63,5 +74,21 @@ describe('describeVideoLook', () => {
     expect(describeVideoLook(PLAIN_LOOK)).toBeNull()
     expect(describeVideoLook(LOOK_PRESETS[3]!.look)).toBe('Black & white look')
     expect(describeVideoLook({ ...PLAIN_LOOK, brightness: -0.3, blur: 3, vignette: true })).toBe('darker, blurred, vignette')
+  })
+})
+
+describe('warmth and sharpen', () => {
+  it('count as changes, are validated and described', () => {
+    expect(isPlainLook({ ...PLAIN_LOOK, warmth: 0.2 })).toBe(false)
+    expect(isPlainLook({ ...PLAIN_LOOK, sharpen: true })).toBe(false)
+    expect(validateLook({ ...PLAIN_LOOK, warmth: 1.5 })).toMatch(/Warmth/)
+    expect(describeVideoLook({ ...PLAIN_LOOK, warmth: -0.3, sharpen: true })).toBe('cooler, sharpened')
+  })
+  it('are previewed with a tint layer, not the CSS filter', () => {
+    expect(cssFilter({ ...PLAIN_LOOK, warmth: 0.5 })).toBe('')
+    expect(warmthTint({ ...PLAIN_LOOK, warmth: 0.5 })).toEqual({ background: '#ff8a00', opacity: 0.175 })
+    expect(warmthTint({ ...PLAIN_LOOK, warmth: -1 })?.background).toBe('#0077ff')
+    expect(warmthTint({ ...PLAIN_LOOK, warmth: 0.5, grayscale: true })).toBeNull()
+    expect(warmthTint(PLAIN_LOOK)).toBeNull()
   })
 })

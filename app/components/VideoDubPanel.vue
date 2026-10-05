@@ -174,21 +174,15 @@ function jobLabel(job: ProcessingJob) {
   return job.status === 'FAILED' ? `${what} failed` : job.status === 'QUEUED' ? `${what} — waiting` : `Making ${what}`
 }
 
-let pollTimer: ReturnType<typeof setInterval> | undefined
-watch(
-  () => visibleJobs.value.some((j) => isActiveJobStatus(j.status)),
-  (active) => {
-    clearInterval(pollTimer)
-    if (!active) return
-    pollTimer = setInterval(async () => {
-      const wasActive = new Set(visibleJobs.value.filter((j) => isActiveJobStatus(j.status)).map((j) => j.id))
-      await load()
-      if ((data.value?.jobs ?? []).some((j) => wasActive.has(j.id) && j.status === 'SUCCEEDED'))
-        toast.add({ title: 'Voice-over ready', description: 'Choose it under Audio to listen.', color: 'success' })
-    }, 3000)
-  }
+usePolling(
+  async () => {
+    const wasActive = new Set(visibleJobs.value.filter((j) => isActiveJobStatus(j.status)).map((j) => j.id))
+    await load()
+    if ((data.value?.jobs ?? []).some((j) => wasActive.has(j.id) && j.status === 'SUCCEEDED'))
+      toast.add({ title: 'Voice-over ready', description: 'Choose it under Audio to listen.', color: 'success' })
+  },
+  { intervalMs: 3000, active: () => visibleJobs.value.some((j) => isActiveJobStatus(j.status)) }
 )
-onBeforeUnmount(() => clearInterval(pollTimer))
 
 // ── Create ─────────────────────────────────────────────────────────────────
 const form = reactive({ language: 'km', voice: '' })

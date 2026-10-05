@@ -70,7 +70,36 @@
                 @time="onTime"
                 @duration="onDuration"
               >
-                <template v-if="cropActive || overlayEdit.state.layers.length || mode === 'overlay' || showGuides" #overlay>
+                <template
+                  v-if="
+                    cropActive ||
+                    overlayEdit.state.layers.length ||
+                    mode === 'overlay' ||
+                    showGuides ||
+                    previewTint ||
+                    previewVignette ||
+                    previewFade ||
+                    (mode === 'trim' && (blurs.length > 0 || !!pip))
+                  "
+                  #overlay
+                >
+                  <!-- Trim tab: warmth as a tinted layer, and the fade in/out at the edges of the range -->
+                  <div v-if="previewTint" class="pointer-events-none absolute inset-0 mix-blend-soft-light" :style="previewTint" aria-hidden="true" />
+                  <!-- Text tab: the subtitle being spoken now, roughly as it will be burned in -->
+                  <div v-if="previewCaption" class="pointer-events-none absolute inset-0 @container-size" aria-hidden="true" data-testid="caption-preview">
+                    <div
+                      class="absolute inset-x-[5%] flex flex-col items-center text-center font-bold leading-tight"
+                      :class="previewCaption.top ? 'top-[6%]' : 'bottom-[6%]'"
+                      :style="{ fontSize: `${previewCaption.sizePct}cqh` }"
+                    >
+                      <span :class="previewCaption.boxClass" :style="previewCaption.textStyle">{{ previewCaption.text }}</span>
+                      <span v-if="previewCaption.second" class="mt-[0.2em] text-[0.8em]" :class="previewCaption.boxClass" :style="previewCaption.secondStyle">{{
+                        previewCaption.second
+                      }}</span>
+                    </div>
+                  </div>
+                  <div v-if="previewVignette" class="pointer-events-none absolute inset-0" :style="{ background: VIGNETTE_GRADIENT }" aria-hidden="true" />
+                  <div v-if="previewFade" class="pointer-events-none absolute inset-0" :style="previewFade" data-testid="fade-preview" aria-hidden="true" />
                   <OverlayLayers
                     v-if="mode === 'overlay' || overlayEdit.state.layers.length"
                     :readonly="mode !== 'overlay'"
@@ -91,8 +120,16 @@
                     <div class="absolute rounded-sm border border-dashed border-emerald-300/90 bg-emerald-400/10" :style="guideBox.safe" />
                     <span class="absolute left-1 top-1 rounded bg-black/60 px-1 text-[10px] font-medium text-emerald-200">{{ guideBox.label }}</span>
                   </div>
+                  <ClipExtrasLayer
+                    v-if="mode === 'trim' && (blurs.length > 0 || !!pip)"
+                    :natural-width="naturalWidth"
+                    :natural-height="naturalHeight"
+                    :blurs="blurs"
+                    :editing-index="editingBlur"
+                    :pip="pip"
+                  />
                   <CropOverlay
-                    v-if="mode !== 'overlay' && cropActive"
+                    v-if="mode !== 'overlay' && cropActive && editingBlur == null"
                     ref="cropLayer"
                     :model-value="crop"
                     :natural-width="naturalWidth"
@@ -100,6 +137,16 @@
                     :aspect="cropAspect"
                     :zoom="zoom"
                     @update:model-value="(v) => Object.assign(crop, v)"
+                  />
+                  <!-- The blurred area being moved or resized -->
+                  <CropOverlay
+                    v-if="mode === 'trim' && editingBlur != null && blurs[editingBlur]"
+                    variant="blur"
+                    :model-value="blurs[editingBlur]!"
+                    :natural-width="naturalWidth"
+                    :natural-height="naturalHeight"
+                    :zoom="zoom"
+                    @update:model-value="(v) => setBlur(editingBlur!, v)"
                   />
                 </template>
               </VideoPlayer>
@@ -225,8 +272,8 @@
                 <template #content>
                   <div class="w-80 space-y-3 p-3">
                     <p class="text-xs text-gray-500 dark:text-gray-400">
-                      A recipe keeps the crop shape and size, the sound settings and the text layers — not the trim, splits or sound clips, which belong to one
-                      video.
+                      A recipe keeps the crop shape and size, the filter, effect and fades, the sound settings and the text layers — not the trim, splits or
+                      sound clips, which belong to one video.
                     </p>
                     <ul
                       v-if="recipes.saved.value.length"
@@ -265,7 +312,7 @@
                         </div>
                       </UFormField>
                       <p v-if="!currentRecipe" class="text-xs text-gray-500 dark:text-gray-400">
-                        Set a crop and size, change the sound or add a text layer first.
+                        Set a crop and size, a filter or effect, change the sound or add a text layer first.
                       </p>
                     </form>
                   </div>
@@ -376,6 +423,18 @@
                   </div>
                 </div>
                 <p class="text-xs text-gray-500 dark:text-gray-400">Type a time like 1:23.5, or step by single frames with ← → under the video.</p>
+                <!-- With a transcript: say so when an edge cuts a spoken line in half, and offer to move it out -->
+                <div
+                  v-if="trimCutsLine"
+                  class="flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100"
+                  data-testid="trim-cuts-line"
+                >
+                  <UIcon name="i-lucide-message-square-warning" class="size-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                  <span class="flex-1">The {{ trimCutsLine }} cuts through a spoken line.</span>
+                  <UButton size="xs" color="neutral" variant="soft" :class="TAB_ACCENTS.trim.soft" icon="i-lucide-text-cursor-input" @click="fitTrimToLines"
+                    >Fit to sentences</UButton
+                  >
+                </div>
                 <USwitch v-model="extendOn" size="xs" label="Extend past the end of the video" data-testid="trim-extend" />
                 <p v-if="extendOn" class="text-xs text-gray-500 dark:text-gray-400">
                   Set the end later than the video ({{ formatMsShort(durationMs) }}) — up to {{ MAX_EXTEND_MS / 60000 }} min more. The extra time holds the last
@@ -639,15 +698,15 @@
                   <UFormField label="Height"><UInput v-model.number="scale.h" type="number" size="sm" /></UFormField>
                 </div>
 
-                <!-- Turn and flip: done after the crop, before the resize -->
-                <div class="space-y-1.5" role="group" aria-label="Turn and flip">
-                  <div class="flex items-center justify-between gap-2">
-                    <p class="text-xs text-gray-500 dark:text-gray-400">Turn and flip</p>
-                    <UButton v-if="orientActive" size="xs" color="neutral" variant="ghost" icon="i-lucide-rotate-ccw" @click="orient = { ...NO_ORIENTATION }"
-                      >Reset</UButton
-                    >
-                  </div>
-                  <div class="flex flex-wrap items-center gap-1.5">
+                <!-- Turn and flip: done after the crop, before the resize. Folded by default — most videos don't need it. -->
+                <EditorSection
+                  v-model:open="orientOpen"
+                  title="Turn and flip"
+                  :changed="orientActive"
+                  :hint="orientActive ? describeOrientation(orient) : ''"
+                  data-testid="turn-flip"
+                >
+                  <div class="flex flex-wrap items-center gap-1.5" role="group" aria-label="Turn and flip">
                     <UButton
                       size="xs"
                       color="neutral"
@@ -697,22 +756,46 @@
                       <span class="inline-block transition-transform motion-reduce:transition-none" :style="{ transform: orientSampleTransform }">F</span>
                     </span>
                   </div>
-                  <p class="text-xs text-gray-500 dark:text-gray-400">
-                    {{
-                      orientActive
-                        ? `${describeOrientation(orient)}. The crop is drawn on the picture as it is now.`
-                        : 'For a video filmed sideways or a mirrored webcam.'
-                    }}
-                  </p>
-                </div>
+                  <div class="flex items-center justify-between gap-2">
+                    <p class="text-xs text-gray-500 dark:text-gray-400">
+                      {{
+                        orientActive
+                          ? `${describeOrientation(orient)}. The crop is drawn on the picture as it is now.`
+                          : 'For a video filmed sideways or a mirrored webcam.'
+                      }}
+                    </p>
+                    <UButton v-if="orientActive" size="xs" color="neutral" variant="ghost" icon="i-lucide-rotate-ccw" @click="orient = { ...NO_ORIENTATION }"
+                      >Reset</UButton
+                    >
+                  </div>
+                </EditorSection>
               </section>
 
-              <LookPanel v-model="look" />
+              <LookPanel v-model="look" :thumbnail="video.thumbnailUrl" />
+
+              <ClipEffectsPanel v-model:effect="effect" v-model:fade="fade" :length-ms="Math.round(range[1] - range[0])" />
+
+              <FreezeFramePanel
+                v-model="freeze"
+                :current-ms="currentMs"
+                :range-start-ms="range[0]"
+                :range-end-ms="range[1]"
+                @seek="(ms: number) => preview?.seek(ms, false)"
+              />
+
+              <SpeedRampPanel v-model="speedPart" :current-ms="currentMs" :range-start-ms="range[0]" :range-end-ms="range[1]" />
+
+              <BlurAreasPanel v-model="blurs" v-model:editing="editingBlur" :natural-width="naturalWidth" :natural-height="naturalHeight" :crop-on="cropOn" />
+
+              <PipPanel v-model="pip" />
+
+              <CardsPanel v-model="cards" :video-title="video.title" />
 
               <TrimAudioPanel v-model="trimAudio" />
 
               <CutOutPanel
                 v-model="cuts"
+                :spoken-lines="spoken.state === 'ready' ? spoken.lines : null"
                 :current-ms="currentMs"
                 :duration-ms="durationMs"
                 :can-write="canWrite"
@@ -722,13 +805,25 @@
                 @start="onStartCut"
               />
 
+              <FrameExportPanel
+                :current-ms="currentMs"
+                :range-start-ms="range[0]"
+                :range-end-ms="range[1]"
+                :duration-ms="durationMs"
+                :can-write="canWrite"
+                :busy="busy"
+                :starting="frameStarting"
+                @gif="onStartGif"
+                @still="onStartStill"
+              />
+
               <!-- Action: says what will be made before it is made -->
               <section class="sticky bottom-0 z-10 space-y-2 border-t bg-default pb-3 pt-4" :class="TAB_ACCENTS.trim.divider" aria-label="Start trim">
                 <p class="text-sm text-gray-700 dark:text-gray-300" data-testid="trim-summary">{{ trimSummary }}</p>
                 <p v-if="trimSizeHint" class="text-xs text-gray-500 dark:text-gray-400" data-testid="trim-size-hint">{{ trimSizeHint }}</p>
                 <!-- Always takes its line, so the layout (and the video) don't jump while a crop is being drawn. -->
-                <p class="text-xs min-h-4" :class="trimError ? 'text-error-500' : 'text-gray-500 dark:text-gray-400'">
-                  {{ trimError ?? (trimDirty ? '' : 'Change the range, or turn on crop or resize, to make a trim.') }}
+                <p class="text-xs min-h-4" :class="trimHint.isError ? 'text-error-500' : 'text-gray-500 dark:text-gray-400'" data-testid="trim-hint">
+                  {{ trimHint.text }}
                 </p>
                 <UButton
                   v-if="canWrite"
@@ -780,7 +875,8 @@
                     class="absolute inset-y-0 flex items-center justify-center text-[11px] font-medium text-white border-r border-white dark:border-gray-900 last:border-r-0 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-white"
                     :class="[bar.valid ? bar.color : 'bg-error-500', selectedSegment === i ? 'ring-2 ring-inset ring-white' : 'opacity-80 hover:opacity-100']"
                     :style="{ left: bar.leftPct + '%', width: bar.widthPct + '%' }"
-                    :aria-label="`Segment ${i + 1}`"
+                    :aria-label="`Segment ${i + 1}: ${segmentRangeLabel(segments[i]!)}`"
+                    :title="`Segment ${i + 1}: ${segmentRangeLabel(segments[i]!)}`"
                     @click="selectSegment(i)"
                   >
                     {{ i + 1 }}
@@ -851,7 +947,7 @@
                     color="error"
                     variant="ghost"
                     icon="i-lucide-x"
-                    aria-label="Remove segment"
+                    :aria-label="`Remove segment ${i + 1}`"
                     :disabled="segments.length <= 1"
                     @click="removeSegment(i)"
                   />
@@ -876,10 +972,31 @@
                     variant="soft"
                     :class="TAB_ACCENTS.split.soft"
                     icon="i-lucide-plus"
-                    @click="segments.push({ startMsSeconds: 0, endMsSeconds: null })"
+                    :disabled="segments.length >= MAX_SEGMENTS"
+                    :title="segments.length >= MAX_SEGMENTS ? `At most ${MAX_SEGMENTS} segments` : 'Adds a segment from where the last one ends'"
+                    @click="addSegment"
                   >
                     Add segment
                   </UButton>
+                </div>
+                <!-- From the transcript: cut in the pauses between spoken lines -->
+                <div v-if="spoken.state !== 'off'" class="space-y-1" data-testid="split-sentences">
+                  <div class="flex flex-wrap items-center gap-2">
+                    <span class="text-xs text-gray-500">By sentences:</span>
+                    <UButton
+                      size="xs"
+                      color="neutral"
+                      variant="soft"
+                      :class="TAB_ACCENTS.split.soft"
+                      icon="i-lucide-message-square-text"
+                      :loading="spoken.state === 'loading'"
+                      :disabled="!sentenceRows.length"
+                      @click="splitBySentences"
+                    >
+                      {{ sentenceRows.length ? `Split at pauses · ${sentenceRows.length} parts` : 'Split at pauses' }}
+                    </UButton>
+                  </div>
+                  <p class="text-xs text-gray-500 dark:text-gray-400">{{ sentenceHint }}</p>
                 </div>
                 <div class="flex flex-wrap items-center gap-2">
                   <span class="text-xs text-gray-500">Split evenly:</span>
@@ -949,8 +1066,8 @@
               <section class="sticky bottom-0 z-10 space-y-2 border-t bg-default pb-3 pt-4" :class="TAB_ACCENTS.split.divider" aria-label="Start split">
                 <p class="text-sm text-gray-700 dark:text-gray-300" data-testid="split-summary">{{ splitSummary }}</p>
                 <p v-if="splitSizeHint" class="text-xs text-gray-500 dark:text-gray-400">{{ splitSizeHint }}</p>
-                <p class="text-xs min-h-4" :class="splitError ? 'text-error-500' : 'text-gray-500 dark:text-gray-400'">
-                  {{ splitError ?? (splitDirty ? '' : 'Add a split point, or use “Split evenly”, to make more than one segment.') }}
+                <p class="text-xs min-h-4" :class="splitHint.isError ? 'text-error-500' : 'text-gray-500 dark:text-gray-400'" data-testid="split-hint">
+                  {{ splitHint.text }}
                 </p>
                 <UButton
                   v-if="canWrite"
@@ -978,6 +1095,8 @@
               :current-ms="currentMs"
               :can-write="canWrite"
               :busy="busy"
+              :caption-source="captionSource"
+              :video-language="video.language"
               @queued="onQueued"
               @preview="(ms: number, play?: boolean) => preview?.seek(ms, play ?? true)"
             />
@@ -1010,7 +1129,23 @@
           <UIcon name="i-lucide-list-checks" class="size-4" :class="TAB_ACCENTS.audio.icon" />
           <h2 class="font-semibold text-gray-900 dark:text-white">Results</h2>
           <UBadge v-if="data?.clips.length" color="neutral" variant="subtle" size="sm">{{ data.clips.length }}</UBadge>
-          <AnimationSpeed v-if="visibleJobs.length" class="ml-auto" />
+          <div class="ml-auto flex items-center gap-2">
+            <AnimationSpeed v-if="visibleJobs.length" />
+            <!-- Every video's edits in one queue (the jobs page, filtered) -->
+            <UButton
+              v-if="can('processing-jobs', 'READ')"
+              size="xs"
+              color="neutral"
+              variant="link"
+              trailing-icon="i-lucide-arrow-up-right"
+              to="/processing-jobs?type=EDIT"
+              :padded="false"
+              title="Edits on all videos, with their place in the queue"
+              data-testid="all-edits"
+            >
+              All edits
+            </UButton>
+          </div>
         </div>
       </template>
 
@@ -1076,60 +1211,96 @@
           <UButton size="xs" color="neutral" :class="TAB_ACCENTS.audio.button" icon="i-lucide-copy-plus" :loading="bulkBusy" @click="onBulkAddAsNew"
             >Add as new videos</UButton
           >
+          <!-- e.g. a split by sentences straight into a practice collection -->
+          <USelectMenu
+            v-if="can('collections', 'WRITE')"
+            v-model="bulkCollectionId"
+            :items="collectionItems"
+            value-key="value"
+            size="xs"
+            class="w-48"
+            placeholder="…and into a collection"
+            :loading="collectionsLoading"
+            :search-input="{ placeholder: 'Search collections…' }"
+            aria-label="Also add the new videos to a collection"
+            data-testid="bulk-collection"
+            @update:open="(o: boolean) => o && loadCollections()"
+          />
           <UButton size="xs" color="error" variant="soft" icon="i-lucide-trash-2" :disabled="bulkBusy" @click="confirmBulkDiscard = true">Discard</UButton>
         </template>
       </div>
 
       <ul v-if="data?.clips.length" class="divide-y divide-gray-100 dark:divide-gray-800 rounded-lg border border-gray-200 dark:border-gray-800">
-        <li v-for="clip in data.clips" :key="clip.id" class="flex items-center gap-3 px-3 py-2" :class="freshClipIds.includes(clip.id) ? 'result-in' : ''">
+        <li
+          v-for="clip in data.clips"
+          :key="clip.id"
+          class="flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2"
+          :class="freshClipIds.includes(clip.id) ? 'result-in' : ''"
+        >
           <UCheckbox
-            v-if="canWrite && selectableClips.length > 1 && clip.operation !== 'EXTRACT'"
+            v-if="canWrite && selectableClips.length > 1 && !isDownloadOnly(clip.operation)"
             :model-value="pickedClipIds.includes(clip.id)"
             :aria-label="`Select ${clipTitle(clip)}`"
             @update:model-value="(v: boolean | 'indeterminate') => pickClip(clip.id, v === true)"
           />
-          <span
-            class="flex items-center justify-center w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300 shrink-0"
-          >
+          <span class="flex items-center justify-center w-8 h-8 rounded-full shrink-0" :class="TAB_ACCENTS[RESULT_TAB[clip.operation]].soft">
             <UIcon :name="CLIP_ICONS[clip.operation]" class="w-4 h-4" />
           </span>
-          <div class="min-w-0 flex-1">
+          <div class="min-w-48 flex-1">
             <p class="text-sm font-medium text-gray-900 dark:text-white truncate">{{ clipTitle(clip) }}</p>
             <p class="text-xs text-gray-500 dark:text-gray-400">
               <template v-if="clip.summary">{{ clip.summary }} · </template>
               {{ formatFileSize(clip.sizeBytes) }}
               <template v-if="clip.crop"> · cropped {{ clip.crop.w }}×{{ clip.crop.h }}</template>
               <template v-if="clip.scale"> · resized {{ clip.scale.w }}×{{ clip.scale.h }}</template>
-              · expires {{ formatTimeUntil(clip.expiresAt) }}
+              ·
+              <span
+                v-if="expiresSoon(clip.expiresAt)"
+                class="font-medium text-warning-700 dark:text-warning-400"
+                title="Results are deleted 72 hours after rendering — keep it as a video before then"
+                data-testid="expires-soon"
+                ><UIcon name="i-lucide-clock-alert" class="size-3 inline align-text-top" /> expires {{ formatTimeUntil(clip.expiresAt) }}</span
+              >
+              <template v-else>expires {{ formatTimeUntil(clip.expiresAt) }}</template>
             </p>
             <audio v-if="clip.operation === 'EXTRACT'" :src="clip.url" controls preload="none" class="mt-1 h-8 w-full max-w-sm" />
+            <img
+              v-else-if="clip.operation === 'GIF' || clip.operation === 'STILL'"
+              :src="clip.url"
+              :alt="clipTitle(clip)"
+              loading="lazy"
+              class="mt-1 max-h-28 rounded border border-gray-200 dark:border-gray-800"
+            />
           </div>
-          <template v-if="clip.operation === 'EXTRACT'">
-            <UButton size="xs" color="primary" variant="soft" icon="i-lucide-download" :href="clip.url" download>Download</UButton>
-          </template>
-          <template v-else>
-            <UButton size="xs" color="neutral" variant="soft" icon="i-lucide-play" @click="previewClip = clip">Preview</UButton>
-            <UButton v-if="video.videoUrl" size="xs" color="neutral" variant="ghost" icon="i-lucide-columns-2" @click="compareClip = clip">Compare</UButton>
-            <template v-if="canWrite">
-              <!-- A trim, audio or overlay result can be kept as a separate video, leaving the original as it is -->
-              <!-- The safe choice is the solid button; replacing (which asks to confirm) is the quieter one. -->
-              <UButton v-if="replaces(clip)" size="xs" color="neutral" :class="TAB_ACCENTS.audio.button" icon="i-lucide-copy-plus" @click="openAsNew(clip)"
-                >Add as new video</UButton
-              >
-              <UButton size="xs" :color="replaces(clip) ? 'warning' : 'primary'" :variant="replaces(clip) ? 'soft' : 'solid'" @click="confirmPromote = clip">
-                {{ replaces(clip) ? 'Replace original' : 'Add as new video' }}
-              </UButton>
+          <!-- On a narrow screen the buttons drop under the title as one group, instead of squeezing it -->
+          <div class="ml-auto flex flex-wrap items-center justify-end gap-2">
+            <template v-if="isDownloadOnly(clip.operation)">
+              <UButton size="xs" color="primary" variant="soft" icon="i-lucide-download" :href="clip.url" download>Download</UButton>
             </template>
-          </template>
-          <UButton
-            v-if="canWrite"
-            size="xs"
-            color="error"
-            variant="ghost"
-            icon="i-lucide-trash-2"
-            aria-label="Discard clip"
-            @click="confirmDiscardClip = clip"
-          />
+            <template v-else>
+              <UButton size="xs" color="neutral" variant="soft" icon="i-lucide-play" @click="previewClip = clip">Preview</UButton>
+              <UButton v-if="video.videoUrl" size="xs" color="neutral" variant="ghost" icon="i-lucide-columns-2" @click="compareClip = clip">Compare</UButton>
+              <template v-if="canWrite">
+                <!-- A trim, audio or overlay result can be kept as a separate video, leaving the original as it is -->
+                <!-- The safe choice is the solid button; replacing (which asks to confirm) is the quieter one. -->
+                <UButton v-if="replaces(clip)" size="xs" color="neutral" :class="TAB_ACCENTS.audio.button" icon="i-lucide-copy-plus" @click="openAsNew(clip)"
+                  >Add as new video</UButton
+                >
+                <UButton size="xs" :color="replaces(clip) ? 'warning' : 'primary'" :variant="replaces(clip) ? 'soft' : 'solid'" @click="confirmPromote = clip">
+                  {{ replaces(clip) ? 'Replace original' : 'Add as new video' }}
+                </UButton>
+              </template>
+            </template>
+            <UButton
+              v-if="canWrite"
+              size="xs"
+              color="error"
+              variant="ghost"
+              icon="i-lucide-trash-2"
+              :aria-label="`Discard ${clipTitle(clip)}`"
+              @click="confirmDiscardClip = clip"
+            />
+          </div>
         </li>
       </ul>
     </UCard>
@@ -1241,6 +1412,15 @@ import {
   centeredCrop,
   findSplitTarget,
   MAX_QUEUED_EDITS,
+  nextSegmentRow,
+  renderHint,
+  isDownloadOnly,
+  validateFreeze,
+  describeFreeze,
+  type ClipFreeze,
+  RESULT_TAB,
+  resultsReadyTitle,
+  expiresSoon,
   NO_ORIENTATION,
   swapsSides,
   describeOrientation,
@@ -1267,10 +1447,50 @@ import {
 import { isMutedAt } from '#shared/utils/audioEdit'
 import { formatTimecode, parseTimecode } from '#shared/utils/transport'
 import { presetFromSettings, ratioLabel } from '#shared/utils/exportPreset'
-import { PLAIN_LOOK, cssFilter, describeVideoLook, isPlainLook, lookRequest, validateLook, type VideoLook } from '#shared/utils/videoLook'
+import {
+  PLAIN_LOOK,
+  cssFilter,
+  describeVideoLook,
+  isPlainLook,
+  lookRequest,
+  validateLook,
+  warmthTint,
+  VIGNETTE_GRADIENT,
+  type VideoLook
+} from '#shared/utils/videoLook'
+import {
+  NO_FADE,
+  describeEffect,
+  describeFade,
+  effectCssFilter,
+  effectRequest,
+  fadeOpacityAt,
+  fadeRequest,
+  isNoFade,
+  validateFade,
+  zoomScaleAt,
+  type ClipFade,
+  type VideoEffect
+} from '#shared/utils/videoEffects'
 import { describeTrimAudio, trimAudioRequest, validateTrimAudio, type TrimAudioSettings } from '#shared/utils/trimAudio'
 import { cutSkipTarget, mergeCutRanges, validateCutOut, type CutRange } from '#shared/utils/cutOut'
 import { TAB_ACCENTS } from '#shared/utils/tabAccent'
+import {
+  cardsRequest,
+  describeCards,
+  describePip,
+  describeSpeedRange,
+  pipRequest,
+  validateBlurs,
+  validateCards,
+  validatePip,
+  validateSpeedRange,
+  type BlurBox,
+  type ClipCards,
+  type PipSettings,
+  type SpeedRange
+} from '#shared/utils/clipExtras'
+import { fitRangeToLines, pickTranscript, sentenceSplitRows, spokenTitle, type SpokenLine } from '#shared/utils/transcriptCuts'
 import { audioDifferences, describeRecipe, fullAudio, isRecipeEmpty, type EditRecipe, type RecipeLayer } from '#shared/utils/editRecipe'
 import { MAX_NAMED_ENTRIES, uniqueName } from '#shared/utils/namedList'
 import { formatFileSize, formatTimeUntil } from '#shared/utils/format'
@@ -1280,23 +1500,36 @@ const props = defineProps<{ video: Video; canWrite: boolean }>()
 const emit = defineEmits<{ replaced: []; created: [videoId: number] }>()
 
 const toast = useToast()
-const { overview, startTrim, startSplit, startCut, autoCrop, promote, remove } = useVideoEdits()
+const { overview, startTrim, startSplit, startCut, startGif, startStill, autoCrop, promote, remove } = useVideoEdits()
 
 const data = ref<EditOverview | null>(null)
 const error = ref('')
 
-// When a render with new audio finishes, say so and offer the next step right there.
-function announceNewAudioClips(before: VideoClip[] | undefined, after: VideoClip[]) {
+// When a render finishes, say so wherever the page is scrolled, and offer the next step right there.
+function announceNewClips(before: VideoClip[] | undefined, after: VideoClip[]) {
   if (!before) return
   const known = new Set(before.map((c) => c.id))
-  const fresh = after.find((c) => c.operation === 'AUDIO' && !known.has(c.id))
-  if (!fresh) return
+  const fresh = after.filter((c) => !known.has(c.id))
+  if (!fresh.length) return
+  const one = fresh.length === 1 ? fresh[0]! : null
+  const actions: { label: string; onClick: () => void }[] = []
+  if (one && !isDownloadOnly(one.operation)) {
+    actions.push({ label: 'Preview', onClick: () => (previewClip.value = one) })
+    if (props.canWrite && replaces(one)) actions.push({ label: 'Add as new video', onClick: () => openAsNew(one) })
+  } else {
+    actions.push({ label: 'Show results', onClick: scrollToResults })
+  }
   toast.add({
-    title: 'Your video with the new audio is ready',
-    description: 'Preview it under Results, then replace the original or add it as a new video.',
+    title: resultsReadyTitle(fresh),
+    description:
+      one && isDownloadOnly(one.operation)
+        ? 'Download it under Results.'
+        : one && replaces(one)
+          ? 'Preview it, then replace the original or add it as a new video.'
+          : 'Preview them under Results, then add them as new videos.',
     color: 'success',
     duration: 10000,
-    actions: props.canWrite ? [{ label: 'Add as new video', onClick: () => openAsNew(fresh) }] : []
+    actions
   })
 }
 // A finished result slides in with a brief glow, then settles.
@@ -1318,7 +1551,7 @@ async function load() {
     const before = data.value?.clips
     data.value = await overview(props.video.id)
     markFreshClips(before, data.value.clips)
-    announceNewAudioClips(before, data.value.clips)
+    announceNewClips(before, data.value.clips)
   } catch (err) {
     error.value = apiErrorMessage(err)
   }
@@ -1507,7 +1740,7 @@ function onPanStart(e: PointerEvent) {
 const cropLayer = useTemplateRef<{ beginDraw: (from: { clientX: number; clientY: number }, to?: PointerEvent) => void }>('cropLayer')
 const CONTROL_BAR_PX = 56
 function onQuickCropStart(e: PointerEvent) {
-  if (e.button !== 0 || spaceHeld.value || mode.value !== 'trim' || cropOn.value) return
+  if (e.button !== 0 || spaceHeld.value || mode.value !== 'trim' || cropOn.value || editingBlur.value != null) return
   const r = zoomBox.value!.getBoundingClientRect()
   if (e.clientY >= r.top + pan.y + zoom.value * (r.height - CONTROL_BAR_PX)) return
   const from = { clientX: e.clientX, clientY: e.clientY }
@@ -1738,6 +1971,9 @@ const multiError = computed(() => {
   if (!naturalWidth.value || !naturalHeight.value) return 'Waiting for the video to load.'
   return (
     validateLook(look.value) ??
+    validateFade(fade.value, Math.round(range.value[1] - range.value[0])) ??
+    validateFreeze(freeze.value, Math.round(range.value[1] - range.value[0])) ??
+    extrasError.value ??
     validateTrimAudio(trimAudio.value, Math.round(range.value[1] - range.value[0])) ??
     validateTrim(Math.round(range.value[0]), Math.round(range.value[1]), Math.round(durationMs.value) || null, extendOn.value)
   )
@@ -1760,7 +1996,11 @@ async function onStartMulti() {
         scale: { w: p.w, h: p.h },
         audio: trimAudioRequest(trimAudio.value),
         extend: extension.value > 0 || undefined,
-        look: lookRequest(look.value)
+        look: lookRequest(look.value),
+        effect: effectRequest(effect.value),
+        fade: fadeRequest(fade.value),
+        freeze: freeze.value ? { ...freeze.value } : null,
+        ...extrasRequest()
       })
       queued++
     }
@@ -1901,6 +2141,9 @@ const cropFieldsOpen = ref(false)
 // Turn and flip (applied after the crop, before the resize).
 const orient = ref<Orientation>({ ...NO_ORIENTATION })
 const orientActive = computed(() => hasOrientation(orient.value))
+// Opens by itself when a turn arrives from elsewhere (a recipe, a draft, undo), so it is never set out of sight.
+const orientOpen = ref(false)
+watch(orientActive, (on) => on && (orientOpen.value = true))
 // The sample "F" shows the result: turn clockwise, then flip (CSS lists the last step first).
 // The preview does the same to the whole player; after a quarter turn it is shrunk to stay inside the 16:9 box.
 const previewOriented = computed(() => orientActive.value && !cropActive.value)
@@ -1916,6 +2159,14 @@ function resetTrim() {
   orient.value = { ...NO_ORIENTATION }
   extendOn.value = false
   look.value = { ...PLAIN_LOOK }
+  effect.value = 'NONE'
+  fade.value = { ...NO_FADE }
+  freeze.value = null
+  blurs.value = []
+  editingBlur.value = null
+  speedPart.value = null
+  pip.value = null
+  cards.value = null
   range.value = [0, durationMs.value]
   cropOn.value = false
   onCropToggle(false)
@@ -1990,8 +2241,16 @@ const trimError = computed(() => {
     const e = validateScale(scale.w, scale.h)
     if (e) return e
   }
-  return validateLook(look.value) ?? validateTrimAudio(trimAudio.value, Math.round(range.value[1] - range.value[0]))
+  return (
+    validateLook(look.value) ??
+    validateFade(fade.value, Math.round(range.value[1] - range.value[0])) ??
+    validateFreeze(freeze.value, Math.round(range.value[1] - range.value[0])) ??
+    extrasError.value ??
+    validateTrimAudio(trimAudio.value, Math.round(range.value[1] - range.value[0]))
+  )
 })
+
+const trimHint = computed(() => renderHint(trimError.value, trimDirty.value, busy.value, 'Change the range, or turn on crop or resize, to make a trim.'))
 
 const starting = ref(false)
 async function onStartTrim() {
@@ -2006,7 +2265,11 @@ async function onStartTrim() {
       ...orientationRequest(orient.value),
       audio: trimAudioRequest(trimAudio.value),
       extend: extension.value > 0 || undefined,
-      look: lookRequest(look.value)
+      look: lookRequest(look.value),
+      effect: effectRequest(effect.value),
+      fade: fadeRequest(fade.value),
+      freeze: freeze.value ? { ...freeze.value } : null,
+      ...extrasRequest()
     })
     toast.add({ title: `Trim queued — job #${job.id}`, color: 'success' })
     await load()
@@ -2022,6 +2285,62 @@ async function onStartTrim() {
 const cuts = ref<CutRange[]>([])
 const trimAudio = ref<TrimAudioSettings | null>(null)
 const look = ref<VideoLook>({ ...PLAIN_LOOK })
+const effect = ref<VideoEffect>('NONE')
+const freeze = ref<ClipFreeze | null>(null)
+// Blurred areas, one part at another speed, a video in a corner, intro/outro cards (clipExtras.ts).
+const blurs = ref<BlurBox[]>([])
+const editingBlur = ref<number | null>(null)
+const speedPart = ref<SpeedRange | null>(null)
+const pip = ref<PipSettings | null>(null)
+const cards = ref<ClipCards | null>(null)
+function setBlur(i: number, box: BlurBox) {
+  blurs.value = blurs.value.map((b, j) => (j === i ? box : b))
+}
+const extrasError = computed(
+  () =>
+    validateBlurs(blurs.value, naturalWidth.value || null, naturalHeight.value || null) ??
+    validateSpeedRange(speedPart.value, Math.round(range.value[1] - range.value[0])) ??
+    validatePip(pip.value) ??
+    validateCards(cards.value)
+)
+function extrasRequest() {
+  return {
+    blurs: blurs.value.length ? blurs.value.map((b) => ({ ...b })) : null,
+    speed: speedPart.value ? { ...speedPart.value } : null,
+    pip: pipRequest(pip.value),
+    cards: cardsRequest(cards.value)
+  }
+}
+
+// ── GIF and still picture (download-only results) ────────────────────────────
+const frameStarting = ref<'gif' | 'still' | null>(null)
+async function onStartGif(width: number) {
+  frameStarting.value = 'gif'
+  try {
+    const job = await startGif(props.video.id, { startMs: Math.round(range.value[0]), endMs: Math.round(range.value[1]), width })
+    toast.add({ title: `GIF queued — job #${job.id}`, color: 'success' })
+    await load()
+    scrollToResults()
+  } catch (err) {
+    toast.add({ title: 'Could not start the GIF', description: apiErrorMessage(err), color: 'error' })
+  } finally {
+    frameStarting.value = null
+  }
+}
+async function onStartStill() {
+  frameStarting.value = 'still'
+  try {
+    const job = await startStill(props.video.id, Math.round(currentMs.value))
+    toast.add({ title: `Picture queued — job #${job.id}`, color: 'success' })
+    await load()
+    scrollToResults()
+  } catch (err) {
+    toast.add({ title: 'Could not take the picture', description: apiErrorMessage(err), color: 'error' })
+  } finally {
+    frameStarting.value = null
+  }
+}
+const fade = ref<ClipFade>({ ...NO_FADE })
 const cutStarting = ref(false)
 async function onStartCut() {
   if (validateCutOut(cuts.value, Math.round(durationMs.value) || null)) return
@@ -2073,6 +2392,11 @@ function selectSegment(i: number) {
   const seg = segments.value[i]
   if (seg) preview.value?.seek(seg.startMsSeconds * 1000, false)
 }
+function addSegment() {
+  if (segments.value.length >= MAX_SEGMENTS) return
+  segments.value = [...segments.value, nextSegmentRow(segments.value, currentMs.value / 1000, durationMs.value / 1000)]
+  selectSegment(segments.value.length - 1)
+}
 function removeSegment(i: number) {
   segments.value.splice(i, 1)
   selectedSegment.value = null
@@ -2088,6 +2412,9 @@ function rowProblem(seg: SegmentInput): string | null {
 }
 function segmentEndSeconds(seg: SegmentInput) {
   return seg.endMsSeconds ?? durationMs.value / 1000
+}
+function segmentRangeLabel(seg: SegmentInput) {
+  return `${formatMsShort(seg.startMsSeconds * 1000)} – ${seg.endMsSeconds == null ? 'end' : formatMsShort(seg.endMsSeconds * 1000)} (${segmentLength(seg)})`
 }
 function segmentLength(seg: SegmentInput) {
   return formatMsShort(Math.max(0, (segmentEndSeconds(seg) - seg.startMsSeconds) * 1000))
@@ -2177,11 +2504,78 @@ function splitEvenly(n: number | null) {
   const rows = n ? splitEvenlyRows(durationMs.value, n) : []
   if (rows.length) segments.value = rows
 }
+// ── Spoken lines (from the video's transcript) ───────────────────────────────
+// Loaded once per video for whoever may read transcripts, to cut between sentences.
+const { list: listTranscripts, get: getTranscript } = useTranscripts()
+const spoken = reactive<{ state: 'off' | 'loading' | 'none' | 'ready' | 'error'; lines: (SpokenLine & { text: string })[]; language: string }>({
+  state: 'off',
+  lines: [],
+  language: ''
+})
+let spokenFor = 0
+async function loadSpokenLines() {
+  const videoId = props.video.id
+  if (!can('transcripts', 'READ') || spokenFor === videoId) return
+  spokenFor = videoId
+  Object.assign(spoken, { state: 'loading', lines: [], language: '' })
+  try {
+    const picked = pickTranscript((await listTranscripts({ videoId, size: 50 })).data, props.video.language)
+    if (!picked) return void (spoken.state = 'none')
+    const full = await getTranscript(picked.id)
+    if (props.video.id !== videoId) return
+    Object.assign(spoken, { state: 'ready', lines: full.segments ?? [], language: full.language })
+  } catch {
+    spoken.state = 'error'
+  }
+}
+onMounted(loadSpokenLines)
+watch(() => props.video.id, loadSpokenLines)
+
+const sentenceRows = computed(() => (spoken.state === 'ready' ? sentenceSplitRows(spoken.lines, durationMs.value) : []))
+const sentenceHint = computed(() => {
+  switch (spoken.state) {
+    case 'loading':
+      return 'Reading the transcript…'
+    case 'none':
+      return 'No transcript yet — make one on the Transcripts page to split between sentences.'
+    case 'error':
+      return "Couldn't read the transcript."
+    case 'ready': {
+      const n = spoken.lines.length
+      const lang = languageLabel(spoken.language)
+      if (!sentenceRows.value.length) return `The ${lang} transcript has too few lines to split by.`
+      return `Uses the ${lang} transcript (${n} line${n === 1 ? '' : 's'}): cuts midway through the pauses${
+        n > sentenceRows.value.length ? `, about ${Math.round(n / sentenceRows.value.length)} lines per part` : ', one line per part'
+      }.`
+    }
+    default:
+      return ''
+  }
+})
+function splitBySentences() {
+  if (sentenceRows.value.length) segments.value = sentenceRows.value
+}
+
+const trimCutsLine = computed(() => {
+  if (spoken.state !== 'ready' || !spoken.lines.length) return ''
+  const r = range.value
+  const fitted = fitRangeToLines(r, spoken.lines, durationMs.value)
+  const start = fitted[0] !== Math.round(r[0])
+  const end = fitted[1] !== Math.round(r[1])
+  return start && end ? 'start and the end each' : start ? 'start' : end ? 'end' : ''
+})
+function fitTrimToLines() {
+  range.value = fitRangeToLines(range.value, spoken.lines, durationMs.value)
+}
+
 const splitError = computed(() =>
   validateSegments(
     segments.value.map((s) => ({ startMs: Math.round(s.startMsSeconds * 1000), endMs: s.endMsSeconds == null ? null : Math.round(s.endMsSeconds * 1000) })),
     Math.round(durationMs.value) || null
   )
+)
+const splitHint = computed(() =>
+  renderHint(splitError.value, splitDirty.value, busy.value, 'Add a split point, or use “Split evenly”, to make more than one segment.')
 )
 async function onStartSplit() {
   if (splitError.value) return
@@ -2247,25 +2641,17 @@ const JOB_LABELS: Record<string, string> = {
   AUDIO: 'Video with new audio',
   EXTRACT: 'Audio extract',
   OVERLAY: 'Text & overlay',
+  GIF: 'GIF',
+  STILL: 'Still picture',
   AUDIO_TO_VIDEO: 'Audio to video'
 }
 function jobLabel(job: ProcessingJob) {
-  let operation = 'Edit'
-  try {
-    operation = JOB_LABELS[JSON.parse(job.parameters ?? '{}').operation] ?? 'Edit'
-  } catch {
-    // Default label above.
-  }
+  const operation = JOB_LABELS[jobOperation(job)] ?? 'Edit'
   if (job.status === 'FAILED') return `${operation} failed`
   return job.status === 'QUEUED' ? `${operation} — waiting` : `${operation} in progress`
 }
 
-let pollTimer: ReturnType<typeof setInterval> | undefined
-watch(busy, (isBusy) => {
-  clearInterval(pollTimer)
-  if (isBusy) pollTimer = setInterval(load, 3000)
-})
-onBeforeUnmount(() => clearInterval(pollTimer))
+usePolling(load, { intervalMs: 3000, active: () => busy.value })
 
 // Fresh state on load, and again whenever the video's file changes
 // (e.g. after "Replace original") — the old ranges/crop don't apply to it.
@@ -2288,7 +2674,8 @@ function reset() {
   load()
 }
 onMounted(reset)
-watch(() => props.video.videoUrl, reset)
+// The same file re-signed (a new query string) is not a new file.
+watch(() => mediaKey(props.video.videoUrl), reset)
 
 // The last tab used on this video comes back next time (a convenience only).
 const tabKey = () => `videolingo:editor-tab:${props.video.id}`
@@ -2309,10 +2696,26 @@ watch(mode, (m) => {
   }
 })
 
-// The look shows on the preview while on the Trim tab (a close match to the render; dark corners aren't shown).
+// The filter and effect show on the preview while on the Trim tab (a close match to the render; dark corners,
+// sharpening and the glitch aren't shown). A slow zoom is shown too, except while a crop is drawn on the original.
 watchEffect(() => {
   const el = preview.value?.videoEl
-  if (el) el.style.filter = mode.value === 'trim' ? cssFilter(look.value) : ''
+  if (!el) return
+  const onTrim = mode.value === 'trim'
+  el.style.filter = onTrim ? [cssFilter(look.value), effectCssFilter(effect.value)].filter(Boolean).join(' ') : ''
+  const z = onTrim && !cropOn.value ? zoomScaleAt(currentMs.value, range.value[0], range.value[1], effect.value) : 1
+  el.style.transform = z === 1 ? '' : `scale(${z})`
+})
+const previewTint = computed(() => {
+  const t = mode.value === 'trim' ? warmthTint(look.value) : null
+  return t ? { background: t.background, opacity: t.opacity } : null
+})
+// Dark corners: from the filter, or as part of the old-film effect (both render with ffmpeg's vignette).
+const previewVignette = computed(() => mode.value === 'trim' && (look.value.vignette || effect.value === 'OLD_FILM'))
+const previewFade = computed(() => {
+  if (mode.value !== 'trim') return null
+  const opacity = fadeOpacityAt(currentMs.value, range.value[0], range.value[1], fade.value)
+  return opacity > 0 ? { background: fade.value.color === 'WHITE' ? '#fff' : '#000', opacity } : null
 })
 
 // ── Audio ────────────────────────────────────────────────────────────────────
@@ -2339,14 +2742,40 @@ watchEffect(() => {
 // away to seed history, and takeState() below touches audioEdit.state.
 const overlayEdit = useOverlayEdit(durationMs)
 const joinEdit = useJoinEdit(() => props.video)
+// The video's transcripts, for burned-in subtitles (Text tab).
+const captionSource = useCaptionSource(() => props.video.id)
+const OUTLINE = '0 0 0.08em #000, 0 0 0.08em #000, 0 0 0.08em #000'
+const previewCaption = computed(() => {
+  const c = overlayEdit.state.captions
+  if (mode.value !== 'overlay' || !c || c.transcriptId == null) return null
+  const second = c.secondTranscriptId != null ? (captionSource.lines[c.secondTranscriptId] ?? []) : []
+  const at = captionAt(captionSource.lines[c.transcriptId] ?? [], second, currentMs.value)
+  if (!at) return null
+  const box = c.style === 'BOX'
+  return {
+    ...at,
+    top: c.position === 'TOP',
+    sizePct: c.sizePct,
+    boxClass: box ? 'rounded-[0.15em] bg-black/50 px-[0.25em]' : '',
+    textStyle: { color: c.style === 'YELLOW' ? '#ffff00' : '#fff', textShadow: box ? undefined : OUTLINE },
+    secondStyle: { color: c.style === 'YELLOW' ? '#fff' : '#ffff99', textShadow: box ? undefined : OUTLINE }
+  }
+})
 watch(() => props.video.id, joinEdit.reset)
-watch(() => [props.video.title, props.video.durationSeconds, props.video.videoUrl], joinEdit.refreshOwn)
+watch(() => [props.video.title, props.video.durationSeconds, mediaKey(props.video.videoUrl)], joinEdit.refreshOwn)
 
 // A dot on a tab means it has pending settings — easy to miss otherwise,
 // since switching tabs doesn't reset or hide what's already set there.
 const trimDirty = computed(
   () =>
     !isPlainLook(look.value) ||
+    effect.value !== 'NONE' ||
+    !isNoFade(fade.value) ||
+    !!freeze.value ||
+    blurs.value.length > 0 ||
+    !!speedPart.value ||
+    !!pip.value ||
+    !!cards.value ||
     !!trimAudio.value ||
     cropOn.value ||
     scaleOn.value ||
@@ -2384,6 +2813,14 @@ const trimSummary = computed(() => {
   if (extension.value) parts.push(`${formatMsShort(extension.value)} past the end (last frame held)`)
   const lookLine = describeVideoLook(look.value)
   if (lookLine) parts.push(lookLine)
+  const effectLine = describeEffect(effect.value)
+  if (effectLine) parts.push(effectLine)
+  const fadeLine = describeFade(fade.value)
+  if (fadeLine) parts.push(fadeLine)
+  const freezeLine = describeFreeze(freeze.value)
+  if (freezeLine) parts.push(freezeLine)
+  if (blurs.value.length) parts.push(`${blurs.value.length} blurred area${blurs.value.length === 1 ? '' : 's'}`)
+  for (const line of [describeSpeedRange(speedPart.value), describePip(pip.value), describeCards(cards.value)]) if (line) parts.push(line)
   const audioLine = describeTrimAudio(trimAudio.value)
   if (audioLine) parts.push(audioLine)
   return parts.join(' · ')
@@ -2414,7 +2851,7 @@ const TAB_TONES: Record<typeof mode.value, { indicator: string; ui: { trigger: s
 }
 // A tab whose edit is being made shows its progress on the tab, so it can be left
 // and checked on from anywhere (the Results card below has the detail).
-const JOB_TAB: Record<string, typeof mode.value> = { TRIM: 'trim', CUT: 'trim', SPLIT: 'split', AUDIO: 'audio', OVERLAY: 'overlay' }
+const JOB_TAB: Record<string, typeof mode.value> = { TRIM: 'trim', CUT: 'trim', SPLIT: 'split', AUDIO: 'audio', OVERLAY: 'overlay', GIF: 'trim', STILL: 'trim' }
 function jobOperation(job: ProcessingJob): string {
   try {
     return JSON.parse(job.parameters ?? '{}').operation ?? ''
@@ -2426,13 +2863,7 @@ const runningByTab = computed(() => {
   const out: Partial<Record<typeof mode.value, { label: string }>> = {}
   for (const job of visibleJobs.value) {
     if (!isActiveJobStatus(job.status)) continue
-    let op = ''
-    try {
-      op = JSON.parse(job.parameters ?? '{}').operation ?? ''
-    } catch {
-      // No tab to show it on.
-    }
-    const tab = JOB_TAB[op]
+    const tab = JOB_TAB[jobOperation(job)]
     if (tab && !out[tab]) out[tab] = { label: job.status === 'QUEUED' ? 'queued' : `${Math.round(job.progress)}%` }
   }
   return out
@@ -2467,7 +2898,7 @@ const tabItems = computed(() => [
     slot: 'overlay' as const,
     icon: 'i-lucide-type',
     ui: TAB_TONES.overlay.ui,
-    badge: tabBadge('overlay', overlayEdit.state.layers.length > 0)
+    badge: tabBadge('overlay', overlayEdit.state.layers.length > 0 || !!overlayEdit.state.captions)
   },
   { label: 'Join', value: 'join', slot: 'join' as const, icon: 'i-lucide-film', ui: TAB_TONES.join.ui }
 ])
@@ -2486,11 +2917,19 @@ function takeState() {
       cuts: cuts.value.map((c) => ({ ...c })),
       audio: trimAudio.value ? { ...trimAudio.value } : null,
       extend: extendOn.value,
-      look: { ...look.value }
+      look: { ...look.value },
+      effect: effect.value,
+      fade: { ...fade.value },
+      freeze: freeze.value ? { ...freeze.value } : null,
+      blurs: blurs.value.map((b) => ({ ...b })),
+      speed: speedPart.value ? { ...speedPart.value } : null,
+      pip: pip.value ? { ...pip.value } : null,
+      cards: cards.value ? { ...cards.value } : null
     },
     split: segments.value,
     audio,
     overlay: overlayEdit.state.layers,
+    overlayCaptions: overlayEdit.state.captions ? { ...overlayEdit.state.captions } : null,
     join: { clips: joinEdit.state.clips }
   }
 }
@@ -2510,11 +2949,23 @@ async function applyState(st: ReturnType<typeof takeState>) {
   extendOn.value = !!st.trim.extend
   // And a look.
   look.value = st.trim.look ? { ...PLAIN_LOOK, ...st.trim.look } : { ...PLAIN_LOOK }
+  // And an effect and fades.
+  effect.value = st.trim.effect ?? 'NONE'
+  fade.value = st.trim.fade ? { ...NO_FADE, ...st.trim.fade } : { ...NO_FADE }
+  freeze.value = st.trim.freeze ? { ...st.trim.freeze } : null
+  // Drafts saved before these existed have none of them.
+  blurs.value = (st.trim.blurs ?? []).map((b) => ({ ...b }))
+  editingBlur.value = null
+  speedPart.value = st.trim.speed ? { ...st.trim.speed } : null
+  pip.value = st.trim.pip ? { ...st.trim.pip } : null
+  cards.value = st.trim.cards ? { ...st.trim.cards } : null
   segments.value = st.split
   const { clips, ...audio } = st.audio
   Object.assign(audioEdit.state, audio)
   audioEdit.state.clips = clips
   overlayEdit.state.layers = st.overlay
+  // Drafts saved before subtitles existed have none.
+  overlayEdit.state.captions = st.overlayCaptions ? { ...st.overlayCaptions } : null
   // Drafts saved before the Join tab existed have no `join`.
   if (st.join) Object.assign(joinEdit.state, st.join)
   if (!st.overlay.some((l) => l.id === overlayEdit.state.selectedId)) overlayEdit.state.selectedId = null
@@ -2530,7 +2981,7 @@ const history = useEditorHistory({
   take: takeState,
   apply: applyState,
   draftKey: () => `videolingo:editor-draft:${props.video.id}`,
-  videoUrl: () => props.video.videoUrl ?? null
+  videoUrl: () => mediaKey(props.video.videoUrl) || null
 })
 
 // Once the state is loaded (and again when the real duration arrives, which
@@ -2565,7 +3016,9 @@ const CLIP_ICONS: Record<VideoClip['operation'], string> = {
   SPLIT: 'i-lucide-split',
   AUDIO: 'i-lucide-audio-lines',
   EXTRACT: 'i-lucide-file-audio',
-  OVERLAY: 'i-lucide-layers'
+  OVERLAY: 'i-lucide-layers',
+  GIF: 'i-lucide-image-play',
+  STILL: 'i-lucide-image'
 }
 function replaces(clip: VideoClip) {
   return clip.operation === 'TRIM' || clip.operation === 'AUDIO' || clip.operation === 'OVERLAY'
@@ -2578,6 +3031,10 @@ function clipTitle(clip: VideoClip) {
       return 'Video with new audio'
     case 'EXTRACT':
       return 'Extracted audio'
+    case 'GIF':
+      return `GIF · ${formatMsShort(clip.startMs)} – ${formatMsShort(clip.endMs ?? clip.startMs)}`
+    case 'STILL':
+      return `Picture at ${formatTimecode(clip.startMs)}`
     case 'OVERLAY':
       return 'Text & overlay'
     default:
@@ -2638,7 +3095,7 @@ async function onCreateNew() {
 const pickedClipIds = ref<number[]>([])
 const bulkBusy = ref(false)
 const confirmBulkDiscard = ref(false)
-const selectableClips = computed(() => (data.value?.clips ?? []).filter((c) => c.operation !== 'EXTRACT'))
+const selectableClips = computed(() => (data.value?.clips ?? []).filter((c) => !isDownloadOnly(c.operation)))
 const pickedClips = computed(() => selectableClips.value.filter((c) => pickedClipIds.value.includes(c.id)))
 const allClipsPicked = computed(() => selectableClips.value.length > 0 && pickedClips.value.length === selectableClips.value.length)
 function pickClip(id: number, on: boolean) {
@@ -2647,19 +3104,51 @@ function pickClip(id: number, on: boolean) {
 function pickAllClips(v: boolean | 'indeterminate') {
   pickedClipIds.value = v === true ? selectableClips.value.map((c) => c.id) : []
 }
+// Optional: put the new videos into a collection too (loaded when the menu opens).
+const { list: listCollections, addVideos: addToCollection } = useCollections()
+const bulkCollectionId = ref<number | undefined>()
+const collectionItems = ref<{ label: string; value: number | undefined }[]>([])
+const collectionsLoading = ref(false)
+async function loadCollections() {
+  if (collectionItems.value.length || collectionsLoading.value) return
+  collectionsLoading.value = true
+  try {
+    const page = await listCollections({ size: 500 })
+    collectionItems.value = [{ label: 'No collection', value: undefined }, ...page.data.map((c) => ({ label: c.title, value: c.id }))]
+  } catch (err) {
+    toast.add({ title: 'Could not load the collections', description: apiErrorMessage(err), color: 'error' })
+  } finally {
+    collectionsLoading.value = false
+  }
+}
+// A split part is named after what is said in it, when the transcript is known.
+function newTitleFor(clip: VideoClip) {
+  const spokenName =
+    clip.operation === 'SPLIT' && spoken.state === 'ready' ? spokenTitle(props.video.title, spoken.lines, clip.startMs, clip.endMs ?? durationMs.value) : null
+  return spokenName ?? suggestedNewTitle(props.video.title, clip.operation, clip.segmentIndex)
+}
 async function onBulkAddAsNew() {
   const list = [...pickedClips.value]
   bulkBusy.value = true
   let done = 0
   let lastId: number | null = null
+  const created: number[] = []
   try {
     for (const clip of list) {
-      const result = await promote(props.video.id, clip.id, { asNew: true, title: suggestedNewTitle(props.video.title, clip.operation, clip.segmentIndex) })
-      if (result.newVideoId) lastId = result.newVideoId
+      const result = await promote(props.video.id, clip.id, { asNew: true, title: newTitleFor(clip) })
+      if (result.newVideoId) {
+        lastId = result.newVideoId
+        created.push(result.newVideoId)
+      }
       done++
     }
+    let into = ''
+    if (bulkCollectionId.value && created.length) {
+      await addToCollection(bulkCollectionId.value, created)
+      into = ` and added to “${collectionItems.value.find((c) => c.value === bulkCollectionId.value)?.label ?? 'the collection'}”`
+    }
     toast.add({
-      title: `${done} new video${done === 1 ? '' : 's'} created`,
+      title: `${done} new video${done === 1 ? '' : 's'} created${into}`,
       description: "They're disabled until you review and enable them.",
       color: 'success'
     })
@@ -2730,6 +3219,9 @@ const currentRecipe = computed<EditRecipe | null>(() => {
   const recipe: EditRecipe = {
     frame: presetFromSettings(cropOn.value, cropAspect.value, scaleOn.value, scale),
     ...(orientActive.value ? { orient: { ...orient.value } } : {}),
+    ...(isPlainLook(look.value) ? {} : { look: { ...look.value } }),
+    ...(effect.value === 'NONE' ? {} : { effect: effect.value }),
+    ...(isNoFade(fade.value) ? {} : { fade: { ...fade.value } }),
     audio: audioDifferences({
       volume: a.volume,
       fadeInMs: a.fadeInMs,
@@ -2762,6 +3254,10 @@ function applyRecipe(r: EditRecipe, name: string) {
     Object.assign(scale, { w: r.frame.w, h: r.frame.h })
   }
   if (r.orient) orient.value = { ...r.orient }
+  // Recipes saved before these existed leave them as they are.
+  if (r.look) look.value = { ...PLAIN_LOOK, ...r.look }
+  if (r.effect) effect.value = r.effect
+  if (r.fade) fade.value = { ...r.fade }
   // A recipe stands for the whole sound setup, so settings it leaves out go back to normal.
   Object.assign(audioEdit.state, fullAudio(r))
   if (r.layers.length) {
