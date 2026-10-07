@@ -467,7 +467,6 @@ const {
   }
 )
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function onCreateSubmit(values: Record<string, any>) {
   if (values.password !== values.confirmPassword) {
     createError.value = "Password and confirmation don't match"

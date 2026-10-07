@@ -325,8 +325,7 @@ interface VimeoPlayer {
   play(): Promise<void>
   pause(): Promise<void>
   setPlaybackRate(rate: number): Promise<number>
-  on(event: 'timeupdate', cb: (e: { seconds: number }) => void): void
-  on(event: 'play' | 'pause' | 'ended', cb: (e: { seconds: number }) => void): void
+  on(event: 'timeupdate' | 'play' | 'pause' | 'ended', cb: (e: { seconds: number }) => void): void
   off(event: string): void
   setVolume(volume: number): Promise<number>
 }

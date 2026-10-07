@@ -20,6 +20,15 @@
     <template v-else-if="kind === 'DOTS'">
       <circle v-for="(v, i) in cols" :key="i" :cx="i * 3 + 1.5" :cy="12.5 - v * 11" r="0.9" :fill="color" />
     </template>
+    <template v-else-if="kind === 'REFLECT'">
+      <g v-for="(v, i) in cols" :key="i">
+        <rect :x="2 + i * layout.pitch" :y="12.5 - barHeight(v) / 2" :width="layout.bar" :height="barHeight(v) / 2" :fill="color" />
+        <rect :x="2 + i * layout.pitch" y="12.5" :width="layout.bar" :height="barHeight(v) / 2" :fill="color" opacity="0.35" />
+      </g>
+    </template>
+    <template v-else-if="kind === 'COLUMNS'">
+      <rect v-for="(v, i) in cols" :key="i" :x="4 + i * layout.pitch" :y="25 - barHeight(v)" :width="layout.bar" :height="barHeight(v)" :fill="color" />
+    </template>
     <template v-else>
       <rect
         v-for="(v, i) in cols"
@@ -49,7 +58,9 @@ const LAYOUTS: Partial<Record<RealStyle, { pitch: number; bar: number }>> = {
   PULSE: { pitch: 2.35, bar: 0.9 },
   BLOCKS: { pitch: 5.4, bar: 3.2 },
   FINE: { pitch: 1.5, bar: 0.5 },
-  STRIPES: { pitch: 3.5, bar: 1.7 }
+  STRIPES: { pitch: 3.5, bar: 1.7 },
+  REFLECT: { pitch: 3, bar: 1.5 },
+  COLUMNS: { pitch: 3.85, bar: 2.1 }
 }
 const layout = computed(() => LAYOUTS[props.kind] ?? { pitch: 2, bar: 1 })
 

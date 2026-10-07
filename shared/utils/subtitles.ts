@@ -88,7 +88,7 @@ function cleanCueText(raw: string): { text: string; speaker: string | null } {
  * whole import.
  */
 export function parseSubtitles(content: string): ParsedSubtitles {
-  const normalized = content.replace(/^﻿/, '').replace(/\r\n?/g, '\n')
+  const normalized = content.replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n')
   const warnings: string[] = []
 
   const isVtt = /^WEBVTT(?:[ \t].*)?(?:\n|$)/.test(normalized)

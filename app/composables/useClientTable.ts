@@ -1,5 +1,5 @@
 type SortState = { column: string; direction: 'asc' | 'desc' } | undefined
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+
 export function useClientTable<T extends Record<string, any>>(
   source: Ref<T[] | null | undefined>,
   options: { searchFields?: (keyof T)[]; pageSize?: number; cap?: number } = {}

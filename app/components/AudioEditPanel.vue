@@ -330,7 +330,6 @@ import { formatTimecode } from '#shared/utils/transport'
 const props = defineProps<{ edit: AudioEdit; videoId: number; durationMs: number; currentMs: number; canWrite: boolean; busy: boolean }>()
 const emit = defineEmits<{ queued: [] }>()
 
-const SECTION = `space-y-2 border-t pt-3 ${TAB_ACCENTS.audio.divider}`
 const ACTION_SECTION = `sticky bottom-0 z-10 space-y-2 border-t bg-default pb-3 pt-3 ${TAB_ACCENTS.audio.divider}`
 const DENOISE: { label: string; value: Denoise }[] = [
   { label: 'Off', value: 'OFF' },

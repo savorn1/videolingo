@@ -9,8 +9,11 @@ export const WAVE_FPS = 15
 /** Seconds of sound the page keeps for the preview; it loops over them. */
 export const PREVIEW_SECONDS = 8
 
-/** The styles the page can draw from raw samples. BARS and SPECTRUM need a frequency analysis, so they keep the sketch. */
-export const REAL_STYLES = ['WAVES', 'SPIKES', 'DOTS', 'PULSE', 'BLOCKS', 'FINE', 'STRIPES'] as const
+/**
+ * The styles the page can draw from raw samples. BARS and SPECTRUM need a frequency analysis, and STEREO both channels
+ * (the preview keeps one, averaged), so they keep the sketch.
+ */
+export const REAL_STYLES = ['WAVES', 'SPIKES', 'DOTS', 'PULSE', 'BLOCKS', 'FINE', 'STRIPES', 'REFLECT', 'COLUMNS'] as const
 export type RealStyle = (typeof REAL_STYLES)[number]
 
 export function canDrawFromAudio(style: string): style is RealStyle {
@@ -18,7 +21,7 @@ export function canDrawFromAudio(style: string): style is RealStyle {
 }
 
 /** How many columns each style draws across the picture. Mirrors the server's bar counts. */
-export const COLUMNS: Record<RealStyle, number> = { WAVES: 100, SPIKES: 50, DOTS: 34, PULSE: 41, BLOCKS: 18, FINE: 64, STRIPES: 28 }
+export const COLUMNS: Record<RealStyle, number> = { WAVES: 100, SPIKES: 50, DOTS: 34, PULSE: 41, BLOCKS: 18, FINE: 64, STRIPES: 28, REFLECT: 32, COLUMNS: 24 }
 
 /**
  * The slice of the sound for one video frame at `timeSec`, as `columns` values: each column's

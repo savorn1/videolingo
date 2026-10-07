@@ -18,7 +18,7 @@ import { buildListQuery, coerceQueryValue } from '#shared/utils/listQuery'
 
 interface ListQueryState {
   /** The page's `reactive({...})` filter object. Keys become query params. */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
   filter?: Record<string, any>
   search?: Ref<string>
   page?: Ref<number>

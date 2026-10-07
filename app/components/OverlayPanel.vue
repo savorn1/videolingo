@@ -46,15 +46,15 @@
               <p class="px-1 pb-1 text-xs text-gray-500 dark:text-gray-400">Recent</p>
               <div class="grid grid-cols-8 gap-0.5">
                 <button
-                  v-for="s in recentStickers"
-                  :key="s.emoji"
+                  v-for="sticker in recentStickers"
+                  :key="sticker.emoji"
                   type="button"
                   class="rounded p-1 text-xl leading-none hover:bg-gray-100 dark:hover:bg-gray-800"
-                  :aria-label="`Add ${s.name} sticker`"
-                  :title="s.name"
-                  @click="onSticker(s)"
+                  :aria-label="`Add ${sticker.name} sticker`"
+                  :title="sticker.name"
+                  @click="onSticker(sticker)"
                 >
-                  {{ s.emoji }}
+                  {{ sticker.emoji }}
                 </button>
               </div>
             </div>
@@ -62,15 +62,15 @@
               <p class="px-1 pb-1 text-xs text-gray-500 dark:text-gray-400">{{ g.label }}</p>
               <div class="grid grid-cols-8 gap-0.5">
                 <button
-                  v-for="s in g.items"
-                  :key="s.emoji"
+                  v-for="sticker in g.items"
+                  :key="sticker.emoji"
                   type="button"
                   class="rounded p-1 text-xl leading-none hover:bg-gray-100 dark:hover:bg-gray-800"
-                  :aria-label="`Add ${s.name} sticker`"
-                  :title="s.name"
-                  @click="onSticker(s)"
+                  :aria-label="`Add ${sticker.name} sticker`"
+                  :title="sticker.name"
+                  @click="onSticker(sticker)"
                 >
-                  {{ s.emoji }}
+                  {{ sticker.emoji }}
                 </button>
               </div>
             </div>
@@ -755,14 +755,6 @@ const confirmClear = ref(false)
 function onConfirmClear() {
   confirmClear.value = false
   props.edit.reset()
-}
-
-/** The layer's on-screen span as a position within the whole video. */
-function layerBar(l: { startMs: number; endMs: number | null }) {
-  const total = props.durationMs || 1
-  const start = Math.min(100, Math.max(0, (l.startMs / total) * 100))
-  const end = Math.min(100, Math.max(start, ((l.endMs ?? total) / total) * 100))
-  return { left: `${start}%`, width: `${Math.max(end - start, 1)}%` }
 }
 
 const toast = useToast()

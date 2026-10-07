@@ -14,14 +14,24 @@
     >
       <div
         class="absolute inset-y-1 flex items-center overflow-hidden rounded text-[10px] leading-none text-white cursor-grab active:cursor-grabbing"
-        :class="l.id === edit.state.selectedId ? 'bg-primary-500 ring-2 ring-primary-300' : edit.state.multi.includes(l.id) ? 'bg-primary-500 ring-2 ring-sky-300' : 'bg-primary-400/80 dark:bg-primary-600/80'"
+        :class="
+          l.id === edit.state.selectedId
+            ? 'bg-primary-500 ring-2 ring-primary-300'
+            : edit.state.multi.includes(l.id)
+              ? 'bg-primary-500 ring-2 ring-sky-300'
+              : 'bg-primary-400/80 dark:bg-primary-600/80'
+        "
         :style="bar(l)"
         :title="`${formatTimecode(l.startMs)} – ${l.endMs == null ? 'end' : formatTimecode(l.endMs)} · drag to move, drag the ends to trim`"
         @pointerdown.stop.prevent="onDown(l, 'move', $event)"
       >
         <span class="absolute inset-y-0 left-0 w-2 cursor-ew-resize hover:bg-white/30" @pointerdown.stop.prevent="onDown(l, 'start', $event)" />
         <span class="mx-2.5 truncate pointer-events-none">{{ l.kind === 'TEXT' ? l.text : l.imageName }}</span>
-        <span v-if="l.endMs != null" class="absolute inset-y-0 right-0 w-2 cursor-ew-resize hover:bg-white/30" @pointerdown.stop.prevent="onDown(l, 'end', $event)" />
+        <span
+          v-if="l.endMs != null"
+          class="absolute inset-y-0 right-0 w-2 cursor-ew-resize hover:bg-white/30"
+          @pointerdown.stop.prevent="onDown(l, 'end', $event)"
+        />
       </div>
     </div>
     <div class="pointer-events-none absolute inset-y-0 w-px bg-error-500" :style="{ left: `${pct(currentMs)}%` }" aria-hidden="true" />

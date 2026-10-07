@@ -43,7 +43,7 @@
           </span>
         </button>
       </li>
-      <li v-for="t in templates.all.value" :key="t.id" class="group relative">
+      <li v-for="t in shown" :key="t.id" class="group relative">
         <button
           type="button"
           class="block w-full overflow-hidden rounded-lg border text-left transition focus-visible:outline-2 focus-visible:outline-primary-500"
@@ -111,6 +111,8 @@ const props = defineProps<{
   current: WaveLook | null
   /** The user's own sound, when it could be read: the card under the pointer then moves with it. */
   audio?: AudioPeaks | null
+  /** The styles the server can draw; templates in other styles are hidden. All when left out. */
+  styles?: readonly string[]
 }>()
 const emit = defineEmits<{ apply: [look: WaveLook]; clear: [] }>()
 
@@ -118,6 +120,7 @@ const toast = useToast()
 const templates = useWaveTemplates()
 const MAX_NAME = 30
 
+const shown = computed(() => (props.styles ? templates.all.value.filter((t) => props.styles!.includes(t.look.waveform)) : templates.all.value))
 const hovered = ref<string | null>(null)
 const isCurrent = (look: WaveLook) =>
   !!props.current &&

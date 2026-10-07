@@ -34,7 +34,9 @@
             {{ v.fileSize === null ? '—' : formatFileSize(v.fileSize) }}
             <template v-if="v.width && v.height"> · {{ v.width }}×{{ v.height }}</template>
           </p>
-          <p class="text-xs text-gray-500 dark:text-gray-400">{{ formatRelativeTime(v.createdAt) }}<template v-if="v.createdBy"> by {{ v.createdBy }}</template></p>
+          <p class="text-xs text-gray-500 dark:text-gray-400">
+            {{ formatRelativeTime(v.createdAt) }}<template v-if="v.createdBy"> by {{ v.createdBy }}</template>
+          </p>
         </div>
         <div class="flex flex-wrap items-center gap-2">
           <UButton size="xs" color="neutral" variant="soft" icon="i-lucide-play" @click="previewing = v">Preview</UButton>

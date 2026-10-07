@@ -22,7 +22,7 @@
 // tell templates apart at a glance in the saved-templates list.
 import type { EditorLayer } from '~/composables/useOverlayEdit'
 
-const props = defineProps<{ layers: EditorLayer[] }>()
+defineProps<{ layers: EditorLayer[] }>()
 const W = 64
 const H = 36
 

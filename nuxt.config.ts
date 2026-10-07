@@ -9,7 +9,7 @@ export default defineNuxtConfig({
   compatibilityDate: '2025-07-15',
   devtools: { enabled: false },
 
-  modules: ['@nuxt/ui'],
+  modules: ['@nuxt/ui', '@nuxt/eslint'],
 
   // `cancelled` is a seventh color alias on top of Nuxt UI's six defaults —
   // StatusBadge uses it for CANCELLED/REJECTED so those don't share `neutral`

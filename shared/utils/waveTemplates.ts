@@ -44,7 +44,30 @@ export const BUILTIN_WAVE_TEMPLATES: WaveTemplate[] = [
     look: { waveform: 'STRIPES', waveColor: '#ffffff', background: '#b91c1c' }
   },
   { id: 'stripes-slate', name: 'Slate stripes', hint: 'Sky-blue bars on slate', look: { waveform: 'STRIPES', waveColor: '#bae6fd', background: '#1e293b' } },
-  { id: 'lecture', name: 'Lecture', hint: 'Clear yellow line on charcoal', look: { waveform: 'WAVES', waveColor: '#facc15', background: '#1f2937' } }
+  { id: 'lecture', name: 'Lecture', hint: 'Clear yellow line on charcoal', look: { waveform: 'WAVES', waveColor: '#facc15', background: '#1f2937' } },
+  {
+    id: 'mirror-lake',
+    name: 'Mirror lake',
+    hint: 'Pale bars over their reflection, deep teal',
+    look: { waveform: 'REFLECT', waveColor: '#ccfbf1', background: '#134e4a' }
+  },
+  { id: 'glass', name: 'Glass', hint: 'White reflection on near-black', look: { waveform: 'REFLECT', waveColor: '#f8fafc', background: '#09090b' } },
+  {
+    id: 'equaliser',
+    name: 'Equaliser',
+    hint: 'Lime columns on black, like a stereo system',
+    look: { waveform: 'COLUMNS', waveColor: '#a3e635', background: '#000000' }
+  },
+  { id: 'skyline', name: 'Skyline', hint: 'Warm columns on dusk purple', look: { waveform: 'COLUMNS', waveColor: '#fdba74', background: '#2e1065' } },
+  { id: 'duet', name: 'Duet', hint: 'Two pink channels on midnight', look: { waveform: 'STEREO', waveColor: '#f9a8d4', background: '#111827' } },
+  { id: 'radio', name: 'Radio', hint: 'Two dark channels on warm sand', look: { waveform: 'STEREO', waveColor: '#292524', background: '#fde68a' } },
+  {
+    id: 'chalkboard',
+    name: 'Chalkboard',
+    hint: 'Chalk-white sticks on board green',
+    look: { waveform: 'SPIKES', waveColor: '#f5f5f4', background: '#14532d' }
+  },
+  { id: 'lavender', name: 'Lavender', hint: 'Deep purple pulse on lavender', look: { waveform: 'PULSE', waveColor: '#3b0764', background: '#ede9fe' } }
 ]
 
 function channel(v: number): number {

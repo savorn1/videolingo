@@ -4,6 +4,7 @@
 
 import type { ApiEnvelope } from '#shared/types'
 import type { SubtitleRules } from '#shared/utils/subtitleQuality'
+import { mediaRulesDrift, type MediaRules } from '#shared/utils/mediaRules'
 
 export interface GeneralSettings {
   siteName: string
@@ -97,6 +98,8 @@ export interface ClientSettings {
   standardRules: SubtitleRules
   compactRules: SubtitleRules
   compactLanguages: string[]
+  /** The media tools' fixed rules; missing from servers older than this field. */
+  mediaRules?: MediaRules
 }
 
 export function useSettings() {
@@ -136,6 +139,9 @@ export function useClientSettings() {
       const res = await useApi()<ApiEnvelope<ClientSettings>>('/api/settings/client')
       state.value = res.data
       setSubtitleRuleDefaults(res.data)
+      // A copy of a backend rule out of step: say so while developing (the server still enforces its own).
+      const drift = mediaRulesDrift(res.data.mediaRules)
+      if (import.meta.dev && drift.length) console.warn(`Media rules differ from the server's — update shared/utils: ${drift.join(' · ')}`)
     } catch {
       // Keep what we had; pages fall back to their built-in defaults.
     }

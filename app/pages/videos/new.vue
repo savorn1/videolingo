@@ -313,7 +313,7 @@
 <script setup lang="ts">
 import { TAB_ACCENTS } from '#shared/utils/tabAccent'
 import type { TabsItem } from '@nuxt/ui'
-import type { InspectedLink, LanguageGuess } from '~/composables/useVideos'
+import { UploadInterruptedError, type InspectedLink, type LanguageGuess, type ResumableUpload } from '~/composables/useVideos'
 
 definePageMeta({ middleware: 'admin' })
 
@@ -497,6 +497,8 @@ const uploadProgress = ref(0)
 const uploadError = ref('')
 const uploadedKey = ref('')
 let abort: AbortController | null = null
+/** Where a large upload stopped (with its file), so Retry carries on from there. */
+let resume: { file: File; state: ResumableUpload } | null = null
 
 function onFilePicked(event: Event) {
   const picked = (event.target as HTMLInputElement).files?.[0]
@@ -547,14 +549,23 @@ async function startUpload(picked: File) {
   uploadedKey.value = ''
   abort = new AbortController()
   try {
-    const ticket = await videos.requestUpload('VIDEO', picked)
-    await uploadToStorage(ticket, picked, (f) => (uploadProgress.value = f), abort.signal)
+    const { key } = await videos.uploadFile('VIDEO', picked, {
+      onProgress: (f) => (uploadProgress.value = f),
+      signal: abort.signal,
+      resume: resume?.file === picked ? resume.state : null
+    })
+    resume = null
     if (file.value === picked) {
-      uploadedKey.value = ticket.key
+      uploadedKey.value = key
       uploadProgress.value = 1
     }
   } catch (err) {
     if ((err as Error).name === 'AbortError') return
+    if (err instanceof UploadInterruptedError) {
+      resume = { file: picked, state: err.resume }
+      uploadError.value = `The upload stopped at ${Math.round(uploadProgress.value * 100)}% (${err.message}). Retry carries on from there.`
+      return
+    }
     uploadError.value = err instanceof Error && !(err as { data?: unknown }).data ? err.message : apiErrorMessage(err)
   } finally {
     uploading.value = false

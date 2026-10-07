@@ -43,7 +43,6 @@ const emit = defineEmits<{ saved: [video: Video] }>()
 const { update } = useVideos()
 const toast = useToast()
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const form = ref<Record<string, any>>({})
 const saving = ref(false)
 const error = ref('')
@@ -104,7 +103,6 @@ watch(open, (value) => {
   showFramePicker.value = false
 })
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function onSubmit(values: Record<string, any>) {
   if (!props.video) return
   saving.value = true

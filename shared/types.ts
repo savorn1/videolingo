@@ -117,7 +117,7 @@ export interface FieldDef {
   /** Layout in DynamicForm's row grid — full row, half a row, or a third of a row. Defaults to 'half'. */
   wrapper?: 'full' | 'half' | 'third'
   /** Hide the field (and skip its `required` check) when this returns false for the current form values. */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
   showIf?: (values: Record<string, any>) => boolean
 }
 
@@ -130,7 +130,7 @@ export type ColumnType = 'text' | 'number' | 'currency' | 'percent' | 'date' | '
 
 // `any` here (not `unknown`) is deliberate: it's the default used only when a
 // caller doesn't parameterize ColumnDef (e.g. <ColumnValue>'s untyped prop).
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+
 export interface ColumnDef<T = any> {
   /** The only mandatory attribute — row property to read. */
   key: string

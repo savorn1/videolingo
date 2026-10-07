@@ -202,7 +202,7 @@ const showForm = ref(false)
 const editing = ref<Language | null>(null)
 const saving = ref(false)
 const formError = ref('')
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+
 const form = ref<Record<string, any>>({})
 
 const formFields = computed<FieldDef[]>(() => {
@@ -238,7 +238,6 @@ function openEdit(row: Language) {
   showForm.value = true
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function onSubmit(values: Record<string, any>) {
   saving.value = true
   formError.value = ''

@@ -301,7 +301,7 @@ import type { StudyItem, WatchPage } from '~/composables/useLearn'
 import type VideoPlayer from '~/components/VideoPlayer.vue'
 
 const route = useRoute()
-const { watch: getWatchPage, cues: getCues, study } = useLearn()
+const { watch: getWatchPage, study } = useLearn()
 const { setCompleted, forVideos } = useWatchProgress()
 const toast = useToast()
 const tracker = useProgressTracker()

@@ -1,4 +1,4 @@
-# Checks every push and pull request: formatting, types and unit tests.
+# Checks every push and pull request: formatting, lint, types and unit tests; then the browser tests.
 name: CI
 
 on:
@@ -28,8 +28,41 @@ jobs:
       - name: Formatting
         run: npm run format:check
 
+      - name: Lint
+        run: npm run lint
+
       - name: Types
         run: npm run typecheck
 
       - name: Unit tests
         run: npm test
+
+  e2e:
+    # The browser tests run the app against a mock backend (e2e/mock-backend.mjs) — no Java service needed.
+    needs: check
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Browser tests
+        run: npm run test:e2e
+
+      - name: Keep the traces of failed tests
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-traces
+          path: test-results
+          retention-days: 7

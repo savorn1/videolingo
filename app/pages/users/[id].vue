@@ -208,7 +208,7 @@ const customRoles = ref<{ id: number; name: string }[]>([])
 const showEdit = ref(false)
 const editing = ref(false)
 const editError = ref('')
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+
 const editForm = ref<Record<string, any>>({})
 
 const editFields = computed<FieldDef[]>(() => [
@@ -237,7 +237,6 @@ async function openEdit() {
   }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function onEditSubmit(values: Record<string, any>) {
   if (!user.value) return
   editing.value = true

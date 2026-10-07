@@ -1,3 +1,4 @@
+import { spreadEvenly } from './slides'
 // Making a video from a sound: the checks and small conversions the "Video from
 // audio" page does before anything is uploaded. The server checks again.
 
@@ -15,6 +16,45 @@ export type VideoResolution = (typeof VIDEO_RESOLUTIONS)[number]['value']
 export const DEFAULT_RESOLUTION: VideoResolution = '720p'
 export const DEFAULT_BACKGROUND = '#111827'
 
+/** WIDE = 16:9, TALL = 9:16 (Shorts, Reels, TikTok), SQUARE = 1:1 — the resolution's height is the short side. */
+export const VIDEO_SHAPES = [
+  { value: 'WIDE', label: 'Wide', hint: '16:9 — YouTube, the web', icon: 'i-lucide-rectangle-horizontal' },
+  { value: 'TALL', label: 'Tall', hint: '9:16 — Shorts, Reels, TikTok', icon: 'i-lucide-rectangle-vertical' },
+  { value: 'SQUARE', label: 'Square', hint: '1:1 — feeds', icon: 'i-lucide-square' }
+] as const
+export type VideoShape = (typeof VIDEO_SHAPES)[number]['value']
+
+/** "1280×720", "720×1280" or "720×720" for a resolution and shape (as the server builds the frame). */
+export function frameSizeLabel(resolution: VideoResolution, shape: VideoShape): string {
+  const [w, h] = (VIDEO_RESOLUTIONS.find((r) => r.value === resolution)?.size ?? '1280×720').split('×').map(Number) as [number, number]
+  return shape === 'TALL' ? `${h}×${w}` : shape === 'SQUARE' ? `${h}×${h}` : `${w}×${h}`
+}
+
+/** How burned-in subtitles look and where they sit (mirrors OverlayRules.CAPTION_STYLES / CAPTION_POSITIONS). */
+export const BURN_STYLES = [
+  { value: 'CLASSIC', label: 'White, outlined' },
+  { value: 'BOX', label: 'On a dark box' },
+  { value: 'YELLOW', label: 'Yellow, outlined' }
+] as const
+export type BurnStyle = (typeof BURN_STYLES)[number]['value']
+export type BurnPosition = 'BOTTOM' | 'TOP'
+
+/** The waveform's height as % of the picture (mirrors AudioToVideoRules); left out, the style's usual height. */
+export const MIN_WAVE_HEIGHT_PCT = 10
+export const MAX_WAVE_HEIGHT_PCT = 80
+
+/** The usual height: a quarter of the picture along the bottom (COLUMNS too), 40 % for the bars in the middle. */
+export function defaultWaveHeight(style: string): number {
+  return waveformPlacement(style) === 'CENTER' ? 40 : 25
+}
+
+/** The strip's text limit (mirrors AudioToVideoRules.MAX_STRIP). */
+export const MAX_STRIP = 120
+
+/** Chapters: parts of this many minutes (mirrors AudioToVideoRules). */
+export const MIN_PART_MINUTES = 2
+export const MAX_PART_MINUTES = 60
+
 export const WAVEFORM_STYLES = [
   { value: 'NONE', label: 'None', hint: 'Just the picture' },
   { value: 'WAVES', label: 'Waveform', hint: 'A moving line' },
@@ -25,13 +65,16 @@ export const WAVEFORM_STYLES = [
   { value: 'PULSE', label: 'Pulse', hint: 'Thin bars in the middle, mirrored up and down' },
   { value: 'BLOCKS', label: 'Blocks', hint: 'Thick bars in the middle, mirrored up and down' },
   { value: 'FINE', label: 'Fine', hint: 'Hair-thin bars, many of them, in the middle' },
-  { value: 'STRIPES', label: 'Stripes', hint: 'Medium bars in the middle, mirrored up and down' }
+  { value: 'STRIPES', label: 'Stripes', hint: 'Medium bars in the middle, mirrored up and down' },
+  { value: 'REFLECT', label: 'Reflection', hint: 'Bars in the middle over a faded reflection' },
+  { value: 'COLUMNS', label: 'Columns', hint: 'Bars rising from the bottom, like an equaliser' },
+  { value: 'STEREO', label: 'Stereo', hint: 'The left and right channels as two bands (one for a mono recording)' }
 ] as const
 export type WaveformStyle = (typeof WAVEFORM_STYLES)[number]['value']
 
-const CENTERED_STYLES = ['PULSE', 'BLOCKS', 'FINE', 'STRIPES']
+const CENTERED_STYLES = ['PULSE', 'BLOCKS', 'FINE', 'STRIPES', 'REFLECT']
 
-/** Where a style is drawn: the mirrored-bar styles (PULSE, BLOCKS, FINE, STRIPES) sit in the middle of the picture (mirrors the server), the rest along the bottom. */
+/** Where a style is drawn: the mirrored-bar styles (PULSE, BLOCKS, FINE, STRIPES, REFLECT) sit in the middle of the picture (mirrors the server), the rest along the bottom. */
 export function waveformPlacement(style: string): 'CENTER' | 'BOTTOM' {
   return CENTERED_STYLES.includes(style) ? 'CENTER' : 'BOTTOM'
 }
@@ -98,9 +141,12 @@ export function uniqueTitles(titles: string[]): string[] {
   })
 }
 
-/** Which of `sizes` (bytes) should upload next: the first one not yet started, or null. Uploads run one at a time. */
-export function nextToUpload(statuses: ('queued' | 'uploading' | 'ready' | 'error')[]): number | null {
-  if (statuses.includes('uploading')) return null
+/** Uploads running at once: enough to keep the line busy, few enough that each file still finishes early. */
+export const PARALLEL_UPLOADS = 2
+
+/** Which file should start uploading next: the first one waiting, or null when none is or `parallel` are already running. */
+export function nextToUpload(statuses: ('queued' | 'uploading' | 'ready' | 'error')[], parallel = PARALLEL_UPLOADS): number | null {
+  if (statuses.filter((s) => s === 'uploading').length >= parallel) return null
   const i = statuses.indexOf('queued')
   return i === -1 ? null : i
 }
@@ -153,6 +199,12 @@ export interface SavedLook {
   waveColor: string
   normalize: boolean
   denoise: boolean
+  shape: VideoShape
+  motion: boolean
+  crossfade: boolean
+  trimSilence: boolean
+  /** Null = the style's usual height. */
+  waveHeightPct: number | null
 }
 
 export const DEFAULT_LOOK: SavedLook = {
@@ -162,7 +214,12 @@ export const DEFAULT_LOOK: SavedLook = {
   waveAuto: true,
   waveColor: '#ffffff',
   normalize: false,
-  denoise: false
+  denoise: false,
+  shape: 'WIDE',
+  motion: false,
+  crossfade: false,
+  trimSilence: false,
+  waveHeightPct: null
 }
 
 /** Settings read back from storage, made safe: anything missing or not valid falls back to the default. */
@@ -176,16 +233,85 @@ export function sanitizeLook(raw: unknown): SavedLook {
     waveAuto: typeof r.waveAuto === 'boolean' ? r.waveAuto : DEFAULT_LOOK.waveAuto,
     waveColor: normalizeHexColor(str(r.waveColor)) ?? DEFAULT_LOOK.waveColor,
     normalize: typeof r.normalize === 'boolean' ? r.normalize : DEFAULT_LOOK.normalize,
-    denoise: typeof r.denoise === 'boolean' ? r.denoise : DEFAULT_LOOK.denoise
+    denoise: typeof r.denoise === 'boolean' ? r.denoise : DEFAULT_LOOK.denoise,
+    shape: VIDEO_SHAPES.find((x) => x.value === r.shape)?.value ?? DEFAULT_LOOK.shape,
+    motion: typeof r.motion === 'boolean' ? r.motion : DEFAULT_LOOK.motion,
+    crossfade: typeof r.crossfade === 'boolean' ? r.crossfade : DEFAULT_LOOK.crossfade,
+    trimSilence: typeof r.trimSilence === 'boolean' ? r.trimSilence : DEFAULT_LOOK.trimSilence,
+    waveHeightPct:
+      typeof r.waveHeightPct === 'number' &&
+      Number.isInteger(r.waveHeightPct) &&
+      r.waveHeightPct >= MIN_WAVE_HEIGHT_PCT &&
+      r.waveHeightPct <= MAX_WAVE_HEIGHT_PCT
+        ? r.waveHeightPct
+        : DEFAULT_LOOK.waveHeightPct
   }
 }
 
+/**
+ * The pictures for one recording: its own picture (from its file's cover art, or chosen for it) on its own; else
+ * the shared pictures, spread evenly over this recording's length when asked (and when it is long enough), else
+ * at the times set.
+ */
+export function recordingSlides(
+  shared: { key: string; startMs: number }[],
+  ownKey: string | null,
+  durationSeconds: number | null,
+  spread: boolean
+): { key: string; startMs: number }[] {
+  if (ownKey) return [{ key: ownKey, startMs: 0 }]
+  if (spread && shared.length > 1 && durationSeconds) {
+    const starts = spreadEvenly(shared.length, durationSeconds)
+    if (starts) return shared.map((sl, i) => ({ key: sl.key, startMs: starts[i]! }))
+  }
+  return shared.map((sl) => ({ key: sl.key, startMs: sl.startMs }))
+}
+
+/** Minutes per part as typed, kept within MIN_PART_MINUTES–MAX_PART_MINUTES (a blank or non-number falls back to 10). */
+export function clampPartMinutes(value: unknown): number {
+  const n = typeof value === 'number' ? value : Number(value)
+  if (!Number.isFinite(n) || value === '' || value === null) return 10
+  return Math.min(MAX_PART_MINUTES, Math.max(MIN_PART_MINUTES, Math.round(n)))
+}
+
+/**
+ * How many videos a recording will likely become when split into parts of `partMinutes`: as
+ * AudioToVideoRules.chapterRanges cuts it with no pauses to move the cuts (a pause can change it by one).
+ * Recordings up to 1.5 parts long, or of unknown length, stay one video.
+ */
+export function estimatedParts(durationSeconds: number | null, partMinutes: number): number {
+  const part = partMinutes * 60
+  if (!durationSeconds || part <= 0) return 1
+  let from = 0
+  let parts = 1
+  while (durationSeconds - from > part * 1.5) {
+    from += part
+    parts++
+  }
+  return parts
+}
+
+/** "Lesson 4 — Part 2 of 3", the title kept within the 200-character limit. */
+export function partTitle(title: string, index: number, count: number): string {
+  const suffix = ` — Part ${index + 1} of ${count}`
+  const base = title.trim() || 'Video'
+  const room = 200 - suffix.length
+  return (base.length > room ? `${base.slice(0, Math.max(0, room - 1))}…` : base) + suffix
+}
+
 /** What is stopping "Make the video" (in the order to fix it), or null when it can go ahead. */
-export function submitBlocker(state: { files: number; uploading: number; untitled: number; slideError: string | null }): string | null {
+export function submitBlocker(state: {
+  files: number
+  uploading: number
+  untitled: number
+  slideError: string | null
+  missingCategory?: boolean
+}): string | null {
   if (state.files === 0) return 'Add an audio file to begin'
   if (state.uploading > 0) return `Uploading ${state.uploading} file${state.uploading === 1 ? '' : 's'}…`
   if (state.untitled > 0) return state.untitled === 1 ? 'Give the video a title' : 'Give every video a title'
   if (state.slideError) return state.slideError
+  if (state.missingCategory) return 'Choose a category under Details'
   return null
 }
 

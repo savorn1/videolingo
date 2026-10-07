@@ -14,7 +14,7 @@ describe('built-in wave templates', () => {
   })
   it('use every drawable style at least once', () => {
     expect(new Set(BUILTIN_WAVE_TEMPLATES.map((t) => t.look.waveform))).toEqual(
-      new Set(['WAVES', 'BARS', 'SPIKES', 'DOTS', 'SPECTRUM', 'PULSE', 'BLOCKS', 'FINE', 'STRIPES'])
+      new Set(['WAVES', 'BARS', 'SPIKES', 'DOTS', 'SPECTRUM', 'PULSE', 'BLOCKS', 'FINE', 'STRIPES', 'REFLECT', 'COLUMNS', 'STEREO'])
     )
   })
 })

@@ -56,6 +56,32 @@
         :style="{ animationDelay: `${(i % 10) * -120}ms` }"
       />
     </template>
+    <!-- Reflection: bars standing on the middle line over a faded copy of themselves -->
+    <template v-else-if="kind === 'REFLECT'">
+      <g v-for="(h, i) in REFLECT" :key="i" class="wf-grow" :style="{ animationDelay: `${(i % 12) * -90}ms` }">
+        <rect :x="2 + i * 3" :y="12.5 - h / 2" width="1.5" :height="h / 2" :fill="color" />
+        <rect :x="2 + i * 3" y="12.5" width="1.5" :height="h / 2" :fill="color" opacity="0.35" />
+      </g>
+    </template>
+    <!-- Columns: bars rising from the bottom edge, like an equaliser -->
+    <template v-else-if="kind === 'COLUMNS'">
+      <rect
+        v-for="(h, i) in COLUMN_HEIGHTS"
+        :key="i"
+        class="wf-rise"
+        :x="4 + i * 3.85"
+        :y="25 - h"
+        width="2.1"
+        :height="h"
+        :fill="color"
+        :style="{ animationDelay: `${(i % 10) * -110}ms` }"
+      />
+    </template>
+    <!-- Stereo: two bands, one per channel, sliding past -->
+    <template v-else-if="kind === 'STEREO'">
+      <polyline class="wf-slide" :points="STEREO_TOP" fill="none" :stroke="color" stroke-width="0.8" vector-effect="non-scaling-stroke" />
+      <polyline class="wf-slide wf-slow" :points="STEREO_BOTTOM" fill="none" :stroke="color" stroke-width="0.8" vector-effect="non-scaling-stroke" />
+    </template>
     <!-- Mirrored bars (pulse, blocks, fine, stripes): swelling in waves around the middle line -->
     <template v-else-if="kind in MIRRORED">
       <rect
@@ -86,21 +112,31 @@ import type { AudioPeaks } from '~/composables/useAudioPeaks'
 // from the sound by the server); it stands still for people who ask for less motion.
 defineProps<{ kind: string; color: string; mini?: boolean; still?: boolean; audio?: AudioPeaks | null }>()
 
+// Rounded, so the server and the browser draw the same numbers (Math.sin may differ in the last digit, which
+// Vue reports as a hydration mismatch).
+const r2 = (n: number) => Math.round(n * 100) / 100
 const BARS = [6, 12, 9, 18, 14, 22, 10, 16, 20, 8, 15, 21, 11, 17, 9, 13, 19, 7, 12, 10, 14, 6, 9, 5]
-const SPIKES = Array.from({ length: 50 }, (_, i) => 2 + 9 * Math.abs(Math.sin(i * 0.6) * Math.cos(i * 0.21)) + (i % 5 === 0 ? 3 : 0))
+const SPIKES = Array.from({ length: 50 }, (_, i) => r2(2 + 9 * Math.abs(Math.sin(i * 0.6) * Math.cos(i * 0.21)) + (i % 5 === 0 ? 3 : 0)))
 // Mirrored bars with a swelling shape, like speech: a few louder swells with quiet stretches between.
 const envelope = (i: number, n: number) => 0.12 + 0.88 * Math.abs(Math.sin((i / n) * Math.PI * 3.2)) ** 1.4 * (0.55 + 0.45 * Math.abs(Math.cos(i * 0.9)))
 // Per style: how many bars, how far apart (in the 100-wide sketch) and how wide.
 const MIRRORED: Record<string, { heights: number[]; pitch: number; bar: number }> = {
-  PULSE: { heights: Array.from({ length: 41 }, (_, i) => 1.5 + 21 * envelope(i, 41)), pitch: 2.35, bar: 0.9 },
-  BLOCKS: { heights: Array.from({ length: 18 }, (_, i) => 2 + 20 * envelope(i, 18)), pitch: 5.4, bar: 3.2 },
-  FINE: { heights: Array.from({ length: 64 }, (_, i) => 1.2 + 21 * envelope(i, 64)), pitch: 1.5, bar: 0.5 },
-  STRIPES: { heights: Array.from({ length: 28 }, (_, i) => 1.8 + 20 * envelope(i, 28)), pitch: 3.5, bar: 1.7 }
+  PULSE: { heights: Array.from({ length: 41 }, (_, i) => r2(1.5 + 21 * envelope(i, 41))), pitch: 2.35, bar: 0.9 },
+  BLOCKS: { heights: Array.from({ length: 18 }, (_, i) => r2(2 + 20 * envelope(i, 18))), pitch: 5.4, bar: 3.2 },
+  FINE: { heights: Array.from({ length: 64 }, (_, i) => r2(1.2 + 21 * envelope(i, 64))), pitch: 1.5, bar: 0.5 },
+  STRIPES: { heights: Array.from({ length: 28 }, (_, i) => r2(1.8 + 20 * envelope(i, 28))), pitch: 3.5, bar: 1.7 }
 }
-const SPECTRUM = Array.from({ length: 51 }, (_, i) => `${i * 2},${24 - (3 + 17 * Math.abs(Math.sin(i * 0.23) * Math.cos(i * 0.07 + 1)))}`).join(' ')
-const DOTS = Array.from({ length: 34 }, (_, i) => 12.5 - Math.sin(i * 0.55) * (3 + 7 * Math.abs(Math.sin(i * 0.17))))
+const SPECTRUM = Array.from({ length: 51 }, (_, i) => `${i * 2},${r2(24 - (3 + 17 * Math.abs(Math.sin(i * 0.23) * Math.cos(i * 0.07 + 1))))}`).join(' ')
+const DOTS = Array.from({ length: 34 }, (_, i) => r2(12.5 - Math.sin(i * 0.55) * (3 + 7 * Math.abs(Math.sin(i * 0.17)))))
+const REFLECT = Array.from({ length: 32 }, (_, i) => r2(2 + 20 * envelope(i, 32)))
+const COLUMN_HEIGHTS = Array.from({ length: 24 }, (_, i) => r2(2 + 21 * envelope(i, 24)))
+// Each channel in its own half of the band, two periods long like WAVE below.
+const band = (mid: number, k: number) =>
+  Array.from({ length: 101 }, (_, i) => `${i * 2},${r2(mid - Math.sin(i * k) * (1.5 + 3.5 * Math.abs(Math.sin(i * 0.17 * 2 + k))))}`).join(' ')
+const STEREO_TOP = band(6.5, 0.9)
+const STEREO_BOTTOM = band(18.5, 0.7)
 // Two periods long, so sliding one period across looks endless.
-const WAVE = Array.from({ length: 101 }, (_, i) => `${i * 2},${12.5 - Math.sin(i * 0.9) * (3 + 6 * Math.abs(Math.sin(i * 0.17 * 2)))}`).join(' ')
+const WAVE = Array.from({ length: 101 }, (_, i) => `${i * 2},${r2(12.5 - Math.sin(i * 0.9) * (3 + 6 * Math.abs(Math.sin(i * 0.17 * 2))))}`).join(' ')
 </script>
 
 <style scoped>

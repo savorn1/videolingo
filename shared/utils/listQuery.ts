@@ -2,7 +2,6 @@
 // the fiddly part (turning URL strings back into the types a filter actually
 // holds) is testable without mounting Nuxt.
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type FilterValue = any
 
 /**

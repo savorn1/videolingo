@@ -3,6 +3,7 @@
 // the video moves to the trash (`deleted: true` in the list filter) and can
 // be restored.
 
+import { MULTIPART_THRESHOLD, partRange, sendParts } from '#shared/utils/multipartUpload'
 import type { ApiEnvelope, PageEnvelope } from '#shared/types'
 import type { VideoSourceKind } from '#shared/utils/videoSources'
 import type { ProcessingJob } from '~/composables/useProcessingJobs'
@@ -187,13 +188,74 @@ export function useVideos() {
   }
 
   /** A signed, size-locked PUT straight to storage. */
-  async function requestUpload(kind: 'VIDEO' | 'THUMBNAIL' | 'AUDIO' | 'OVERLAY', file: { name: string; type: string; size: number }) {
+  async function requestUpload(kind: UploadKind, file: { name: string; type: string; size: number }) {
     return (
       await api<ApiEnvelope<UploadTicket>>('/api/admin/videos/uploads', {
         method: 'POST',
         body: { kind, fileName: file.name, contentType: file.type || undefined, size: file.size }
       })
     ).data
+  }
+
+  /**
+   * Sends a file to storage and returns its key. Large files go in parts (shared/utils/multipartUpload.ts): if
+   * one keeps failing this throws an UploadInterruptedError whose `resume`, passed back in, carries on from the
+   * parts already stored.
+   */
+  async function uploadFile(
+    kind: UploadKind,
+    file: File,
+    opts: { onProgress?: (fraction: number) => void; signal?: AbortSignal; resume?: ResumableUpload | null } = {}
+  ): Promise<{ key: string }> {
+    if (file.size < MULTIPART_THRESHOLD) {
+      const ticket = await requestUpload(kind, file)
+      await uploadToStorage(ticket, file, opts.onProgress, opts.signal)
+      return { key: ticket.key }
+    }
+    const state: ResumableUpload =
+      opts.resume && opts.resume.size === file.size
+        ? opts.resume
+        : {
+            ...(
+              await api<ApiEnvelope<MultipartTicket>>('/api/admin/videos/uploads/multipart', {
+                method: 'POST',
+                body: { kind, fileName: file.name, contentType: file.type || undefined, size: file.size }
+              })
+            ).data,
+            size: file.size,
+            done: []
+          }
+    const ref = { key: state.key, uploadId: state.uploadId }
+    const done = new Set(state.done)
+    try {
+      await sendParts({
+        size: file.size,
+        partSize: state.partSize,
+        partCount: state.partCount,
+        done,
+        signal: opts.signal,
+        onProgress: opts.onProgress,
+        sendPart: async (n, onBytes) => {
+          const part = (
+            await api<ApiEnvelope<{ url: string; length: number }>>('/api/admin/videos/uploads/multipart/part', {
+              method: 'POST',
+              body: { ...ref, partNumber: n, size: file.size }
+            })
+          ).data
+          const [start, end] = partRange(file.size, state.partSize, n)
+          await putBlob(part.url, file.slice(start, end), {}, (f) => onBytes(f * (end - start)), opts.signal)
+        }
+      })
+    } catch (err) {
+      if ((err as Error)?.name === 'AbortError') {
+        // Cancelled: storage can drop the parts sent so far.
+        api('/api/admin/videos/uploads/multipart/abort', { method: 'POST', body: ref }).catch(() => {})
+        throw err
+      }
+      throw new UploadInterruptedError(err instanceof Error ? err.message : 'The upload stopped', { ...state, done: [...done] })
+    }
+    await api('/api/admin/videos/uploads/multipart/complete', { method: 'POST', body: ref })
+    return { key: state.key }
   }
 
   async function create(payload: CreateVideoPayload) {
@@ -206,6 +268,16 @@ export function useVideos() {
   }
 
   /** A video made from an uploaded sound (a still picture plus the audio). Queues a job; the video stays disabled until reviewed. */
+  /** Where to cut a long recording into parts of about `partMinutes`, at its pauses (found on the server, on the spot). */
+  async function chaptersFromAudio(audioKey: string, partMinutes: number) {
+    return (
+      await api<ApiEnvelope<{ totalMs: number; parts: { startMs: number; endMs: number }[] }>>('/api/admin/videos/from-audio/chapters', {
+        method: 'POST',
+        body: { audioKey, partMinutes }
+      })
+    ).data
+  }
+
   async function createFromAudio(payload: AudioToVideoPayload) {
     return (await api<ApiEnvelope<{ video: Video; job: ProcessingJob }>>('/api/admin/videos/from-audio', { method: 'POST', body: payload })).data
   }
@@ -218,6 +290,7 @@ export function useVideos() {
     waveColor?: string
     normalize?: boolean
     denoise?: boolean
+    waveHeightPct?: number
   }) {
     return (await api<ApiEnvelope<{ url: string; seconds: number }>>('/api/admin/videos/from-audio/preview', { method: 'POST', body: payload })).data
   }
@@ -240,8 +313,10 @@ export function useVideos() {
     inspect,
     detectLanguage,
     requestUpload,
+    uploadFile,
     create,
     createFromAudio,
+    chaptersFromAudio,
     previewFromAudio,
     mergeVideos
   }
@@ -281,6 +356,36 @@ export interface InspectedLink {
   duplicates: { id: number; title: string; trashed: boolean }[]
 }
 
+export type UploadKind = 'VIDEO' | 'THUMBNAIL' | 'AUDIO' | 'OVERLAY'
+
+/** A large upload started in parts (VideoIngestDtos.MultipartTicket). */
+export interface MultipartTicket {
+  key: string
+  uploadId: string
+  partSize: number
+  partCount: number
+  publicUrl: string
+  contentType: string
+}
+
+/** Where an upload in parts stopped: pass it back to uploadFile to carry on. */
+export interface ResumableUpload extends MultipartTicket {
+  size: number
+  /** Parts already in storage. */
+  done: number[]
+}
+
+/** An upload in parts that stopped part-way; `resume` carries on from there. */
+export class UploadInterruptedError extends Error {
+  constructor(
+    message: string,
+    readonly resume: ResumableUpload
+  ) {
+    super(message)
+    this.name = 'UploadInterruptedError'
+  }
+}
+
 export interface UploadTicket {
   key: string
   uploadUrl: string
@@ -313,7 +418,7 @@ export interface AudioToVideoPayload {
   /** "#rrggbb". */
   background?: string
   resolution?: string
-  /** NONE, WAVES, BARS, SPIKES, DOTS, SPECTRUM, PULSE, BLOCKS, FINE or STRIPES: a moving waveform (bottom or middle of the picture). */
+  /** NONE, WAVES, BARS, SPIKES, DOTS, SPECTRUM, PULSE, BLOCKS, FINE, STRIPES, REFLECT, COLUMNS or STEREO: a moving waveform (bottom or middle of the picture). */
   waveform?: string
   waveColor?: string
   /** Write text on the background (no cover picture). */
@@ -323,6 +428,23 @@ export interface AudioToVideoPayload {
   denoise?: boolean
   /** Transcribe the finished video (needs a language). */
   transcribe?: boolean
+  /** WIDE (default), TALL (9:16) or SQUARE. */
+  shape?: string
+  /** A slow zoom on the pictures; dissolves between them. */
+  motion?: boolean
+  crossfade?: boolean
+  /** A strip of text over the picture; a logo (an OVERLAY upload) in the top-right corner. */
+  stripText?: string
+  logoKey?: string
+  /** Take the silence off the start and end of the recording. */
+  trimSilence?: boolean
+  /** Only this part of the recording (a chapter). */
+  audioStartMs?: number
+  audioEndMs?: number
+  /** The waveform's height, % of the picture (10–80); left out, the style's usual height. */
+  waveHeightPct?: number
+  /** Burn the transcript into the picture once it is made (needs transcribe). */
+  burnSubtitles?: { style: string; position: string }
   title: string
   description?: string
   language?: string
@@ -352,10 +474,21 @@ export interface CreateVideoPayload {
  * upload progress, hence XHR). Resolves when stored; rejects on failure or abort.
  */
 export function uploadToStorage(ticket: UploadTicket, body: Blob, onProgress?: (fraction: number) => void, signal?: AbortSignal): Promise<void> {
+  return putBlob(ticket.uploadUrl, body, ticket.headers, onProgress, signal)
+}
+
+/** A PUT of `body` to a signed URL, with upload progress (fetch can't report it). */
+export function putBlob(
+  url: string,
+  body: Blob,
+  headers: Record<string, string>,
+  onProgress?: (fraction: number) => void,
+  signal?: AbortSignal
+): Promise<void> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest()
-    xhr.open(ticket.method, ticket.uploadUrl)
-    for (const [k, v] of Object.entries(ticket.headers)) xhr.setRequestHeader(k, v)
+    xhr.open('PUT', url)
+    for (const [k, v] of Object.entries(headers)) xhr.setRequestHeader(k, v)
     xhr.upload.onprogress = (e) => e.lengthComputable && onProgress?.(e.loaded / e.total)
     xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error(`Storage refused the upload (HTTP ${xhr.status})`)))
     xhr.onerror = () => reject(new Error('The upload failed — check your connection and try again'))
