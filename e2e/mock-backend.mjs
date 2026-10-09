@@ -149,6 +149,36 @@ function route(method, path, body) {
   if (method === 'GET' && path === '/api/settings/client') return ok(clientSettings())
   if (path === '/api/me/preferences') return ok(method === 'GET' ? {} : body)
   if (method === 'GET' && path === '/api/admin/collections') return page([{ id: 5, title: 'Season one' }])
+  // One ready voice-over for the sample video (its sound is the sample clip's), for the player's sound mix.
+  if (method === 'GET' && path === '/api/admin/videos/7/dubs')
+    return ok({
+      speechToTextReady: true,
+      textToSpeechReady: true,
+      translationReady: true,
+      spokenLanguage: 'en',
+      voices: {},
+      jobs: [],
+      dubs: [
+        {
+          id: 3,
+          videoId: 7,
+          language: 'km',
+          languageName: 'Khmer',
+          voice: 'km-KH-SreymomNeural',
+          voiceName: 'Sreymom',
+          audioUrl: '/api/__media/sample.mp4',
+          mimeType: 'audio/mp4',
+          durationMs: 10000,
+          sizeBytes: 1000,
+          jobId: null,
+          transcriptId: null,
+          locked: false,
+          createdBy: 'admin',
+          createdAt: null,
+          updatedAt: null
+        }
+      ]
+    })
   if (method === 'POST' && path === '/api/admin/videos/uploads') {
     const key = `uploads/e2e-${++uploads}`
     return ok({
@@ -183,14 +213,20 @@ function route(method, path, body) {
     made.push(entry)
     return ok({ video: { id: entry.videoId, title: entry.title }, job: { id: entry.jobId, status: 'QUEUED' } })
   }
+  // Jobs set by a test (config.running: shown as running; config.jobs: each job's latest state), for the header's job alerts.
+  if (method === 'GET' && path === '/api/admin/processing-jobs/summary') return ok({ RUNNING: (config.running ?? []).length })
+  if (method === 'GET' && path === '/api/admin/processing-jobs') return page((config.running ?? []).map(job))
   const jobMatch = /^\/api\/admin\/processing-jobs\/(\d+)(\/retry)?$/.exec(path)
   if (jobMatch) {
-    const entry = made.find((m) => m.jobId === Number(jobMatch[1]))
+    const entry = [...made, ...(config.jobs ?? [])].find((m) => m.jobId === Number(jobMatch[1]))
     if (!entry) return null
     if (method === 'POST' && jobMatch[2]) entry.status = 'SUCCEEDED'
     return ok(job(entry))
   }
   if (method === 'GET' && /^\/api\/admin\/videos\/\d+$/.test(path)) return ok(video(Number(path.split('/').pop())))
+  // Archive, unarchive and restore answer with the video as it is afterwards (for "Undo" on the toast).
+  const flip = /^\/api\/admin\/videos\/(\d+)\/(archive|unarchive|restore)$/.exec(path)
+  if (method === 'POST' && flip) return ok({ ...video(Number(flip[1])), archived: flip[2] === 'archive', deleted: false })
   if (method === 'GET' && /^\/api\/admin\/videos\/\d+\/edits$/.test(path)) return ok({ clips: [], jobs: [] })
   if (method === 'POST' && /^\/api\/admin\/videos\/\d+\/edits\/(trim|split|audio|overlay|cut)$/.test(path)) {
     return ok({

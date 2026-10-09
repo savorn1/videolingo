@@ -89,6 +89,61 @@
       <UIcon name="i-lucide-volume-2" class="w-4 h-4" />
       Turn on the voice-over
     </button>
+    <!-- The sound mix while a voice-over plays: how loud it is, and how much of the original stays underneath -->
+    <UPopover v-else-if="dubUrl" v-model:open="mixOpen" :content="{ align: 'start', side: 'bottom' }">
+      <button
+        type="button"
+        class="absolute top-3 left-3 z-10 flex items-center gap-1.5 rounded-full bg-black/60 px-3 py-1.5 text-xs font-medium text-white opacity-80 transition-opacity hover:bg-black/80 hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-primary-400"
+        aria-label="Sound mix"
+        data-testid="dub-mix-button"
+      >
+        <UIcon name="i-lucide-sliders-vertical" class="w-4 h-4" />
+        Sound mix
+      </button>
+      <template #content>
+        <div class="w-72 space-y-3 p-3" data-testid="dub-mix">
+          <div class="flex flex-wrap gap-1" role="group" aria-label="Quick mixes">
+            <UButton
+              v-for="p in DUB_MIX_PRESETS"
+              :key="p.label"
+              size="xs"
+              :color="isDubMixPreset(mix, p.mix) ? 'primary' : 'neutral'"
+              :variant="isDubMixPreset(mix, p.mix) ? 'soft' : 'ghost'"
+              :aria-pressed="isDubMixPreset(mix, p.mix)"
+              @click="setMix(p.mix)"
+              >{{ p.label }}</UButton
+            >
+          </div>
+          <div class="space-y-1">
+            <div class="flex items-center justify-between text-xs text-gray-600 dark:text-gray-300">
+              <span>Voice-over</span><span class="tabular-nums">{{ Math.round(mix.voice * 100) }}%</span>
+            </div>
+            <USlider
+              :model-value="mix.voice * 100"
+              :min="0"
+              :max="100"
+              :step="5"
+              aria-label="Voice-over volume"
+              @update:model-value="(v) => setMix({ voice: Number(v) / 100 })"
+            />
+          </div>
+          <div class="space-y-1">
+            <div class="flex items-center justify-between text-xs text-gray-600 dark:text-gray-300">
+              <span>Original sound</span><span class="tabular-nums">{{ mix.original ? `${Math.round(mix.original * 100)}%` : 'Off' }}</span>
+            </div>
+            <USlider
+              :model-value="mix.original * 100"
+              :min="0"
+              :max="100"
+              :step="5"
+              aria-label="Original sound volume"
+              @update:model-value="(v) => setMix({ original: Number(v) / 100 })"
+            />
+          </div>
+          <p class="text-xs text-gray-500 dark:text-gray-400">Kept in this browser for every video with a voice-over.</p>
+        </div>
+      </template>
+    </UPopover>
 
     <div
       v-if="playbackError || embedError"
@@ -117,10 +172,13 @@
 // - With `resumeKey`, remembers the position in this browser and picks up
 //   from there next time.
 // - With `dubUrl`, plays that voice-over track in sync with the video and
-//   mutes the video's own sound (files, YouTube and Vimeo).
+//   plays the video's own sound at the viewer's mix level — off unless they
+//   choose to keep some underneath (files, YouTube and Vimeo).
 // - With `autoplay`, starts on its own (no cover) — for playlists. Emits
 //   `ended` when the video finishes (files, YouTube and Vimeo; Facebook's
 //   player doesn't say).
+import { DEFAULT_DUB_MIX, DUB_MIX_PRESETS, isDubMixPreset, sanitizeDubMix, type DubMix } from '#shared/utils/dubMix'
+
 const props = defineProps<{
   embedUrl?: string | null
   /** The file to play — or, for embeds, the original link (offered when the embed fails). */
@@ -131,7 +189,7 @@ const props = defineProps<{
   vertical?: boolean
   readDuration?: boolean
   resumeKey?: string | number | null
-  /** Voice-over audio to play instead of the original sound. */
+  /** Voice-over audio to play with the video, the original sound kept at the viewer's mix level (off by default). */
   dubUrl?: string | null
   /** Start playing as soon as it loads (browsers may still ask for a click the first time). */
   autoplay?: boolean
@@ -305,6 +363,7 @@ interface YTPlayer {
   setPlaybackRate(rate: number): void
   mute(): void
   unMute(): void
+  setVolume(volume: number): void
 }
 interface YTNamespace {
   Player: new (
@@ -500,16 +559,54 @@ watch(playing, (isPlaying) => {
   else dubEl.value.pause()
 })
 
-// The original sound is muted while a voice-over is chosen.
-function applyOriginalMute() {
-  const mute = !!props.dubUrl
-  if (videoEl.value) videoEl.value.muted = mute
-  if (ytPlayer) {
-    if (mute) ytPlayer.mute()
-    else ytPlayer.unMute()
+// ── The mix: the voice-over and the video's own sound, each at its own level ──
+// The voice-over alone by default; the levels are kept in this browser.
+const MIX_KEY = 'videolingo.dubMix'
+const mix = ref<DubMix>({ ...DEFAULT_DUB_MIX })
+const mixOpen = ref(false)
+onMounted(() => {
+  try {
+    const raw = localStorage.getItem(MIX_KEY)
+    if (raw) mix.value = sanitizeDubMix(JSON.parse(raw))
+  } catch {
+    // Storage blocked or unreadable: the default mix.
   }
-  vimeoPlayer?.setVolume(mute ? 0 : 1).catch(() => {})
+})
+function setMix(next: Partial<DubMix>) {
+  mix.value = sanitizeDubMix({ ...mix.value, ...next })
+  try {
+    localStorage.setItem(MIX_KEY, JSON.stringify(mix.value))
+  } catch {
+    // Not kept, but still used now.
+  }
 }
+/** Whether this player turned the original down for a voice-over (so it puts it back when the voice-over goes). */
+let originalLowered = false
+
+// With a voice-over chosen, the original plays at the mix's level (0 = muted); without one, as it was.
+function applyOriginalMute() {
+  const dub = !!props.dubUrl
+  const level = dub ? mix.value.original : 1
+  if (!dub && !originalLowered) return
+  originalLowered = dub
+  if (videoEl.value) {
+    videoEl.value.muted = level === 0
+    videoEl.value.volume = level
+  }
+  if (ytPlayer) {
+    if (level === 0) ytPlayer.mute()
+    else {
+      ytPlayer.unMute()
+      ytPlayer.setVolume(Math.round(level * 100))
+    }
+  }
+  vimeoPlayer?.setVolume(level).catch(() => {})
+}
+watch(mix, () => {
+  applyOriginalMute()
+  if (dubEl.value) dubEl.value.volume = mix.value.voice
+})
+watch(dubEl, (el) => el && (el.volume = mix.value.voice), { flush: 'post' })
 
 watch(
   () => props.dubUrl,

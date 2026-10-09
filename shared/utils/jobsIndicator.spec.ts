@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { activeJobs, jobsLabel, nextPollDelay } from './jobsIndicator'
+import { activeJobs, endedJobsMessage, jobsLabel, nextPollDelay, withJobCount } from './jobsIndicator'
 
 describe('activeJobs', () => {
   it('adds running and waiting jobs', () => {
@@ -31,7 +31,37 @@ describe('nextPollDelay', () => {
     expect(nextPollDelay(0, false)).toBe(20_000)
   })
   it('stops while the tab is hidden', () => {
-    expect(nextPollDelay(3, true)).toBeNull()
+    expect(nextPollDelay(3, true)).toBe(30_000)
     expect(nextPollDelay(0, true)).toBeNull()
+  })
+})
+
+describe('withJobCount', () => {
+  it('puts the count in front only while jobs are active', () => {
+    expect(withJobCount('Videos · VideoLingo', 2)).toBe('(2) Videos · VideoLingo')
+    expect(withJobCount('Videos · VideoLingo', 0)).toBe('Videos · VideoLingo')
+  })
+})
+
+describe('endedJobsMessage', () => {
+  const job = { id: 9, status: 'SUCCEEDED', typeLabel: 'Translate', videoTitle: 'Lesson 4', errorMessage: null }
+  it('names one job, the video, and where to open it', () => {
+    expect(endedJobsMessage([job])).toEqual({ title: 'Translate finished', description: 'Lesson 4', color: 'success', to: '/processing-jobs/9' })
+  })
+  it('says why one failed', () => {
+    expect(endedJobsMessage([{ ...job, status: 'FAILED', errorMessage: 'No transcript' }])).toMatchObject({
+      title: 'Translate failed',
+      description: 'Lesson 4: No transcript',
+      color: 'error'
+    })
+    expect(endedJobsMessage([{ ...job, status: 'CANCELLED' }])).toMatchObject({ title: 'Translate cancelled', color: 'neutral' })
+  })
+  it('counts several, pointing at the list', () => {
+    expect(endedJobsMessage([job, { ...job, id: 10 }, { ...job, id: 11, status: 'FAILED' }])).toEqual({
+      title: '3 jobs ended: 2 finished, 1 failed',
+      color: 'error',
+      to: '/processing-jobs'
+    })
+    expect(endedJobsMessage([])).toBeNull()
   })
 })

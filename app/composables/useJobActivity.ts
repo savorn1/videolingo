@@ -79,8 +79,9 @@ export function useJobActivity(options: { onVideosFinished?: (videoIds: number[]
     if (delay !== null) timer = setTimeout(refresh, delay)
   }
   function onVisibility() {
+    // Hidden: look now and then while jobs are active (so their ending can be told), else not at all.
     if (document.visibilityState === 'visible') refresh()
-    else clearTimeout(timer)
+    else schedule()
   }
 
   onMounted(() => {

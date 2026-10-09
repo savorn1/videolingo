@@ -100,12 +100,21 @@ import type { BreadcrumbItem, DropdownMenuItem } from '@nuxt/ui'
 import type { SidebarItem } from '~/components/SidebarNav.vue'
 import { usePageCrumbs } from '~/composables/usePageCrumbs'
 import { goShortcutHelp, goShortcutsFor } from '#shared/utils/goShortcuts'
+import { activeJobs, withJobCount } from '#shared/utils/jobsIndicator'
+import { pushRecentPage, sanitizeRecentPages, type RecentPage } from '#shared/utils/recentPages'
 
 const { username, role, hasAnyAccess, logout } = useAuth()
 // Settings › General
 const { settings: clientSettings } = useClientSettings()
 const siteName = computed(() => clientSettings.value?.siteName || 'VideoLingo')
-useHead({ title: siteName, titleTemplate: (title) => tabTitle(title, siteName.value) })
+// While jobs run, the tab says how many ("(2) Videos · VideoLingo"), so they can be followed from another tab.
+const { counts: jobCounts } = useJobActivity()
+const activeJobCount = computed(() => activeJobs(jobCounts.value).total)
+useHead(() => {
+  const site = siteName.value
+  const active = activeJobCount.value
+  return { title: site, titleTemplate: (title) => withJobCount(tabTitle(title, site), active) }
+})
 const route = useRoute()
 
 // g + a letter goes to a page; "?" (the keyboard button in the toolbar) lists them.
@@ -245,7 +254,23 @@ const searchGroups = computed(() => {
 // those results come first, the matching pages after.
 const searchTerm = ref('')
 const { groups: contentGroups, loading: contentLoading } = useGlobalSearch(searchTerm)
-const allSearchGroups = computed(() => [...contentGroups.value, ...searchGroups.value])
+// With nothing typed, the pages opened lately come first (kept in this browser, named as their breadcrumb ends).
+const RECENT_KEY = 'videolingo.recentPages'
+const recentPages = ref<RecentPage[]>([])
+onMounted(() => {
+  try {
+    recentPages.value = sanitizeRecentPages(JSON.parse(localStorage.getItem(RECENT_KEY) ?? '[]'))
+  } catch {
+    // Storage blocked or unreadable: no recent pages.
+  }
+})
+const recentGroup = computed(() => {
+  const items = recentPages.value
+    .filter((p) => p.path !== route.path)
+    .map((p) => ({ id: `recent:${p.path}`, label: p.label, icon: 'i-lucide-history', suffix: p.path, onSelect: () => navigateTo(p.path) }))
+  return searchTerm.value.trim() || !items.length ? [] : [{ id: 'recent', label: 'Recent', items }]
+})
+const allSearchGroups = computed(() => [...recentGroup.value, ...contentGroups.value, ...searchGroups.value])
 
 // Derived from the same nav list so it can never drift out of sync with the
 // sidebar — each top-level item is now a collapsible group with `children`,
@@ -291,4 +316,18 @@ const navCrumbs = computed<BreadcrumbItem[]>(() => {
   const segment = route.path.split('/').filter(Boolean).pop()
   return [{ label: segment ? humanize(segment) : 'Dashboard' }]
 })
+
+// Remember this page once its name is known (a video's title arrives after it loads, so the name is updated then).
+watch(
+  () => [route.path, mounted.value ? String(breadcrumbItems.value.at(-1)?.label ?? '') : ''] as const,
+  ([path, label]) => {
+    if (!label) return
+    recentPages.value = pushRecentPage(recentPages.value, { path, label })
+    try {
+      localStorage.setItem(RECENT_KEY, JSON.stringify(recentPages.value))
+    } catch {
+      // Not kept, but still offered in this visit.
+    }
+  }
+)
 </script>

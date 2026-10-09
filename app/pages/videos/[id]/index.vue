@@ -502,6 +502,7 @@ const showEdit = ref(false)
 const showDownload = ref(false)
 const showShare = ref(false)
 const busy = ref(false)
+const { doneWithUndo } = useUndoToast()
 const confirmDisable = ref(false)
 const confirmDelete = ref(false)
 
@@ -509,9 +510,14 @@ async function setStatus(enabled: boolean) {
   if (!video.value) return
   busy.value = true
   try {
-    video.value = await updateStatus(video.value.id, enabled)
+    const id = video.value.id
+    video.value = await updateStatus(id, enabled)
     confirmDisable.value = false
-    toast.add({ title: enabled ? 'Video enabled' : 'Video disabled', color: 'success' })
+    doneWithUndo(enabled ? 'Video enabled' : 'Video disabled', {
+      run: async () => (video.value = await updateStatus(id, !enabled)),
+      undone: enabled ? 'Disabled again' : 'Enabled again',
+      failed: `Could not ${enabled ? 'disable' : 'enable'} the video again`
+    })
   } catch (err) {
     toast.add({ title: `Could not ${enabled ? 'enable' : 'disable'} video`, description: apiErrorMessage(err), color: 'error' })
   } finally {
@@ -523,11 +529,15 @@ async function onDelete() {
   if (!video.value) return
   busy.value = true
   try {
-    await remove(video.value.id)
+    const id = video.value.id
+    await remove(id)
     confirmDelete.value = false
-    toast.add({ title: 'Moved to trash', color: 'success' })
-    // Stay on the page — it now shows the trash banner and a Restore button,
-    // which doubles as an undo.
+    // Stay on the page — it now shows the trash banner and a Restore button; the toast's Undo does the same.
+    doneWithUndo('Moved to trash', {
+      run: async () => (video.value = await restore(id)),
+      undone: 'Video restored',
+      failed: 'Could not restore the video'
+    })
     await load()
   } catch (err) {
     toast.add({ title: 'Could not delete video', description: apiErrorMessage(err), color: 'error' })
@@ -557,8 +567,13 @@ async function onArchive() {
   if (!video.value) return
   busy.value = true
   try {
-    video.value = await archive(video.value.id)
-    toast.add({ title: 'Video archived', color: 'success' })
+    const id = video.value.id
+    video.value = await archive(id)
+    doneWithUndo('Video archived', {
+      run: async () => (video.value = await unarchive(id)),
+      undone: 'Back in the library',
+      failed: 'Could not unarchive the video'
+    })
   } catch (err) {
     toast.add({ title: 'Could not archive video', description: apiErrorMessage(err), color: 'error' })
   } finally {
@@ -570,8 +585,13 @@ async function onUnarchive() {
   if (!video.value) return
   busy.value = true
   try {
-    video.value = await unarchive(video.value.id)
-    toast.add({ title: 'Video unarchived', color: 'success' })
+    const id = video.value.id
+    video.value = await unarchive(id)
+    doneWithUndo('Video unarchived', {
+      run: async () => (video.value = await archive(id)),
+      undone: 'Archived again',
+      failed: 'Could not archive the video again'
+    })
   } catch (err) {
     toast.add({ title: 'Could not unarchive video', description: apiErrorMessage(err), color: 'error' })
   } finally {

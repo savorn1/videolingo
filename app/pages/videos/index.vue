@@ -292,6 +292,7 @@ import type { SummaryTile } from '~/components/SummaryTiles.vue'
 definePageMeta({ middleware: 'admin' })
 
 const { list, updateStatus, remove, restore, archive, unarchive, duplicate, purge, purgeTrash } = useVideos()
+const { doneWithUndo } = useUndoToast()
 // Rows ticked for bulk actions (VideoBulkActions).
 const selected = ref<Video[]>([])
 
@@ -612,11 +613,13 @@ const confirmDelete = ref<Video | null>(null)
 const confirmPurge = ref<Video | null>(null)
 const peeking = ref<Video | null>(null)
 
-async function run(action: () => Promise<unknown>, success: string, failure: string) {
+/** Runs an action, says how it went, and reloads; with `undo`, the toast offers to reverse it. */
+async function run(action: () => Promise<unknown>, success: string, failure: string, undo?: { run: () => Promise<unknown>; undone: string; failed: string }) {
   busy.value = true
   try {
     await action()
-    toast.add({ title: success, color: 'success' })
+    if (undo) doneWithUndo(success, { ...undo, after: reloadAll })
+    else toast.add({ title: success, color: 'success' })
     await load()
     loadTileCounts()
     return true
@@ -628,14 +631,25 @@ async function run(action: () => Promise<unknown>, success: string, failure: str
   }
 }
 
+async function reloadAll() {
+  await load()
+  loadTileCounts()
+}
+
 async function setStatus(row: Video, enabled: boolean) {
-  if (await run(() => updateStatus(row.id, enabled), enabled ? 'Video enabled' : 'Video disabled', `Could not ${enabled ? 'enable' : 'disable'} video`)) {
+  const undo = {
+    run: () => updateStatus(row.id, !enabled),
+    undone: enabled ? 'Disabled again' : 'Enabled again',
+    failed: `Could not ${enabled ? 'disable' : 'enable'} the video again`
+  }
+  if (await run(() => updateStatus(row.id, enabled), enabled ? 'Video enabled' : 'Video disabled', `Could not ${enabled ? 'enable' : 'disable'} video`, undo)) {
     confirmDisable.value = null
   }
 }
 
 async function onDelete(row: Video) {
-  if (await run(() => remove(row.id), 'Moved to trash', 'Could not delete video')) confirmDelete.value = null
+  const undo = { run: () => restore(row.id), undone: `“${row.title}” is back`, failed: 'Could not restore the video' }
+  if (await run(() => remove(row.id), 'Moved to trash', 'Could not delete video', undo)) confirmDelete.value = null
 }
 
 function onRestore(row: Video) {
@@ -681,7 +695,12 @@ function onArchiveToggle(row: Video, archived: boolean) {
   run(
     () => (archived ? archive(row.id) : unarchive(row.id)),
     archived ? 'Video archived' : 'Video unarchived',
-    `Could not ${archived ? 'archive' : 'unarchive'} video`
+    `Could not ${archived ? 'archive' : 'unarchive'} video`,
+    {
+      run: () => (archived ? unarchive(row.id) : archive(row.id)),
+      undone: archived ? 'Back in the library' : 'Archived again',
+      failed: `Could not ${archived ? 'unarchive' : 'archive'} the video again`
+    }
   )
 }
 
