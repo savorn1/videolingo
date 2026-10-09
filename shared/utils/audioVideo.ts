@@ -113,6 +113,12 @@ export function coverFileProblem(file: FileLike): string | null {
   return null
 }
 
+/** Files dropped on the page, sorted: pictures (any image) go to the slideshow, everything else is tried as audio. */
+export function sortDroppedFiles<F extends FileLike>(files: F[]): { audio: F[]; pictures: F[] } {
+  const isPicture = (f: F) => f.type.startsWith('image/') || (IMAGE_EXTENSIONS as readonly string[]).includes(extension(f.name))
+  return { audio: files.filter((f) => !isPicture(f)), pictures: files.filter(isPicture) }
+}
+
 /** Whether a colour is "#rrggbb", the only form the server accepts. */
 export function isHexColor(value: string): boolean {
   return /^#[0-9a-fA-F]{6}$/.test(value)
@@ -312,6 +318,23 @@ export function submitBlocker(state: {
   if (state.untitled > 0) return state.untitled === 1 ? 'Give the video a title' : 'Give every video a title'
   if (state.slideError) return state.slideError
   if (state.missingCategory) return 'Choose a category under Details'
+  return null
+}
+
+/** Which step of the form holds what submitBlocker reports (checked in the same order): 1 the audio, 2 the look, 4 the details. */
+export function submitBlockerStep(state: {
+  files: number
+  audioUploading: number
+  picturesUploading: boolean
+  untitled: number
+  slideError: string | null
+  missingCategory?: boolean
+}): 1 | 2 | 4 | null {
+  if (state.files === 0 || state.audioUploading > 0) return 1
+  if (state.picturesUploading) return 2
+  if (state.untitled > 0) return 1
+  if (state.slideError) return 2
+  if (state.missingCategory) return 4
   return null
 }
 

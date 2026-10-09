@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { mockRequests, openReady, resetMock, signInAsAdmin } from './helpers'
+import { mockRequests, openReady, resetMock, signInAsAdmin, wavFile } from './helpers'
 
 // The editor (docs/editor-scenarios.md, Trim and Split) on a 10-second sample clip from the mock backend.
 
@@ -23,6 +23,55 @@ test('Trim: moving the start queues a trim of that range', async ({ page }) => {
   await page.getByRole('button', { name: 'Start trim' }).click()
 
   await expect.poll(async () => (await mockRequests()).find((r) => r.path === '/api/admin/videos/7/edits/trim')?.body).toMatchObject({ startMs: 2000 })
+})
+
+test('Trim: resize to 1080p keeps the shape, warns it is larger, and queues that size', async ({ page }) => {
+  await openEditor(page)
+  await page.getByRole('switch', { name: 'Also resize the output' }).click()
+  const resize = page.getByTestId('resize')
+  await resize.getByRole('button', { name: /1080p/ }).click()
+  await expect(resize).toContainText('From 320×180')
+  await expect(resize).toContainText('bigger, not sharper')
+  await expect(resize).not.toContainText('stretched')
+
+  // With Keep shape on, typing the width works out the height
+  await resize.getByLabel('Width').fill('1280')
+  await expect(resize.getByLabel('Height')).toHaveValue('720')
+  await resize.getByRole('button', { name: /720p/ }).click()
+  await resize.getByRole('button', { name: /1080p/ }).click()
+  await page.getByRole('button', { name: 'Start trim' }).click()
+
+  await expect
+    .poll(async () => (await mockRequests()).find((r) => r.path === '/api/admin/videos/7/edits/trim')?.body)
+    .toMatchObject({ scale: { w: 1920, h: 1080 } })
+})
+
+test('Audio: music added in this visit plays along with the preview', async ({ page }) => {
+  await openEditor(page)
+  await page.getByRole('tab', { name: /Audio/ }).click()
+  await page.getByRole('heading', { name: 'Background music' }).click()
+  const section = page.getByRole('group').filter({ has: page.getByRole('heading', { name: 'Background music' }) })
+  await section.locator('input[type=file]').setInputFiles(wavFile('song.wav', 3))
+  await expect(page.getByTestId('music-preview-note')).toContainText('Plays along with the preview')
+
+  // It shows under the clips, and ←/→ move when it starts
+  const lane = page.getByTestId('music-lane')
+  await expect(lane).toHaveAttribute('aria-valuetext', /0:00/)
+  await lane.focus()
+  await lane.press('Shift+ArrowRight')
+  await lane.press('Shift+ArrowRight')
+  await expect(lane).toHaveAttribute('aria-valuenow', '2')
+
+  // The fades are set from their handles on the strip too
+  const fadeIn = page.getByTestId('fade-in-handle')
+  await fadeIn.focus()
+  await fadeIn.press('Shift+ArrowRight')
+  await expect(fadeIn).toHaveAttribute('aria-valuetext', '1.0 s')
+  await expect(page.getByTestId('fade-in')).toBeVisible()
+  const fadeOut = page.getByTestId('fade-out-handle')
+  await fadeOut.focus()
+  await fadeOut.press('ArrowLeft')
+  await expect(fadeOut).toHaveAttribute('aria-valuetext', '0.1 s')
 })
 
 test('Split: three even parts queue a split into three segments', async ({ page }) => {

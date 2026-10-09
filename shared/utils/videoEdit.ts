@@ -189,6 +189,54 @@ export function swapsSides(o: Orientation): boolean {
   return o.rotate === 90 || o.rotate === 270
 }
 
+// ── Resizing ─────────────────────────────────────────────────────────────────
+// A resize is the size of the finished picture: after the crop and the turn.
+
+/** The picture a resize starts from: the crop (or the whole frame), with its sides traded by a quarter turn. */
+export function pictureBeforeResize(frameW: number, frameH: number, crop: { w: number; h: number } | null, o: Orientation): { w: number; h: number } | null {
+  const w = crop?.w || frameW
+  const h = crop?.h || frameH
+  if (!w || !h) return null
+  return swapsSides(o) ? { w: h, h: w } : { w, h }
+}
+
+/** Rounded to a whole, even number of pixels (video encoders want even sides), at least 2. */
+function evenPx(n: number): number {
+  return Math.max(2, Math.round(n / 2) * 2)
+}
+
+/** The usual sizes, named by the short side as video sizes are ("1080p" is 1920×1080 wide or 1080×1920 tall). */
+export const RESIZE_HEIGHTS = [
+  { label: '480p', short: 480 },
+  { label: '720p', short: 720 },
+  { label: '1080p', short: 1080 },
+  { label: '1440p', short: 1440 },
+  { label: '4K', short: 2160 }
+] as const
+
+/** Each usual size in the picture's own shape. */
+export function resizeChoices(picture: { w: number; h: number }): { label: string; w: number; h: number }[] {
+  const tall = picture.h > picture.w
+  return RESIZE_HEIGHTS.map(({ label, short }) => {
+    const long = (short * Math.max(picture.w, picture.h)) / Math.min(picture.w, picture.h)
+    return tall ? { label, w: evenPx(short), h: evenPx(long) } : { label, w: evenPx(long), h: evenPx(short) }
+  })
+}
+
+/** The other side, when one is typed with "Keep shape" on. */
+export function keepShapeSize(side: 'w' | 'h', value: number, picture: { w: number; h: number }): { w: number; h: number } {
+  if (!(value > 0)) return side === 'w' ? { w: value, h: 0 } : { w: 0, h: value }
+  return side === 'w' ? { w: value, h: evenPx((value * picture.h) / picture.w) } : { w: evenPx((value * picture.w) / picture.h), h: value }
+}
+
+/** What to say about a resize: larger than the picture (no sharper), or a different shape (stretched; more than 1 % off). */
+export function resizeNotes(size: { w: number; h: number }, picture: { w: number; h: number }): { larger: boolean; stretched: boolean } {
+  if (!(size.w > 0 && size.h > 0)) return { larger: false, stretched: false }
+  const larger = size.w > picture.w || size.h > picture.h
+  const stretched = Math.abs(size.w / size.h / (picture.w / picture.h) - 1) > 0.01
+  return { larger, stretched }
+}
+
 /** The picture's size after the turn: a quarter turn swaps width and height. */
 export function orientedSize(w: number, h: number, o: Orientation): { w: number; h: number } {
   return swapsSides(o) ? { w: h, h: w } : { w, h }

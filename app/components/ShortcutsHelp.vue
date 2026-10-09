@@ -5,19 +5,26 @@
 
   <UModal v-model:open="open" title="Keyboard shortcuts" :ui="{ content: 'sm:max-w-2xl' }">
     <template #body>
-      <dl class="grid grid-cols-[auto_1fr] md:grid-cols-[auto_1fr_auto_1fr] md:gap-x-8 text-sm">
-        <template v-for="s in items" :key="s.label">
-          <dt class="flex flex-wrap items-center gap-1 border-b border-gray-100 py-2.5 pr-4 dark:border-gray-800/70">
-            <UKbd v-for="(k, i) in s.keys.split(' ').filter(Boolean)" :key="i" :value="k" :class="keyTone(k)" />
-          </dt>
-          <dd class="border-b border-gray-100 py-2.5 text-gray-700 dark:border-gray-800/70 dark:text-gray-200">{{ s.label }}</dd>
-        </template>
-      </dl>
+      <div class="space-y-5">
+        <section v-for="group in groups" :key="group.title ?? 'page'" class="space-y-1">
+          <h3 v-if="group.title" class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{{ group.title }}</h3>
+          <dl class="grid grid-cols-[auto_1fr] md:grid-cols-[auto_1fr_auto_1fr] md:gap-x-8 text-sm">
+            <template v-for="s in group.items" :key="s.label">
+              <dt class="flex flex-wrap items-center gap-1 border-b border-gray-100 py-2.5 pr-4 dark:border-gray-800/70">
+                <UKbd v-for="(k, i) in s.keys.split(' ').filter(Boolean)" :key="i" :value="k" :class="keyTone(k)" />
+              </dt>
+              <dd class="border-b border-gray-100 py-2.5 text-gray-700 dark:border-gray-800/70 dark:text-gray-200">{{ s.label }}</dd>
+            </template>
+          </dl>
+        </section>
+      </div>
     </template>
   </UModal>
 </template>
 
 <script setup lang="ts">
+import { goShortcutHelp, goShortcutsFor } from '#shared/utils/goShortcuts'
+
 // Soft tints by kind of key — no outlines, no legend — so the list stays calm but can be scanned by colour:
 // arrows blue, modifiers violet (and a little back), letters green, space and the rest amber.
 const ARROWS = new Set(['←', '→', '↑', '↓', '←→', '←→↑↓'])
@@ -46,18 +53,38 @@ const props = withDefaults(
     buttonClass?: string
     /** false when a modal/input elsewhere should keep the "?" key (rare — most pages can leave this on). */
     enabled?: boolean
+    /** The app-wide list in the layout: it gives way to a page's own list, which shows the app-wide keys too. */
+    global?: boolean
   }>(),
-  { enabled: true }
+  { enabled: true, global: false }
 )
 
 const open = ref(false)
+const { hasAnyAccess } = useAuth()
+const anywhere = computed(() => goShortcutHelp(goShortcutsFor(hasAnyAccess.value)))
+const groups = computed(() =>
+  props.global
+    ? [{ title: null, items: props.items }]
+    : [
+        { title: 'On this page', items: props.items },
+        { title: 'Anywhere', items: anywhere.value }
+      ]
+)
+// How many page lists are mounted; while there is one, the layout's list leaves "?" to it.
+const pageLists = useState('shortcut-page-lists', () => 0)
+onMounted(() => {
+  if (!props.global) pageLists.value++
+})
+onBeforeUnmount(() => {
+  if (!props.global) pageLists.value--
+})
 
 function isTyping(target: EventTarget | null) {
   const el = target as HTMLElement | null
   return !!el && (el.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName))
 }
 function onKeyDown(e: KeyboardEvent) {
-  if (!props.enabled) return
+  if (!props.enabled || (props.global && pageLists.value > 0)) return
   if (e.key !== '?' || e.metaKey || e.ctrlKey || e.altKey || isTyping(e.target)) return
   e.preventDefault()
   open.value = true

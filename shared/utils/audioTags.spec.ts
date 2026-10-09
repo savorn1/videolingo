@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { findMp4Box, id3TagLength, parseId3, parseMp4 } from './audioTags'
+import { findMp4Box, id3TagLength, parseFlac, parseFlacPicture, parseId3, parseMp4, parseOgg, parseVorbisComment } from './audioTags'
 
 const enc = new TextEncoder()
 const bytes = (...parts: (number[] | Uint8Array | string)[]) => Uint8Array.from(parts.flatMap((p) => (typeof p === 'string' ? [...enc.encode(p)] : [...p])))
@@ -83,5 +83,83 @@ describe('MP4 / M4A', () => {
   it('gives nothing when there are no tags', () => {
     expect(parseMp4(box('moov', box('mvhd', Uint8Array.from([0]))))).toEqual({})
     expect(parseMp4(bytes('garbage!'))).toEqual({})
+  })
+})
+
+// ── FLAC, Ogg Vorbis and Opus ──
+const le32 = (n: number) => [n & 255, (n >>> 8) & 255, (n >>> 16) & 255, (n >>> 24) & 255]
+function vorbisComment(entries: string[]) {
+  const vendor = enc.encode('test')
+  return bytes(le32(vendor.length), vendor, le32(entries.length), ...entries.flatMap((e) => [le32(enc.encode(e).length), e]))
+}
+function flacPicture(type: number, mime: string, data: Uint8Array) {
+  return bytes(be32(type), be32(mime.length), mime, be32(0), be32(0), be32(0), be32(0), be32(0), be32(data.length), data)
+}
+function flacBlock(type: number, data: Uint8Array, last = false) {
+  return bytes([type | (last ? 0x80 : 0)], [(data.length >> 16) & 255, (data.length >> 8) & 255, data.length & 255], data)
+}
+/** One Ogg page holding `payload` (a single segment table entry per 255 bytes). */
+function oggPage(payload: Uint8Array) {
+  const lacing: number[] = []
+  let n = payload.length
+  while (n >= 255) {
+    lacing.push(255)
+    n -= 255
+  }
+  lacing.push(n)
+  return bytes('OggS', new Array(22).fill(0), [lacing.length], lacing, payload)
+}
+const png = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 1, 2])
+
+describe('Vorbis comments', () => {
+  it('reads title, artist and album, whatever the key case, keeping the first of each', () => {
+    const tags = parseVorbisComment(vorbisComment(['title=Lesson 5', 'ARTIST=Dara', 'Album=Khmer A1', 'TITLE=ignored', 'NOEQUALS']))
+    expect(tags).toEqual({ title: 'Lesson 5', artist: 'Dara', album: 'Khmer A1' })
+  })
+  it('reads a cover carried as METADATA_BLOCK_PICTURE', () => {
+    const b64 = btoa(String.fromCharCode(...flacPicture(3, 'image/png', png)))
+    const tags = parseVorbisComment(vorbisComment(['TITLE=x', `METADATA_BLOCK_PICTURE=${b64}`]))
+    expect(tags.cover?.mime).toBe('image/png')
+    expect([...tags.cover!.data]).toEqual([...png])
+  })
+  it('keeps what fits when the block is cut short', () => {
+    const full = vorbisComment(['TITLE=Kept', 'ARTIST=Lost'])
+    expect(parseVorbisComment(full.subarray(0, full.length - 3))).toEqual({ title: 'Kept' })
+  })
+})
+
+describe('FLAC', () => {
+  it('reads the comment block and prefers the front cover', () => {
+    const file = bytes(
+      'fLaC',
+      flacBlock(0, new Uint8Array(34)),
+      flacBlock(6, flacPicture(4, 'image/jpeg', jpeg)),
+      flacBlock(4, vorbisComment(['TITLE=សួស្តី'])),
+      flacBlock(6, flacPicture(3, 'image/png', png), true),
+      [0xff, 0xf8] // audio frames follow
+    )
+    const tags = parseFlac(file)
+    expect(tags.title).toBe('សួស្តី')
+    expect(tags.cover?.mime).toBe('image/png')
+  })
+  it('gives nothing for another file, and skips a broken picture', () => {
+    expect(parseFlac(bytes('RIFF....'))).toEqual({})
+    expect(parseFlacPicture(bytes(be32(3), be32(500), 'image/png'))).toBeNull()
+  })
+})
+
+describe('Ogg', () => {
+  it('reads Opus tags from the second packet', () => {
+    const file = bytes(oggPage(bytes('OpusHead', new Array(11).fill(0))), oggPage(bytes('OpusTags', vorbisComment(['TITLE=Podcast 12', 'ARTIST=Sok']))))
+    expect(parseOgg(file)).toEqual({ title: 'Podcast 12', artist: 'Sok' })
+  })
+  it('reads Vorbis tags, even when the comment packet spans pages', () => {
+    const comment = bytes([3], 'vorbis', vorbisComment(['TITLE=' + 'A'.repeat(300)]))
+    const file = bytes(oggPage(bytes([1], 'vorbis', new Array(23).fill(0))), oggPage(comment.subarray(0, 200)), oggPage(comment.subarray(200)))
+    expect(parseOgg(file).title).toBe('A'.repeat(300))
+  })
+  it('gives nothing without the Ogg pages or tags', () => {
+    expect(parseOgg(bytes('ID3'))).toEqual({})
+    expect(parseOgg(oggPage(bytes('OpusHead')))).toEqual({})
   })
 })

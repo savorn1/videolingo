@@ -192,3 +192,90 @@ export function validateClips(clips: AudioClip[], durationMs: number): string | 
 export function isMutedAt(mutes: TimeRange[], ms: number) {
   return mutes.some((r) => ms >= r.startMs && ms < r.endMs)
 }
+
+/**
+ * Where the background music is at a point of the video, in ms into the music file, or null while it is silent:
+ * before it starts, or after it ends when it doesn't loop. An unknown music length plays on (looping is left to the player).
+ */
+export function musicPositionAt(music: { startMs: number; loop: boolean; durationMs: number | null }, videoMs: number): number | null {
+  const into = videoMs - music.startMs
+  if (into < 0) return null
+  const length = music.durationMs
+  if (!length || length <= 0) return into
+  if (music.loop) return into % length
+  return into < length ? into : null
+}
+
+/** At most this many loop rounds are drawn; past it the last one runs to the end. */
+const MAX_MUSIC_SPANS = 100
+
+/**
+ * Where the background music plays on the video's timeline: one span per loop round (or just one), cut at the
+ * video's end. An unknown length is drawn as one span to the end.
+ */
+export function musicSpans(music: { startMs: number; loop: boolean; durationMs: number | null }, durationMs: number): TimeRange[] {
+  const start = Math.max(0, music.startMs)
+  if (durationMs <= 0 || start >= durationMs) return []
+  const length = music.durationMs
+  if (!length || length <= 0) return [{ startMs: start, endMs: durationMs }]
+  if (!music.loop) return [{ startMs: start, endMs: Math.min(durationMs, start + length) }]
+  const spans: TimeRange[] = []
+  for (let at = start; at < durationMs; at += length) {
+    if (spans.length === MAX_MUSIC_SPANS - 1) {
+      spans.push({ startMs: at, endMs: durationMs })
+      break
+    }
+    spans.push({ startMs: at, endMs: Math.min(durationMs, at + length) })
+  }
+  return spans
+}
+
+/** The longest fade the form takes, in or out. */
+export const MAX_FADE_MS = 60_000
+
+/**
+ * A fade's length from where its handle is dragged to on the video's timeline: from the start for the fade-in,
+ * to the end for the fade-out. On the finished timeline (so divided by the speed), to 0.1 s, at most MAX_FADE_MS,
+ * and never so long that the two fades together outlast the result.
+ */
+export function fadeFromHandle(edge: 'in' | 'out', videoMs: number, s: { fadeInMs: number; fadeOutMs: number; speed: number }, durationMs: number): number {
+  const speed = s.speed > 0 ? s.speed : 1
+  const raw = (edge === 'in' ? videoMs : durationMs - videoMs) / speed
+  const room = durationMs / speed - (edge === 'in' ? s.fadeOutMs : s.fadeInMs)
+  const max = Math.max(0, Math.min(MAX_FADE_MS, room))
+  return Math.min(max, Math.max(0, Math.round(raw / 100) * 100))
+}
+
+/** The fades on the video's timeline (they are set on the finished one, which the speed change stretches or shortens). */
+export function fadeSpans(
+  s: { fadeInMs: number; fadeOutMs: number; speed: number },
+  durationMs: number
+): { fadeIn: TimeRange | null; fadeOut: TimeRange | null } {
+  const speed = s.speed > 0 ? s.speed : 1
+  const inMs = Math.min(durationMs, s.fadeInMs * speed)
+  const outMs = Math.min(durationMs, s.fadeOutMs * speed)
+  return {
+    fadeIn: inMs > 0 ? { startMs: 0, endMs: inMs } : null,
+    fadeOut: outMs > 0 ? { startMs: durationMs - outMs, endMs: durationMs } : null
+  }
+}
+
+/**
+ * The level the live preview plays at a point of the video (0–1): the volume (the player can't go above 100 %),
+ * the muted ranges, and the fades. The fades are linear, as ffmpeg's afade, and sit on the finished video's
+ * timeline, which a speed change stretches or shortens.
+ */
+export function previewGainAt(
+  s: { volume: number; mutes: TimeRange[]; fadeInMs: number; fadeOutMs: number; speed: number },
+  durationMs: number,
+  ms: number
+): number {
+  if (s.volume <= 0 || isMutedAt(s.mutes, ms)) return 0
+  const speed = s.speed > 0 ? s.speed : 1
+  const outMs = ms / speed
+  const outLength = durationMs / speed
+  let fade = 1
+  if (s.fadeInMs > 0) fade = Math.min(fade, outMs / s.fadeInMs)
+  if (s.fadeOutMs > 0 && outLength > 0) fade = Math.min(fade, (outLength - outMs) / s.fadeOutMs)
+  return Math.max(0, Math.min(1, s.volume * Math.max(0, fade)))
+}

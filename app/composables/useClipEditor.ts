@@ -34,12 +34,16 @@ import {
   uncoveredMs as uncoveredTime,
   validateCrop,
   validateScale,
+  pictureBeforeResize,
+  resizeChoices,
+  keepShapeSize,
+  resizeNotes,
   validateSegments,
   suggestedNewTitle,
   validateTrim,
   withTrimEdge
 } from '#shared/utils/videoEdit'
-import { isMutedAt } from '#shared/utils/audioEdit'
+import { musicPositionAt, previewGainAt } from '#shared/utils/audioEdit'
 import { formatTimecode, parseTimecode } from '#shared/utils/transport'
 import { presetFromSettings, ratioLabel } from '#shared/utils/exportPreset'
 import { PLAIN_LOOK, cssFilter, describeVideoLook, isPlainLook, lookRequest, validateLook, type VideoLook } from '#shared/utils/videoLook'
@@ -761,8 +765,25 @@ export function useClipEditor(props: ClipEditorProps, emit: ClipEditorEmit) {
   )
   const scaleOn = ref(false)
   const scale = reactive({ w: 0, h: 0 })
+  /** The picture the resize starts from (after the crop and the turn). */
+  const resizeFrom = computed(() => pictureBeforeResize(naturalWidth.value, naturalHeight.value, cropOn.value ? crop : null, orient.value))
+  const resizeOptions = computed(() => (resizeFrom.value ? resizeChoices(resizeFrom.value) : []))
+  const scaleNotes = computed(() => (resizeFrom.value ? resizeNotes(scale, resizeFrom.value) : { larger: false, stretched: false }))
+  /** "Keep shape": typing one side works out the other. Not part of the edit, so not in undo or drafts. */
+  const scaleLock = ref(true)
   function onScaleToggle(on: boolean) {
-    if (on && !scale.w) Object.assign(scale, { w: naturalWidth.value || 1280, h: naturalHeight.value || 720 })
+    if (on && !scale.w) Object.assign(scale, resizeFrom.value ?? { w: 1280, h: 720 })
+  }
+  function setScaleSide(side: 'w' | 'h', value: number) {
+    if (scaleLock.value && resizeFrom.value) Object.assign(scale, keepShapeSize(side, value, resizeFrom.value))
+    else scale[side] = value
+  }
+  function pickScale(size: { w: number; h: number }) {
+    Object.assign(scale, { w: size.w, h: size.h })
+  }
+  /** Puts the shape back to the picture's, keeping the width. */
+  function matchScaleShape() {
+    if (resizeFrom.value) Object.assign(scale, keepShapeSize('w', scale.w, resizeFrom.value))
   }
 
   const trimError = computed(() => {
@@ -1106,8 +1127,8 @@ export function useClipEditor(props: ClipEditorProps, emit: ClipEditorEmit) {
   // ── Audio ────────────────────────────────────────────────────────────────────
   const audioEdit = useAudioEdit(durationMs)
 
-  // While on the Audio tab the preview plays the level and the muted ranges
-  // (the rest needs rendering). The <video> can't go above 100%.
+  // While on the Audio tab the preview plays the level, the muted ranges and the
+  // fades (the rest needs rendering). The <video> can't go above 100%.
   watchEffect(() => {
     const el = preview.value?.videoEl
     if (!el) return
@@ -1116,9 +1137,74 @@ export function useClipEditor(props: ClipEditorProps, emit: ClipEditorEmit) {
       el.muted = false
       return
     }
-    const s = audioEdit.state
-    el.volume = Math.min(1, s.volume)
-    el.muted = s.volume === 0 || isMutedAt(s.mutes, currentMs.value)
+    setPreviewGain(el, currentMs.value)
+  })
+  function setPreviewGain(el: HTMLVideoElement, ms: number) {
+    const gain = previewGainAt(audioEdit.state, durationMs.value, ms)
+    el.volume = gain
+    el.muted = gain === 0
+  }
+  // The time above comes ~4× a second, which makes a fade step; with fades set, follow the video every frame.
+  let fadeFrame = 0
+  function followFades() {
+    const el = preview.value?.videoEl
+    fadeFrame = requestAnimationFrame(followFades)
+    if (el && !el.paused) setPreviewGain(el, el.currentTime * 1000)
+  }
+  watch(
+    () => mode.value === 'audio' && (audioEdit.state.fadeInMs > 0 || audioEdit.state.fadeOutMs > 0),
+    (on) => {
+      cancelAnimationFrame(fadeFrame)
+      fadeFrame = on ? requestAnimationFrame(followFades) : 0
+    },
+    { immediate: true }
+  )
+  onBeforeUnmount(() => cancelAnimationFrame(fadeFrame))
+
+  // The background music, played beside the preview on the Audio tab when its file was added in this visit
+  // (at its volume up to 100 %, from its start, looping; the ducking is heard only in the result).
+  const musicPreviewUrl = computed(() => {
+    const m = audioEdit.state.music
+    return mode.value === 'audio' && m ? (audioEdit.localUrls.get(m.key) ?? null) : null
+  })
+  let musicEl: HTMLAudioElement | null = null
+  let musicFrame = 0
+  function stopMusic() {
+    cancelAnimationFrame(musicFrame)
+    musicFrame = 0
+    musicEl?.pause()
+  }
+  function followMusic() {
+    musicFrame = requestAnimationFrame(followMusic)
+    const el = preview.value?.videoEl
+    const m = audioEdit.state.music
+    if (!el || !m || !musicEl) return
+    const at = musicPositionAt(m, el.currentTime * 1000)
+    musicEl.volume = Math.min(1, m.volume)
+    musicEl.playbackRate = el.playbackRate
+    if (el.paused || at === null) {
+      if (!musicEl.paused) musicEl.pause()
+      return
+    }
+    // Catch up after a seek, a loop round or drift.
+    if (Math.abs(musicEl.currentTime * 1000 - at) > 250) musicEl.currentTime = at / 1000
+    if (musicEl.paused) musicEl.play().catch(() => {})
+  }
+  watch(
+    musicPreviewUrl,
+    (url) => {
+      stopMusic()
+      if (!url) return
+      if (!musicEl) musicEl = new Audio()
+      if (musicEl.src !== url) musicEl.src = url
+      musicEl.loop = false
+      musicFrame = requestAnimationFrame(followMusic)
+    },
+    { immediate: true }
+  )
+  onBeforeUnmount(() => {
+    stopMusic()
+    musicEl = null
   })
 
   // ── Undo / redo, and the draft kept in this browser ─────────────────────────
@@ -1707,6 +1793,13 @@ export function useClipEditor(props: ClipEditorProps, emit: ClipEditorEmit) {
     scaleOn,
     scale,
     onScaleToggle,
+    resizeFrom,
+    resizeOptions,
+    scaleNotes,
+    scaleLock,
+    setScaleSide,
+    pickScale,
+    matchScaleShape,
     trimError,
     starting,
     onStartTrim,

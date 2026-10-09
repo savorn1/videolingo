@@ -15,6 +15,7 @@
             :class="uploadingAny ? 'animate-spin motion-reduce:animate-none' : 'text-warning-500'"
           />
           {{ blocker }}
+          <UButton v-if="blockerStep && !uploadingAny" size="xs" color="neutral" variant="link" :padded="false" @click="showBlocker">Show me</UButton>
         </p>
         <p v-else class="flex items-center gap-1.5 text-sm text-gray-700 dark:text-gray-300">
           <UIcon name="i-lucide-circle-check" class="h-4 w-4 shrink-0 text-success-600 dark:text-success-500" />
@@ -33,5 +34,13 @@
 <script setup lang="ts">
 // The bottom of "Video from audio": the save error and the bar that stays in view, saying what is still missing.
 import { TAB_ACCENTS } from '#shared/utils/tabAccent'
-const { saveError, saving, uploadingAny, blocker, canSubmit, submitLabel, readySummary } = useAudioToVideoFormContext()
+const { saveError, saving, uploadingAny, blocker, blockerStep, scrollToStep, canSubmit, submitLabel, readySummary } = useAudioToVideoFormContext()
+
+// Scrolls to the step holding the problem, and puts the cursor in the first missing title when that is it.
+function showBlocker() {
+  const card = blockerStep.value ? scrollToStep(blockerStep.value) : null
+  if (!card) return
+  const untitled = card.querySelector<HTMLInputElement>('[data-untitled] input, input[data-untitled]')
+  untitled?.focus({ preventScroll: true })
+}
 </script>

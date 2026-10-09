@@ -5,7 +5,11 @@
         <UIcon name="i-lucide-audio-lines" class="w-4 h-4" />
         Audio clips
       </span>
-      <span>Drag a clip to move it · drag its edges to trim · click empty space to seek</span>
+      <span
+        >Drag a clip to move it · drag its edges to trim · click empty space to seek<template v-if="music">
+          · drag the music to change when it starts</template
+        ></span
+      >
     </div>
 
     <!-- Ruler: click to seek; shows the selected range -->
@@ -74,12 +78,87 @@
         />
       </div>
 
+      <!-- Fades: the sound rising from silence and sinking back (drawn over the clips, not in the way of dragging) -->
+      <div
+        v-if="fades.fadeIn"
+        class="absolute inset-y-0 z-10 pointer-events-none bg-linear-to-r from-gray-900/45 to-transparent dark:from-black/60"
+        :style="{ left: pct(fades.fadeIn.startMs), width: pct(fades.fadeIn.endMs - fades.fadeIn.startMs) }"
+        data-testid="fade-in"
+        :title="`Fade in, ${formatTimecode(edit.state.fadeInMs)}`"
+      >
+        <svg class="absolute inset-0 h-full w-full text-white/80" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+          <g stroke="currentColor" stroke-width="1.5"><line x1="0" y1="100" x2="100" y2="0" vector-effect="non-scaling-stroke" /></g>
+        </svg>
+      </div>
+      <div
+        v-if="fades.fadeOut"
+        class="absolute inset-y-0 z-10 pointer-events-none bg-linear-to-l from-gray-900/45 to-transparent dark:from-black/60"
+        :style="{ left: pct(fades.fadeOut.startMs), width: pct(fades.fadeOut.endMs - fades.fadeOut.startMs) }"
+        data-testid="fade-out"
+        :title="`Fade out, ${formatTimecode(edit.state.fadeOutMs)}`"
+      >
+        <svg class="absolute inset-0 h-full w-full text-white/80" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+          <g stroke="currentColor" stroke-width="1.5"><line x1="0" y1="0" x2="100" y2="100" vector-effect="non-scaling-stroke" /></g>
+        </svg>
+      </div>
+
+      <!-- Fade handles, as in audio editors: drag in from a top corner (or use ←/→) to set the fade -->
+      <div
+        v-for="h in fadeHandles"
+        :key="h.edge"
+        class="absolute top-0.5 z-30 size-3 -translate-x-1/2 rounded-full border-2 border-white bg-gray-700 shadow cursor-ew-resize focus-visible:outline-2 focus-visible:outline-primary-500 dark:bg-gray-300 dark:border-gray-900"
+        :class="h.ms > 0 ? '' : 'opacity-60 hover:opacity-100'"
+        :style="{ left: h.left }"
+        role="slider"
+        tabindex="0"
+        :aria-label="h.edge === 'in' ? 'Fade in' : 'Fade out'"
+        aria-valuemin="0"
+        :aria-valuemax="MAX_FADE_MS / 1000"
+        :aria-valuenow="h.ms / 1000"
+        :aria-valuetext="`${(h.ms / 1000).toFixed(1)} s`"
+        :title="`${h.edge === 'in' ? 'Fade in' : 'Fade out'}: ${(h.ms / 1000).toFixed(1)} s — drag to change`"
+        :data-testid="`fade-${h.edge}-handle`"
+        @pointerdown.stop="onFadeDown(h.edge, $event)"
+        @keydown="onFadeKey(h.edge, $event)"
+      />
+
       <p v-if="!edit.state.clips.length" class="absolute inset-0 flex items-center justify-center text-xs text-gray-500 pointer-events-none dark:text-gray-400">
         No clips — the sound is empty
       </p>
 
       <!-- Playhead -->
       <div class="absolute -top-6 bottom-0 w-px bg-error-500 pointer-events-none z-20" :style="{ left: pct(currentMs) }" />
+    </div>
+
+    <!-- Background music: where it plays (each loop round marked); drag it, or use ←/→, to change when it starts -->
+    <div
+      v-if="music"
+      ref="musicEl"
+      class="relative h-6 rounded bg-gray-50 dark:bg-gray-800/60 overflow-x-clip focus-visible:outline-2 focus-visible:outline-primary-500"
+      role="slider"
+      tabindex="0"
+      :aria-label="`Music start: ${music.name}`"
+      aria-valuemin="0"
+      :aria-valuemax="Math.round(maxMusicStart / 1000)"
+      :aria-valuenow="Math.round(music.startMs / 1000)"
+      :aria-valuetext="formatTimecode(music.startMs)"
+      data-testid="music-lane"
+      @keydown="onMusicKey"
+    >
+      <div
+        v-for="(sp, i) in musicRounds"
+        :key="i"
+        class="absolute inset-y-0.5 flex items-center overflow-hidden border-l-2 border-amber-600 bg-amber-400/70 px-1.5 text-[11px] leading-none text-amber-950 cursor-grab active:cursor-grabbing dark:border-amber-400 dark:bg-amber-500/50 dark:text-amber-50"
+        :class="i === 0 ? 'rounded-l-md' : 'border-dashed'"
+        :style="{ left: pct(sp.startMs), width: pct(sp.endMs - sp.startMs) }"
+        :title="i === 0 ? `${music.name} — drag to change when it starts` : 'Loops round'"
+        @pointerdown="onMusicDown"
+      >
+        <span v-if="i === 0" class="flex items-center gap-1 truncate pointer-events-none">
+          <UIcon name="i-lucide-music" class="size-3 shrink-0" />{{ music.name }}
+        </span>
+      </div>
+      <div class="absolute inset-y-0 w-px bg-error-500 pointer-events-none z-20" :style="{ left: pct(currentMs) }" />
     </div>
   </div>
 </template>
@@ -89,7 +168,18 @@
 // pieces of the source sound: drag one to move it, drag its edges to trim.
 // Drags snap to the playhead, the selected range and other clips' edges.
 import type { AudioEdit } from '~/composables/useAudioEdit'
-import { assignLanes, clipEnd, clipLength, moveTo, trimEdges, type AudioClip } from '#shared/utils/audioEdit'
+import {
+  assignLanes,
+  clipEnd,
+  clipLength,
+  fadeFromHandle,
+  fadeSpans,
+  MAX_FADE_MS,
+  moveTo,
+  musicSpans,
+  trimEdges,
+  type AudioClip
+} from '#shared/utils/audioEdit'
 import { formatTimecode } from '#shared/utils/transport'
 import { snapMs } from '#shared/utils/timeline'
 
@@ -101,6 +191,7 @@ const SNAP_PX = 8
 
 const ruler = useTemplateRef<HTMLDivElement>('ruler')
 const lanesEl = useTemplateRef<HTMLDivElement>('lanesEl')
+const musicEl = useTemplateRef<HTMLDivElement>('musicEl')
 const lanes = computed(() => assignLanes(props.edit.state.clips))
 const laneCount = computed(() => Math.max(1, ...[...lanes.value.values()].map((l) => l + 1)))
 
@@ -228,5 +319,68 @@ function onClipDown(c: AudioClip, what: 'move' | 'start' | 'end', e: PointerEven
   }
   window.addEventListener('pointermove', move)
   window.addEventListener('pointerup', () => window.removeEventListener('pointermove', move), { once: true })
+}
+
+// ── Fades and background music ──────────────────────────────────────────────
+const fades = computed(() => fadeSpans(props.edit.state, props.durationMs))
+const music = computed(() => props.edit.state.music)
+const musicRounds = computed(() => (music.value ? musicSpans(music.value, props.durationMs) : []))
+/** The music has to start a little before the end, or nothing of it would be heard. */
+const maxMusicStart = computed(() => Math.max(0, props.durationMs - 100))
+function setMusicStart(ms: number) {
+  if (music.value) music.value.startMs = Math.round(Math.min(Math.max(0, ms), maxMusicStart.value))
+}
+function onMusicDown(e: PointerEvent) {
+  if (e.button !== 0 || !music.value) return
+  e.preventDefault()
+  musicEl.value?.focus()
+  const startX = e.clientX
+  const startMs = music.value.startMs
+  const k = props.durationMs / Math.max(musicEl.value?.clientWidth ?? 1, 1)
+  const targets = snapTargets('')
+  const move = (ev: PointerEvent) => setMusicStart(snapMs(startMs + (ev.clientX - startX) * k, targets, SNAP_PX * k))
+  window.addEventListener('pointermove', move)
+  window.addEventListener('pointerup', () => window.removeEventListener('pointermove', move), { once: true })
+}
+/** ←/→ move the start by 0.1 s (Shift: 1 s); Home puts it at the beginning. */
+function onMusicKey(e: KeyboardEvent) {
+  if (!music.value) return
+  const step = e.shiftKey ? 1000 : 100
+  if (e.key === 'ArrowLeft') setMusicStart(music.value.startMs - step)
+  else if (e.key === 'ArrowRight') setMusicStart(music.value.startMs + step)
+  else if (e.key === 'Home') setMusicStart(0)
+  else return
+  e.preventDefault()
+  e.stopPropagation()
+}
+
+// The fade handles sit where each fade ends, kept just inside the strip when there is no fade.
+const fadeHandles = computed(() => [
+  { edge: 'in' as const, ms: props.edit.state.fadeInMs, left: `max(6px, ${pct(fades.value.fadeIn?.endMs ?? 0)})` },
+  { edge: 'out' as const, ms: props.edit.state.fadeOutMs, left: `min(calc(100% - 6px), ${pct(fades.value.fadeOut?.startMs ?? props.durationMs)})` }
+])
+function setFade(edge: 'in' | 'out', ms: number) {
+  if (edge === 'in') props.edit.state.fadeInMs = ms
+  else props.edit.state.fadeOutMs = ms
+}
+function onFadeDown(edge: 'in' | 'out', e: PointerEvent) {
+  if (e.button !== 0) return
+  e.preventDefault()
+  ;(e.currentTarget as HTMLElement).focus()
+  const move = (ev: PointerEvent) => setFade(edge, fadeFromHandle(edge, msAt(ev.clientX, lanesEl.value), props.edit.state, props.durationMs))
+  window.addEventListener('pointermove', move)
+  window.addEventListener('pointerup', () => window.removeEventListener('pointermove', move), { once: true })
+}
+/** ←/→ lengthen or shorten the fade by 0.1 s (Shift: 1 s), the arrow pointing the way the handle moves. */
+function onFadeKey(edge: 'in' | 'out', e: KeyboardEvent) {
+  if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return
+  e.preventDefault()
+  e.stopPropagation()
+  const s = props.edit.state
+  const speed = s.speed > 0 ? s.speed : 1
+  const step = (e.shiftKey ? 1000 : 100) * (e.key === 'ArrowRight' ? 1 : -1)
+  // Where the handle is now on the video's timeline, moved by the step on the finished one.
+  const at = edge === 'in' ? s.fadeInMs * speed : props.durationMs - s.fadeOutMs * speed
+  setFade(edge, fadeFromHandle(edge, at + step * speed, s, props.durationMs))
 }
 </script>

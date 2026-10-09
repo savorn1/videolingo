@@ -200,6 +200,13 @@
           <USwitch v-model="s.music.loop" label="Loop" />
           <USwitch v-model="s.music.duck" label="Quieter under speech" />
         </div>
+        <p class="text-xs text-gray-500 dark:text-gray-400" data-testid="music-preview-note">
+          {{
+            edit.localUrls.has(s.music.key)
+              ? 'Plays along with the preview, at its volume up to 100 %; making it quieter under speech is heard in the result.'
+              : 'Added on an earlier visit, so the preview can’t play it — it is in the result. Add it again to hear it here.'
+          }}
+        </p>
       </template>
       <UploadButton
         v-else
@@ -270,7 +277,7 @@
     <section :class="ACTION_SECTION">
       <p class="text-sm text-gray-700 dark:text-gray-300" data-testid="audio-summary">{{ summary }}</p>
       <p class="text-xs text-gray-500 dark:text-gray-400">
-        The preview plays the volume (up to 100%) and muted ranges; everything else is heard in the result.
+        The preview plays the volume (up to 100%), muted ranges, fades and the background music; everything else is heard in the result.
       </p>
       <ul class="space-y-1 text-xs text-gray-600 dark:text-gray-300">
         <li class="flex items-start gap-1.5">
@@ -324,7 +331,19 @@ import { TAB_ACCENTS } from '#shared/utils/tabAccent'
 // jobs, whose results appear in the editor's Results list.
 import type { AudioEdit, Channels, Denoise } from '~/composables/useAudioEdit'
 import { uploadToStorage } from '~/composables/useVideos'
-import { addMute, clipAt, clipEnd, deleteRange, duplicate, MAX_AUDIO_CLIPS, MIN_CLIP_MS, mergeWithNext, splitAt, type AudioClip } from '#shared/utils/audioEdit'
+import {
+  addMute,
+  clipAt,
+  clipEnd,
+  deleteRange,
+  duplicate,
+  MAX_AUDIO_CLIPS,
+  MAX_FADE_MS,
+  MIN_CLIP_MS,
+  mergeWithNext,
+  splitAt,
+  type AudioClip
+} from '#shared/utils/audioEdit'
 import { formatTimecode } from '#shared/utils/transport'
 
 const props = defineProps<{ edit: AudioEdit; videoId: number; durationMs: number; currentMs: number; canWrite: boolean; busy: boolean }>()
@@ -349,7 +368,7 @@ const s = props.edit.state
 
 const sec = (ms: number) => +(ms / 1000).toFixed(2)
 const ms = (v: unknown) => Math.max(0, Math.round((Number(v) || 0) * 1000))
-const clampFade = (v: unknown) => Math.min(ms(v), 60_000)
+const clampFade = (v: unknown) => Math.min(ms(v), MAX_FADE_MS)
 
 const balanceLabel = computed(() => (s.balance === 0 ? 'Centre' : `${s.balance < 0 ? 'L' : 'R'} ${Math.round(Math.abs(s.balance) * 100)}%`))
 
@@ -473,6 +492,7 @@ async function onUpload(file: File, what: 'replacement' | 'music') {
     const [durationMs, ticket] = await Promise.all([readAudioDuration(file), requestUpload('AUDIO', file)])
     await uploadToStorage(ticket, file, (f) => (uploadProgress.value = f))
     const uploaded = { key: ticket.key, name: file.name, durationMs }
+    props.edit.rememberLocalFile(ticket.key, file)
     if (what === 'replacement') s.replacement = uploaded
     else s.music = { ...uploaded, volume: 0.3, loop: true, duck: true, startMs: 0 }
   } catch (err) {

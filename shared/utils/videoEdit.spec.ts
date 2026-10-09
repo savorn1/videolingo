@@ -26,6 +26,10 @@ import {
   uncoveredMs,
   validateCrop,
   validateScale,
+  pictureBeforeResize,
+  resizeChoices,
+  keepShapeSize,
+  resizeNotes,
   validateSegments,
   validateTrim,
   withTrimEdge
@@ -403,5 +407,35 @@ describe('extending a trim past the video', () => {
   it('lets the end edge move past the video up to the limit', () => {
     expect(withTrimEdge([0, 60000], 'end', 90000, trimLimitMs(60000, true))).toEqual([0, 90000])
     expect(withTrimEdge([0, 60000], 'end', 90000, 60000)).toEqual([0, 60000])
+  })
+})
+
+describe('resizing', () => {
+  const flat = { rotate: 0, flipH: false, flipV: false } as const
+  it('starts from the crop, turned', () => {
+    expect(pictureBeforeResize(1280, 720, null, flat)).toEqual({ w: 1280, h: 720 })
+    expect(pictureBeforeResize(1280, 720, { w: 400, h: 300 }, flat)).toEqual({ w: 400, h: 300 })
+    expect(pictureBeforeResize(1280, 720, null, { ...flat, rotate: 90 })).toEqual({ w: 720, h: 1280 })
+    expect(pictureBeforeResize(0, 0, null, flat)).toBeNull()
+  })
+  it('offers the usual sizes in the picture’s shape, with even sides', () => {
+    const wide = resizeChoices({ w: 1280, h: 720 })
+    expect(wide.find((c) => c.label === '1080p')).toMatchObject({ w: 1920, h: 1080 })
+    expect(wide.find((c) => c.label === '4K')).toMatchObject({ w: 3840, h: 2160 })
+    expect(resizeChoices({ w: 720, h: 1280 }).find((c) => c.label === '1080p')).toMatchObject({ w: 1080, h: 1920 })
+    expect(resizeChoices({ w: 640, h: 480 }).find((c) => c.label === '720p')).toMatchObject({ w: 960, h: 720 })
+    for (const c of resizeChoices({ w: 1001, h: 563 })) expect([c.w % 2, c.h % 2]).toEqual([0, 0])
+  })
+  it('keeps the shape when one side is typed', () => {
+    expect(keepShapeSize('w', 1920, { w: 1280, h: 720 })).toEqual({ w: 1920, h: 1080 })
+    expect(keepShapeSize('h', 1080, { w: 1280, h: 720 })).toEqual({ w: 1920, h: 1080 })
+    expect(keepShapeSize('w', 0, { w: 1280, h: 720 })).toEqual({ w: 0, h: 0 })
+  })
+  it('notes a larger or stretched picture', () => {
+    const pic = { w: 1280, h: 720 }
+    expect(resizeNotes({ w: 1920, h: 1080 }, pic)).toEqual({ larger: true, stretched: false })
+    expect(resizeNotes({ w: 854, h: 480 }, pic)).toEqual({ larger: false, stretched: false })
+    expect(resizeNotes({ w: 1080, h: 1080 }, pic)).toEqual({ larger: true, stretched: true })
+    expect(resizeNotes({ w: 0, h: 720 }, pic)).toEqual({ larger: false, stretched: false })
   })
 })

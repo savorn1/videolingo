@@ -11,10 +11,12 @@ npx vitest run shared/utils/videoEdit.spec.ts   # one test file
 npx vitest run -t "splitEvenlyRows"             # tests by name
 npm run typecheck      # nuxt prepare + vue-tsc (CI runs this)
 npm run format:check   # prettier check (CI runs this); `npm run format` to fix
-npm run gen:api        # regenerate shared/api.generated.d.ts from the backend's /v3/api-docs
+npm run lint           # eslint (@nuxt/eslint; style rules off, Prettier does that)
+npm run test:e2e       # Playwright browser tests (e2e/) against a mock backend; first time: npx playwright install chromium
+npm run gen:api        # regenerate shared/api.generated.d.ts from the backend's /v3/api-docs (NUXT_BACKEND_BASE)
 ```
 
-CI (`.github/workflows/ci.yml`) runs format:check, typecheck and tests on every push/PR — all three must pass. Prettier: no semicolons, single quotes, 160 columns, no trailing commas.
+CI (`.github/workflows/ci.yml`) runs format:check, lint, typecheck and unit tests on every push/PR, then the browser tests — all must pass. Prettier: no semicolons, single quotes, 160 columns, no trailing commas.
 
 ## Architecture
 
@@ -22,7 +24,11 @@ Nuxt 4 + Nuxt UI 4 admin/learning app for a video-learning platform. It is only 
 
 **Backend access.** The backend has no CORS config, so the browser never calls it directly. All calls go to this app's own `/api/**`, which Nitro `routeRules` proxy to `NUXT_BACKEND_BASE` (default `http://localhost:8080`, see `.env.example`). Don't call the backend origin from client code. Nuxt Icon's local endpoint is moved to `/_nuxt_icon` so it doesn't hit that proxy.
 
-**Data layer.** Every backend call goes through `useApi()` (`app/composables/useApi.ts`): it attaches the Bearer token, and on a 401 refreshes once and retries, then redirects to `/login` (hence `experimental.asyncContext` in `nuxt.config.ts`). One `use<Feature>.ts` composable per backend area wraps it; responses are typed with the `ApiEnvelope<T>` / `PageEnvelope<T>` shapes in `shared/types.ts`.
+**Data layer.** Every backend call goes through `useApi()` (`app/composables/useApi.ts`): it attaches the Bearer token, and on a 401 refreshes once and retries, then redirects to `/login` (hence `experimental.asyncContext` in `nuxt.config.ts`). One `use<Feature>.ts` composable per backend area wraps it; responses are typed with the `ApiEnvelope<T>` / `PageEnvelope<T>` shapes in `shared/types.ts`. The request/response types are hand-written (the generated ones mark every field optional), but `app/apiContract.ts` checks at typecheck time that their field names and types still match `shared/api.generated.d.ts`: after a backend change, run `npm run gen:api` and fix what typecheck reports.
+
+**Backend rules the UI copies.** Limits such as `MAX_SEGMENTS` and the waveform styles are copied in `shared/utils`; the backend also sends its own in the client settings (`mediaRules`, `ClientSettingsController.MediaRules`). `shared/utils/mediaRules.ts` warns in dev when the copies drift, and the waveform styles offered are the ones the running server lists (`offeredWaveforms`), so a newer UI on an older server never offers a style it can't draw.
+
+**Uploads.** Use `useVideos().uploadFile(kind, file, { onProgress, signal, resume })`: small files are one signed PUT; files of 64 MB or more go in 16 MB parts (backend `MultipartRules`, `shared/utils/multipartUpload.ts`), a few at a time, each retried; if a part keeps failing it throws `UploadInterruptedError`, whose `resume` passed back in carries on from the parts already stored.
 
 **Permissions.** `useAuth().can(module, 'READ' | 'WRITE' | 'APPROVE')` gates UI (admins pass everything). Routes are guarded by `auth.global.ts` and `admin.ts`; learners with no permissions land on `/learn`. When adding a button for a backend action, find which of READ/WRITE/APPROVE the backend requires (noted at the top of the composables, e.g. `useProcessingJobs.ts`: cancel = APPROVE).
 
@@ -34,10 +40,10 @@ Nuxt 4 + Nuxt UI 4 admin/learning app for a video-learning platform. It is only 
 
 ### The video editor (the largest feature)
 
-`app/pages/videos/[id]/editor.vue` mounts `app/components/VideoClipEditor.vue` (very large). Its tabs — Trim, Split, Audio (`AudioEditPanel`), Text (`OverlayPanel`), Join (`JoinPanel`) — each build a request for a backend job (`useVideoEdits`: `startTrim`, `startSplit`, `startAudio`, `startOverlay`, …). Things that span files:
+`app/pages/videos/[id]/editor.vue` mounts `app/components/VideoClipEditor.vue`, whose state and actions live in `app/composables/useClipEditor.ts` (provided to the tab components; the Trim tab, Split tab and Results are in `app/components/clip-editor/`, which inject it with `useClipEditorContext()`; a template ref inside one of them is a `shallowRef` in the composable, bound by the child's `ref="…"`). Its tabs — Trim, Split, Audio (`AudioEditPanel`), Text (`OverlayPanel`), Join (`JoinPanel`) — each build a request for a backend job (`useVideoEdits`: `startTrim`, `startSplit`, `startAudio`, `startOverlay`, …). Things that span files:
 
 - **Jobs and results.** Starting an edit queues a processing job; the editor polls `overview()` every 3 s while any job is active. Finished jobs appear as clips under "Results", which can be promoted (`Replace original`, which keeps the old file under Versions, or `Add as new video`) or discarded. The single-edit buttons are disabled while any job is active (`busy`), but the server accepts up to `MAX_QUEUED_EDITS` (3) queued/running edits per video (409 beyond that; they run one at a time), which multi-format export uses.
-- **Undo/redo and drafts.** `useEditorHistory` snapshots `takeState()` / restores with `applyState()` in `VideoClipEditor.vue`. Any new editor state that should be undoable and survive in a draft must be added to both functions.
+- **Undo/redo and drafts.** `useEditorHistory` snapshots `takeState()` / restores with `applyState()` in `useClipEditor.ts`. Any new editor state that should be undoable and survive in a draft must be added to both functions.
 - **Per-tab colours.** `shared/utils/tabAccent.ts` holds the Tailwind class strings for each tab's colour; `app/assets/css/main.css` holds the matching `.tab-scope-<colour>` rules that recolour Nuxt UI's `primary` inside a tab. `tabAccent.spec.ts` checks the two stay in sync. Use full literal class names (Tailwind can't see built-up strings).
 - **Units.** Trim ranges are in ms; the Split tab's rows are in seconds with `endMsSeconds: null` meaning "to the end". `MAX_SEGMENTS` (20) and `MIN_TRIM_MS` (500) in `shared/utils/videoEdit.ts` mirror backend rules, which stay the authority.
 - **Related pages.** `app/pages/videos/from-audio.vue` (make videos from audio files) and `MergeVideosModal.vue` (join videos) reuse the same accents and helpers (`shared/utils/audioVideo.ts`, `mergeVideos.ts`).
@@ -80,7 +86,7 @@ These are what a change to the editor must not break. The backend re-checks ever
 
 - 2–`MAX_MERGE_VIDEOS` (10) videos, total ≤ `MAX_MERGE_SECONDS` (3 h). Only stored files not in the trash: links (YouTube/Vimeo/Facebook/URL) and deleted videos are blocked with a reason. Output resolution and a transition (`NONE` straight cut, `FADE` through black); the result is a new, hidden video.
 
-**Video from audio** (`from-audio.vue`, `shared/utils/audioVideo.ts`)
+**Video from audio** (`from-audio.vue`, `shared/utils/audioVideo.ts`; the page's state and actions are in `app/composables/useAudioToVideoForm.ts`, provided to its step components in `app/components/audio-video/`)
 
 - Up to `MAX_BATCH` (20) audio files, each becoming its own video; optional cover pictures (JPG/PNG/WebP ≤ 5 MB) as a slideshow of at most `MAX_SLIDES` (30) with starts at least 1 s apart; background colour, resolution (360p–1080p), waveform style (12, from `WAVEFORM_STYLES`; the mirrored-bar ones and `REFLECT` sit in the middle, the rest along the bottom; a new style needs the backend `AudioToVideoRules` filter, a sketch in `WaveformPreview.vue` and, if drawable from mono samples, `RealWaveform.vue` / `waveSamples.REAL_STYLES`), and optional loudness/noise clean-up. Submit is blocked while files upload, a title is missing, or the slideshow is invalid (`submitBlocker`). Look settings are remembered per user.
 - From each file (`audioTags.ts`, `readAudioTags`): the title and cover art written inside MP3 (ID3v2.2–2.4) and M4A files are read in the browser; the title fills in an untouched title, the cover art becomes that recording's own picture. A recording's own picture (from the file or chosen per file) is used instead of the shared pictures (`recordingSlides`).
@@ -97,7 +103,7 @@ These are what a change to the editor must not break. The backend re-checks ever
 
 ### Video editor scenarios
 
-The flows to keep working are written as step-by-step manual test cases in `docs/editor-scenarios.md`, grouped by tab (Trim, Split, Audio, Text, Join, Results, around the editor, Video from audio). There is no browser test setup, so walk through the ones touching your change by hand. Update that file when a flow or rule changes.
+The flows to keep working are written as step-by-step manual test cases in `docs/editor-scenarios.md`, grouped by tab (Trim, Split, Audio, Text, Join, Results, around the editor, Video from audio). The main ones also run as Playwright tests (`e2e/`, `npm run test:e2e`): `nuxt dev` against `e2e/mock-backend.mjs` (pointed at by `NUXT_BACKEND_BASE`), which answers the calls those flows make, records what was sent (`mockRequests()`), and serves a 10 s sample clip for the editor. Open pages with `openReady()` (it waits for hydration). Walk through the rest by hand, and add a test when you add a flow. Update that file when a flow or rule changes.
 
 ## Theme
 

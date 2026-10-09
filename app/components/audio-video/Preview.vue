@@ -1,6 +1,18 @@
 <template>
   <aside class="lg:col-span-2 lg:sticky lg:top-4 space-y-2" aria-label="Preview">
-    <p class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Preview</p>
+    <div class="flex items-center justify-between gap-2">
+      <p class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Preview</p>
+      <!-- Several recordings: choose which one's title, own picture and length the preview shows -->
+      <USelect
+        v-if="readyItems.length > 1"
+        :model-value="previewItem?.id"
+        :items="previewChoices"
+        size="xs"
+        class="w-48"
+        aria-label="Recording shown in the preview"
+        @update:model-value="(v) => (previewItemId = Number(v))"
+      />
+    </div>
     <div
       class="relative mx-auto w-full overflow-hidden rounded-lg border border-gray-200 dark:border-gray-800"
       :class="shape === 'TALL' ? 'max-w-[56%]' : shape === 'SQUARE' ? 'max-w-[75%]' : ''"
@@ -69,6 +81,7 @@
       <dt title="Not counting uploads or waiting behind other jobs">Render time</dt>
       <dd class="text-right text-gray-700 dark:text-gray-300">{{ renderNote }}</dd>
     </dl>
+    <AudioVideoStepNav class="pt-3" />
   </aside>
 </template>
 
@@ -104,8 +117,12 @@ const {
   textColor,
   audioPeaks,
   waveDrawColor,
-  previewTitle
+  previewTitle,
+  previewItem,
+  previewItemId
 } = useAudioToVideoFormContext()
+
+const previewChoices = computed(() => readyItems.value.map((i, n) => ({ label: `${n + 1}. ${i.title.trim() || i.name}`, value: i.id })))
 </script>
 
 <style scoped>

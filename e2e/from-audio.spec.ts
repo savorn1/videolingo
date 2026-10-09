@@ -16,6 +16,43 @@ test('V4: says what is missing before anything is added', async ({ page }) => {
   await expect(bar.getByRole('button', { name: 'Make the video' })).toBeDisabled()
 })
 
+test('V4: a missing title is marked, and Show me puts the cursor in it', async ({ page }) => {
+  await openReady(page, '/videos/from-audio')
+  await page.getByLabel('Choose audio files').setInputFiles(wavFile('lesson-one.wav'))
+  await expect(page.getByText('Uploaded')).toBeVisible()
+  const title = page.getByLabel('Title for lesson-one.wav')
+  await title.fill('')
+  const bar = page.getByTestId('action-bar')
+  await expect(bar).toContainText('Give the video a title')
+  await expect(title).toHaveAttribute('aria-invalid', 'true')
+  await bar.getByRole('button', { name: 'Show me' }).click()
+  await expect(title).toBeFocused()
+})
+
+test('The steps beside the preview sum up the choices, and a dropped picture joins the slideshow', async ({ page }) => {
+  await page.setViewportSize({ width: 1400, height: 900 })
+  await openReady(page, '/videos/from-audio')
+  const nav = page.getByTestId('step-nav')
+  await expect(nav).toContainText('No files yet')
+  await page.getByLabel('Choose audio files').setInputFiles(wavFile('lesson-one.wav'))
+  await expect(page.getByText('Uploaded')).toBeVisible()
+  await expect(nav).toContainText('1 file')
+
+  // A 1×1 PNG dropped anywhere on the page goes to the pictures, not the audio
+  const png = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII='
+  const drop = await page.evaluateHandle((b64) => {
+    const dt = new DataTransfer()
+    dt.items.add(new File([Uint8Array.from(atob(b64), (c) => c.charCodeAt(0))], 'cover.png', { type: 'image/png' }))
+    return dt
+  }, png)
+  await page.locator('form').dispatchEvent('drop', { dataTransfer: drop })
+  await expect(page.getByRole('button', { name: 'Remove cover.png' })).toBeVisible()
+  await expect(nav).toContainText('1 picture')
+
+  await nav.getByRole('button', { name: /Details/ }).click()
+  await expect(page.locator('#step-4')).toBeInViewport()
+})
+
 test('V1 + V5: uploads a recording, then makes the video with its title and look', async ({ page }) => {
   await openReady(page, '/videos/from-audio')
   await page.getByLabel('Choose audio files').setInputFiles(wavFile('lesson-one.wav'))

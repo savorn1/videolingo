@@ -22,6 +22,8 @@ import {
   DEFAULT_LOOK,
   sanitizeLook,
   submitBlocker,
+  submitBlockerStep,
+  sortDroppedFiles,
   uniqueTitles,
   waveformPlacement
 } from './audioVideo'
@@ -208,6 +210,36 @@ describe('submitBlocker', () => {
   it('asks for a required category last', () => {
     expect(submitBlocker({ ...ok, missingCategory: true })).toMatch(/category/)
     expect(submitBlocker({ ...ok, untitled: 1, missingCategory: true })).toMatch(/title/)
+  })
+})
+
+describe('submitBlockerStep', () => {
+  const ok = { files: 2, audioUploading: 0, picturesUploading: false, untitled: 0, slideError: null }
+  it('is null when nothing blocks', () => {
+    expect(submitBlockerStep(ok)).toBeNull()
+  })
+  it('points at the step holding the first thing to fix', () => {
+    expect(submitBlockerStep({ ...ok, files: 0 })).toBe(1)
+    expect(submitBlockerStep({ ...ok, audioUploading: 1, picturesUploading: true })).toBe(1)
+    expect(submitBlockerStep({ ...ok, picturesUploading: true, untitled: 1 })).toBe(2)
+    expect(submitBlockerStep({ ...ok, untitled: 1, slideError: 'x' })).toBe(1)
+    expect(submitBlockerStep({ ...ok, slideError: 'x', missingCategory: true })).toBe(2)
+    expect(submitBlockerStep({ ...ok, missingCategory: true })).toBe(4)
+  })
+})
+
+describe('sortDroppedFiles', () => {
+  const f = (name: string, type = '') => ({ name, type, size: 1 })
+  it('sends pictures to the slideshow and the rest to the audio', () => {
+    const { audio, pictures } = sortDroppedFiles([
+      f('a.mp3', 'audio/mpeg'),
+      f('b.png', 'image/png'),
+      f('c.JPG'),
+      f('d.txt', 'text/plain'),
+      f('e.gif', 'image/gif')
+    ])
+    expect(audio.map((x) => x.name)).toEqual(['a.mp3', 'd.txt'])
+    expect(pictures.map((x) => x.name)).toEqual(['b.png', 'c.JPG', 'e.gif'])
   })
 })
 

@@ -3,13 +3,53 @@
     <template #aside>
       <AudioVideoSavedLooks />
     </template>
-    <div class="space-y-5">
+    <div class="space-y-5 divide-y divide-gray-100 dark:divide-gray-800">
+      <!-- The frame: its shape and size, which everything else is placed in -->
+      <section class="space-y-3 pt-5 first:pt-0" aria-labelledby="look-frame">
+        <h3 id="look-frame" class="flex items-center gap-1.5 text-sm font-medium text-gray-900 dark:text-white">
+          <UIcon name="i-lucide-frame" class="size-4 text-gray-400" />Frame
+        </h3>
+        <div class="grid grid-cols-[auto_1fr] items-center gap-x-3 gap-y-2">
+          <span class="text-xs text-gray-500 dark:text-gray-400">Shape</span>
+          <div class="flex flex-wrap gap-2" role="radiogroup" aria-label="Shape">
+            <UButton
+              v-for="sh in VIDEO_SHAPES"
+              :key="sh.value"
+              size="sm"
+              role="radio"
+              :icon="sh.icon"
+              :title="sh.hint"
+              :color="shape === sh.value ? 'primary' : 'neutral'"
+              :variant="shape === sh.value ? 'soft' : 'ghost'"
+              :aria-checked="shape === sh.value"
+              @click="shape = sh.value"
+            >
+              {{ sh.label }} <span class="text-xs opacity-70">{{ sh.hint.split(' — ')[0] }}</span>
+            </UButton>
+          </div>
+          <span class="text-xs text-gray-500 dark:text-gray-400">Size</span>
+          <div class="flex flex-wrap gap-2" role="group" aria-label="Video size">
+            <UButton
+              v-for="r in VIDEO_RESOLUTIONS"
+              :key="r.value"
+              size="sm"
+              :color="resolution === r.value ? 'primary' : 'neutral'"
+              :variant="resolution === r.value ? 'soft' : 'ghost'"
+              :aria-pressed="resolution === r.value"
+              @click="resolution = r.value"
+            >
+              {{ r.label }} <span class="text-xs opacity-70 tabular-nums">{{ frameSizeLabel(r.value, shape) }}</span>
+            </UButton>
+          </div>
+        </div>
+      </section>
       <!-- Pictures: one, or a slideshow with the time each one appears -->
-      <div class="space-y-3">
+      <section class="space-y-3 pt-5 first:pt-0" aria-labelledby="look-pictures">
         <div class="flex flex-wrap items-baseline justify-between gap-2">
-          <p class="text-sm font-medium text-gray-700 dark:text-gray-300">
-            Pictures <span class="font-normal text-gray-500">(optional, shared by all the videos)</span>
-          </p>
+          <h3 id="look-pictures" class="flex items-center gap-1.5 text-sm font-medium text-gray-900 dark:text-white">
+            <UIcon name="i-lucide-images" class="size-4 text-gray-400" />Pictures
+            <span class="font-normal text-gray-500 dark:text-gray-400">· optional, shared by all the videos</span>
+          </h3>
           <UButton
             v-if="slides.length > 1"
             size="xs"
@@ -109,7 +149,7 @@
               ? spreadPerRecording
                 ? 'Spread evenly over each recording, so every video shows every picture. The first picture is the thumbnail.'
                 : 'Each picture stays until the next one starts. The times are the same for every video; the first picture is the thumbnail.'
-              : 'Fitted inside the frame, not stretched. Add more than one to change the picture over time. The first picture is the thumbnail.'
+              : 'Fitted inside the frame, not stretched; you can also drop pictures anywhere on the page. Add more than one to change the picture over time. The first picture is the thumbnail.'
           }}
         </p>
         <div v-if="slides.length || items.some((i) => i.coverKey)" class="flex flex-wrap gap-x-5 gap-y-2" data-testid="picture-motion">
@@ -117,31 +157,35 @@
           <USwitch v-model="motion" size="sm" label="Slow zoom" />
           <USwitch v-if="slides.length > 1" v-model="crossfade" size="sm" label="Dissolve between pictures" />
         </div>
-      </div>
 
-      <!-- Title card -->
-      <USwitch
-        v-model="titleCard"
-        :disabled="slides.length > 0"
-        label="Write the title on the picture"
-        :description="slides.length ? 'Not used when there are pictures.' : 'Each video shows its own title, centred on the background.'"
-      />
+        <!-- Title card -->
+        <USwitch
+          v-model="titleCard"
+          :disabled="slides.length > 0"
+          label="Write the title on the picture"
+          :description="slides.length ? 'Not used when there are pictures.' : 'Each video shows its own title, centred on the background.'"
+        />
+      </section>
 
       <!-- Background -->
-      <div class="space-y-2">
-        <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Background colour</p>
+      <section class="space-y-2 pt-5 first:pt-0" aria-labelledby="look-background">
+        <h3 id="look-background" class="flex items-center gap-1.5 text-sm font-medium text-gray-900 dark:text-white">
+          <UIcon name="i-lucide-palette" class="size-4 text-gray-400" />Background colour
+        </h3>
         <div class="flex flex-wrap items-center gap-2">
           <button
             v-for="c in BACKGROUND_SWATCHES"
             :key="c"
             type="button"
-            class="h-7 w-7 rounded-full border border-gray-300 focus-visible:outline-2 focus-visible:outline-primary-500 dark:border-gray-600"
+            class="flex h-7 w-7 items-center justify-center rounded-full border border-gray-300 focus-visible:outline-2 focus-visible:outline-primary-500 dark:border-gray-600"
             :class="background === c ? 'ring-2 ring-primary-500 ring-offset-2 dark:ring-offset-gray-900' : ''"
             :style="{ backgroundColor: c }"
             :aria-label="`Background ${c}`"
             :aria-pressed="background === c"
             @click="setBackground(c)"
-          />
+          >
+            <UIcon v-if="background === c" name="i-lucide-check" class="size-4" :class="darkBackground ? 'text-white' : 'text-gray-900'" />
+          </button>
           <input
             :value="background"
             type="color"
@@ -159,12 +203,14 @@
             @change="commitBackgroundText"
           />
         </div>
-      </div>
+      </section>
 
       <!-- Waveform -->
-      <div class="space-y-2">
+      <section class="space-y-2 pt-5 first:pt-0" aria-labelledby="look-waveform">
         <div class="flex flex-wrap items-center justify-between gap-2">
-          <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Moving waveform</p>
+          <h3 id="look-waveform" class="flex items-center gap-1.5 text-sm font-medium text-gray-900 dark:text-white">
+            <UIcon name="i-lucide-audio-waveform" class="size-4 text-gray-400" />Moving waveform
+          </h3>
           <AnimationSpeed v-if="waveform !== 'NONE'" label="Preview speed" />
         </div>
         <WaveTemplatePicker
@@ -268,32 +314,13 @@
               : `${waveformPlacement(waveform) === 'CENTER' ? 'Drawn in the middle' : 'Drawn along the bottom'}, ${waveHeightShown} % of the picture's height. The file is somewhat larger than a still picture.`
           }}
         </p>
-      </div>
-
-      <!-- Shape -->
-      <div class="space-y-2">
-        <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Shape</p>
-        <div class="flex flex-wrap gap-2" role="radiogroup" aria-label="Shape">
-          <UButton
-            v-for="sh in VIDEO_SHAPES"
-            :key="sh.value"
-            size="sm"
-            role="radio"
-            :icon="sh.icon"
-            :title="sh.hint"
-            :color="shape === sh.value ? 'primary' : 'neutral'"
-            :variant="shape === sh.value ? 'soft' : 'ghost'"
-            :aria-checked="shape === sh.value"
-            @click="shape = sh.value"
-          >
-            {{ sh.label }} <span class="text-xs opacity-70">{{ sh.hint.split(' — ')[0] }}</span>
-          </UButton>
-        </div>
-      </div>
+      </section>
 
       <!-- A strip of text and a logo over the picture -->
-      <div class="space-y-2" data-testid="branding">
-        <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Title strip and logo</p>
+      <section class="space-y-2 pt-5 first:pt-0" data-testid="branding" aria-labelledby="look-branding">
+        <h3 id="look-branding" class="flex items-center gap-1.5 text-sm font-medium text-gray-900 dark:text-white">
+          <UIcon name="i-lucide-type" class="size-4 text-gray-400" />Title strip and logo
+        </h3>
         <UInput
           v-model="stripText"
           :maxlength="MAX_STRIP"
@@ -316,25 +343,7 @@
             >The logo sits in the top-right corner; the strip at the bottom (at the top when a waveform runs along the bottom).</span
           >
         </div>
-      </div>
-
-      <!-- Size -->
-      <div class="space-y-2">
-        <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Video size</p>
-        <div class="flex flex-wrap gap-2" role="group" aria-label="Video size">
-          <UButton
-            v-for="r in VIDEO_RESOLUTIONS"
-            :key="r.value"
-            size="sm"
-            :color="resolution === r.value ? 'primary' : 'neutral'"
-            :variant="resolution === r.value ? 'soft' : 'ghost'"
-            :aria-pressed="resolution === r.value"
-            @click="resolution = r.value"
-          >
-            {{ r.label }} <span class="text-xs opacity-70 tabular-nums">{{ frameSizeLabel(r.value, shape) }}</span>
-          </UButton>
-        </div>
-      </div>
+      </section>
     </div>
   </AudioVideoStepCard>
 </template>
@@ -399,6 +408,7 @@ const {
   customOpen,
   offeredStyles,
   setBackground,
+  darkBackground,
   commitBackgroundText,
   onPickPictures,
   typeStart,

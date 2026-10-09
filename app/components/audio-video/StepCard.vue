@@ -1,5 +1,5 @@
 <template>
-  <UCard :class="tone.scope" :ui="{ header: tone.header }">
+  <UCard :id="`step-${step}`" class="scroll-mt-4" :class="tone.scope" :ui="{ header: tone.header }">
     <template #header>
       <div class="flex items-center justify-between gap-2">
         <h2 class="flex items-center gap-2 font-semibold text-gray-900 dark:text-white">

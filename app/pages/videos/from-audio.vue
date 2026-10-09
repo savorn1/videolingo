@@ -13,7 +13,9 @@
       :class="TAB_ACCENTS.audio.scope"
       aria-hidden="true"
     >
-      <p class="rounded-lg bg-white px-4 py-2 font-medium text-primary-700 shadow dark:bg-gray-900 dark:text-primary-300">Drop audio files to add them</p>
+      <p class="rounded-lg bg-white px-4 py-2 font-medium text-primary-700 shadow dark:bg-gray-900 dark:text-primary-300">
+        Drop audio files or pictures to add them
+      </p>
     </div>
 
     <form class="grid grid-cols-1 lg:grid-cols-5 gap-4 items-start" @submit.prevent="onSubmit">

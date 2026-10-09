@@ -1,5 +1,11 @@
 <template>
   <UDashboardGroup class="bg-gray-50 dark:bg-gray-950">
+    <!-- First stop for the Tab key: past the sidebar and toolbar, straight to the page -->
+    <a
+      href="#main-content"
+      class="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-[100] focus:rounded-md focus:bg-white focus:px-3 focus:py-2 focus:text-sm focus:font-medium focus:text-primary-700 focus:shadow-lg focus:ring-2 focus:ring-primary-500 dark:focus:bg-gray-900 dark:focus:text-primary-300"
+      >Skip to content</a
+    >
     <!-- Cmd/Ctrl+K anywhere in the app — items are derived straight from the
          sidebar nav below, so it can never list a page the sidebar doesn't
          also have (see searchGroups). -->
@@ -49,6 +55,11 @@
           <template #right>
             <div class="flex items-center gap-0.5 rounded-lg bg-white/80 p-0.5 ring-1 ring-primary-100 dark:bg-gray-900/70 dark:ring-primary-900/60">
               <UDashboardSearchButton class="text-sky-600 hover:bg-sky-50 dark:text-sky-400 dark:hover:bg-sky-950/40" />
+              <ShortcutsHelp
+                :items="globalShortcuts"
+                global
+                button-class="text-emerald-600 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-950/40"
+              />
               <WhatsNewButton />
               <JobsIndicator />
               <InboxBell />
@@ -68,10 +79,13 @@
             </UDropdownMenu>
           </template>
         </UDashboardNavbar>
+        <ConnectionBanner />
       </template>
 
       <template #body>
-        <slot />
+        <main id="main-content" tabindex="-1" class="outline-none">
+          <slot />
+        </main>
       </template>
     </UDashboardPanel>
 
@@ -85,6 +99,7 @@
 import type { BreadcrumbItem, DropdownMenuItem } from '@nuxt/ui'
 import type { SidebarItem } from '~/components/SidebarNav.vue'
 import { usePageCrumbs } from '~/composables/usePageCrumbs'
+import { goShortcutHelp, goShortcutsFor } from '#shared/utils/goShortcuts'
 
 const { username, role, hasAnyAccess, logout } = useAuth()
 // Settings › General
@@ -92,6 +107,10 @@ const { settings: clientSettings } = useClientSettings()
 const siteName = computed(() => clientSettings.value?.siteName || 'VideoLingo')
 useHead({ title: siteName, titleTemplate: (title) => tabTitle(title, siteName.value) })
 const route = useRoute()
+
+// g + a letter goes to a page; "?" (the keyboard button in the toolbar) lists them.
+useGoShortcuts()
+const globalShortcuts = computed(() => goShortcutHelp(goShortcutsFor(hasAnyAccess.value)))
 
 const profileItems = computed<DropdownMenuItem[][]>(() => [
   [

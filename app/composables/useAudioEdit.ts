@@ -131,7 +131,19 @@ export function useAudioEdit(durationMs: Ref<number>) {
     return null
   })
 
-  return { state, sourceMs, clipsChanged, request, changed, error, reset, resetClips }
+  /**
+   * Files uploaded in this visit, playable in the browser (upload key → object URL), so the preview can play them.
+   * Kept out of `state`: drafts and undo would keep a link that dies with the page.
+   */
+  const localUrls = shallowReactive(new Map<string, string>())
+  function rememberLocalFile(key: string, file: File) {
+    localUrls.set(key, URL.createObjectURL(file))
+  }
+  onBeforeUnmount(() => {
+    for (const url of localUrls.values()) URL.revokeObjectURL(url)
+  })
+
+  return { state, sourceMs, clipsChanged, request, changed, error, reset, resetClips, localUrls, rememberLocalFile }
 }
 
 export type AudioEdit = ReturnType<typeof useAudioEdit>

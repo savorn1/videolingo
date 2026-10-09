@@ -168,3 +168,119 @@ export function parseMp4(buf: Uint8Array): AudioTags {
   if (covr?.bytes.length) tags.cover = { mime: covr.kind === 14 ? 'image/png' : 'image/jpeg', data: covr.bytes }
   return Object.fromEntries(Object.entries(tags).filter(([, v]) => v !== undefined)) as AudioTags
 }
+
+// ── FLAC, Ogg Vorbis and Opus: "Vorbis comments" (KEY=value) and FLAC picture blocks ──
+
+function le32(b: Uint8Array, at: number): number {
+  return ((b[at + 3]! << 24) >>> 0) + (b[at + 2]! << 16) + (b[at + 1]! << 8) + b[at]!
+}
+
+/** A FLAC picture block (also carried base64-encoded in Ogg as METADATA_BLOCK_PICTURE); null when it doesn't add up. */
+export function parseFlacPicture(b: Uint8Array): { type: number; mime: string; data: Uint8Array } | null {
+  if (b.length < 32) return null
+  const type = uint32(b, 0)
+  const mimeLen = uint32(b, 4)
+  let at = 8 + mimeLen
+  if (at + 4 > b.length) return null
+  const mime = latin1.decode(b.subarray(8, at)) || 'image/jpeg'
+  at += 4 + uint32(b, at) + 16 // the description, then width, height, depth and colours
+  if (at + 4 > b.length) return null
+  const length = uint32(b, at)
+  const data = b.subarray(at + 4, at + 4 + length)
+  return data.length === length && length > 0 ? { type, mime, data } : null
+}
+
+function base64Bytes(s: string): Uint8Array | null {
+  try {
+    return Uint8Array.from(atob(s.replace(/\s/g, '')), (c) => c.charCodeAt(0))
+  } catch {
+    return null
+  }
+}
+
+/** Keeps a picture when there is none yet, or when it is the front cover (type 3) and the one kept isn't. */
+function offerCover(tags: AudioTags, kept: { type: number }, pic: { type: number; mime: string; data: Uint8Array } | null) {
+  if (!pic || (tags.cover && !(pic.type === 3 && kept.type !== 3))) return
+  tags.cover = { mime: pic.mime, data: pic.data }
+  kept.type = pic.type
+}
+
+/**
+ * A Vorbis comment block (little-endian lengths: vendor, count, then "KEY=value" entries), as FLAC, Ogg Vorbis
+ * and Opus store their tags. Reads what fits when the block is cut short.
+ */
+export function parseVorbisComment(b: Uint8Array, tags: AudioTags = {}, kept = { type: -1 }): AudioTags {
+  if (b.length < 8) return tags
+  let at = 4 + le32(b, 0)
+  if (at + 4 > b.length) return tags
+  const count = le32(b, at)
+  at += 4
+  for (let i = 0; i < count && at + 4 <= b.length; i++) {
+    const len = le32(b, at)
+    const entry = b.subarray(at + 4, at + 4 + len)
+    at += 4 + len
+    if (entry.length < len) break
+    const eq = entry.indexOf(0x3d) // '='
+    if (eq <= 0) continue
+    const key = latin1.decode(entry.subarray(0, eq)).toUpperCase()
+    if (key === 'METADATA_BLOCK_PICTURE') {
+      const raw = base64Bytes(latin1.decode(entry.subarray(eq + 1)))
+      offerCover(tags, kept, raw && parseFlacPicture(raw))
+      continue
+    }
+    const value = utf8.decode(entry.subarray(eq + 1)).trim()
+    if (!value) continue
+    if (key === 'TITLE') tags.title ||= value
+    else if (key === 'ARTIST') tags.artist ||= value
+    else if (key === 'ALBUM') tags.album ||= value
+  }
+  return tags
+}
+
+/** Reads a FLAC file's tags and pictures: `buf` holds at least its metadata blocks. */
+export function parseFlac(buf: Uint8Array): AudioTags {
+  if (buf.length < 4 || ascii(buf, 0, 4) !== 'fLaC') return {}
+  const tags: AudioTags = {}
+  const kept = { type: -1 }
+  let pos = 4
+  while (pos + 4 <= buf.length) {
+    const type = buf[pos]! & 0x7f
+    const last = buf[pos]! & 0x80
+    const len = (buf[pos + 1]! << 16) | (buf[pos + 2]! << 8) | buf[pos + 3]!
+    const data = buf.subarray(pos + 4, pos + 4 + len)
+    if (type === 4) parseVorbisComment(data, tags, kept)
+    else if (type === 6) offerCover(tags, kept, parseFlacPicture(data))
+    if (last) break
+    pos += 4 + len
+  }
+  return tags
+}
+
+/**
+ * Reads the tags of an Ogg Vorbis or Opus file: `buf` is the start of the file. The pages' payloads are joined into
+ * one stream, where the comment packet ("OpusTags", or 3 + "vorbis") follows the identification packet.
+ */
+export function parseOgg(buf: Uint8Array): AudioTags {
+  const parts: Uint8Array[] = []
+  let pos = 0
+  while (pos + 27 <= buf.length && ascii(buf, pos, 4) === 'OggS') {
+    const segments = buf[pos + 26]!
+    let size = 0
+    for (let i = 0; i < segments; i++) size += buf[pos + 27 + i] ?? 0
+    const start = pos + 27 + segments
+    parts.push(buf.subarray(start, Math.min(buf.length, start + size)))
+    pos = start + size
+  }
+  const stream = new Uint8Array(parts.reduce((n, p) => n + p.length, 0))
+  let at = 0
+  for (const p of parts) {
+    stream.set(p, at)
+    at += p.length
+  }
+  const text = latin1.decode(stream.subarray(0, Math.min(stream.length, 4096)))
+  const opus = text.indexOf('OpusTags')
+  if (opus !== -1) return parseVorbisComment(stream.subarray(opus + 8))
+  const vorbis = text.indexOf('\u0003vorbis', 1) // the identification packet starts with 1 + "vorbis"
+  if (vorbis !== -1) return parseVorbisComment(stream.subarray(vorbis + 7))
+  return {}
+}

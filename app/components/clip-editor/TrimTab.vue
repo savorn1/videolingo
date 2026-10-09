@@ -286,9 +286,49 @@
         description="Set the exact width and height of the result."
         @update:model-value="onScaleToggle"
       />
-      <div v-if="scaleOn" class="grid grid-cols-2 gap-2">
-        <UFormField label="Width"><UInput v-model.number="scale.w" type="number" size="sm" /></UFormField>
-        <UFormField label="Height"><UInput v-model.number="scale.h" type="number" size="sm" /></UFormField>
+      <div v-if="scaleOn" class="space-y-2.5" data-testid="resize">
+        <!-- The usual sizes, in the shape of the picture after the crop and turn -->
+        <div v-if="resizeOptions.length" class="flex flex-wrap gap-1.5" role="group" aria-label="Common sizes">
+          <UButton
+            v-for="c in resizeOptions"
+            :key="c.label"
+            size="xs"
+            :color="scale.w === c.w && scale.h === c.h ? 'primary' : 'neutral'"
+            :variant="scale.w === c.w && scale.h === c.h ? 'soft' : 'outline'"
+            :aria-pressed="scale.w === c.w && scale.h === c.h"
+            @click="pickScale(c)"
+          >
+            {{ c.label }} <span class="tabular-nums opacity-70">{{ c.w }}×{{ c.h }}</span>
+          </UButton>
+        </div>
+        <div class="flex items-end gap-2">
+          <UFormField label="Width" class="flex-1">
+            <UInput :model-value="scale.w" type="number" size="sm" min="2" class="w-full" @update:model-value="(v) => setScaleSide('w', Number(v))" />
+          </UFormField>
+          <UButton
+            size="sm"
+            color="neutral"
+            :variant="scaleLock ? 'soft' : 'ghost'"
+            :icon="scaleLock ? 'i-lucide-link' : 'i-lucide-unlink'"
+            :aria-pressed="scaleLock"
+            :aria-label="scaleLock ? 'Keep shape is on: the other side follows' : 'Keep shape is off: each side is set on its own'"
+            :title="scaleLock ? 'Keep shape: on' : 'Keep shape: off'"
+            @click="scaleLock = !scaleLock"
+          />
+          <UFormField label="Height" class="flex-1">
+            <UInput :model-value="scale.h" type="number" size="sm" min="2" class="w-full" @update:model-value="(v) => setScaleSide('h', Number(v))" />
+          </UFormField>
+        </div>
+        <p v-if="resizeFrom" class="text-xs text-gray-500 dark:text-gray-400 tabular-nums">
+          From {{ resizeFrom.w }}×{{ resizeFrom.h }}<template v-if="resizeFromNote"> ({{ resizeFromNote }})</template>.
+        </p>
+        <p v-if="scaleNotes.stretched" class="flex flex-wrap items-center gap-x-2 text-xs text-warning-700 dark:text-warning-400" role="status">
+          <span>A different shape from the picture — it will be stretched.</span>
+          <UButton size="xs" color="neutral" variant="link" :padded="false" @click="matchScaleShape">Match the shape</UButton>
+        </p>
+        <p v-if="scaleNotes.larger" class="text-xs text-gray-600 dark:text-gray-300" role="status">
+          Larger than the picture: it gets bigger, not sharper — no detail is added, and the file grows.
+        </p>
       </div>
 
       <!-- Turn and flip: done after the crop, before the resize -->
@@ -458,6 +498,13 @@ const {
   onAutoCenter,
   scaleOn,
   scale,
+  resizeFrom,
+  resizeOptions,
+  scaleNotes,
+  scaleLock,
+  setScaleSide,
+  pickScale,
+  matchScaleShape,
   onScaleToggle,
   trimError,
   starting,
@@ -477,4 +524,7 @@ const {
   presetFileInput,
   renameInput
 } = useClipEditorContext()
+
+// What the resize starts from, when it isn't simply the whole video.
+const resizeFromNote = computed(() => [cropOn.value && 'the crop', orientActive.value && 'turned'].filter(Boolean).join(', '))
 </script>

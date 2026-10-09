@@ -29,6 +29,8 @@ import {
   sanitizeLook,
   type SavedLook,
   submitBlocker,
+  sortDroppedFiles,
+  submitBlockerStep,
   uniqueTitles,
   WAVEFORM_STYLES,
   waveformPlacement,
@@ -165,8 +167,10 @@ export function useAudioToVideoForm() {
   function commitPartMinutes() {
     partMinutes.value = clampPartMinutes(partMinutes.value)
   }
-  // The first recording's own picture shows in the preview when it has one.
-  const previewOwnCover = computed(() => readyItems.value[0]?.coverUrl ?? null)
+  // The preview shows one recording (its title, own picture and length): the one chosen, else the first.
+  const previewItemId = ref<number | null>(null)
+  const previewItem = computed(() => readyItems.value.find((i) => i.id === previewItemId.value) ?? readyItems.value[0] ?? null)
+  const previewOwnCover = computed(() => previewItem.value?.coverUrl ?? null)
   // The title goes on the picture only when there are no pictures to show.
   watch(
     () => slides.value.length,
@@ -187,7 +191,10 @@ export function useAudioToVideoForm() {
   })
   const beyond = computed(() => slidesBeyond(slideStarts.value, shortestSeconds.value))
   const spreadStarts = computed(() => (shortestSeconds.value ? spreadEvenly(slides.value.length, shortestSeconds.value) : null))
-  const previewMax = computed(() => readyItems.value[0]?.durationSeconds ?? 0)
+  const previewMax = computed(() => previewItem.value?.durationSeconds ?? 0)
+  watch(previewMax, (max) => {
+    if (previewSeconds.value > max) previewSeconds.value = Math.floor(max)
+  })
   const shownIndex = computed(() => slideIndexAt(slideStarts.value, previewSeconds.value * 1000))
   const shownSlide = computed(() => slides.value[shownIndex.value] ?? null)
   const uploadingAny = computed(() => picUploading.value || items.value.some((i) => i.status === 'queued' || i.status === 'uploading'))
@@ -200,6 +207,25 @@ export function useAudioToVideoForm() {
       missingCategory: requireCategory.value && !categoryIds.value.length
     })
   )
+  /** The step to look at for what blocks making the videos. */
+  const blockerStep = computed(() =>
+    blocker.value
+      ? submitBlockerStep({
+          files: items.value.filter((i) => i.status !== 'error').length,
+          audioUploading: items.value.filter((i) => i.status === 'queued' || i.status === 'uploading').length,
+          picturesUploading: picUploading.value,
+          untitled: readyItems.value.filter((i) => !i.title.trim()).length,
+          slideError: slideError.value,
+          missingCategory: requireCategory.value && !categoryIds.value.length
+        })
+      : null
+  )
+  /** Brings a step's card into view (instantly when the user prefers less motion); returns it. */
+  function scrollToStep(step: number): HTMLElement | null {
+    const card = document.getElementById(`step-${step}`)
+    card?.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' })
+    return card
+  }
   const canSubmit = computed(() => !blocker.value && !saving.value && readyItems.value.length > 0)
   const submitLabel = computed(() => {
     if (uploadingAny.value) return 'Waiting for the uploads…'
@@ -373,7 +399,7 @@ export function useAudioToVideoForm() {
     if (!offeredStyles.value.includes(waveform.value)) waveform.value = 'NONE'
   })
   const waveDrawColor = computed(() => (waveAuto.value ? textColor.value : waveColor.value))
-  const previewTitle = computed(() => readyItems.value[0]?.title.trim() || items.value[0]?.title.trim() || 'Your title here')
+  const previewTitle = computed(() => previewItem.value?.title.trim() || items.value[0]?.title.trim() || 'Your title here')
 
   function setBackground(value: string) {
     const hex = normalizeHexColor(value)
@@ -462,8 +488,9 @@ export function useAudioToVideoForm() {
   function onDrop(event: DragEvent) {
     dragDepth = 0
     dragging.value = false
-    const files = Array.from(event.dataTransfer?.files ?? [])
-    if (files.length) addFiles(files)
+    const { audio, pictures } = sortDroppedFiles(Array.from(event.dataTransfer?.files ?? []))
+    if (audio.length) addFiles(audio)
+    if (pictures.length) addPictures(pictures)
   }
 
   /** Starts waiting files, up to PARALLEL_UPLOADS at once; each one that finishes starts the next. */
@@ -496,7 +523,7 @@ export function useAudioToVideoForm() {
       item.file = null
       // Its cover art becomes its own picture (unless one was chosen meanwhile).
       if (tags.cover && !item.coverKey) {
-        const ext = tags.cover.mime === 'image/png' ? 'png' : 'jpg'
+        const ext = tags.cover.mime === 'image/png' ? 'png' : tags.cover.mime === 'image/webp' ? 'webp' : 'jpg'
         await setItemPicture(item, new File([new Uint8Array(tags.cover.data)], `cover.${ext}`, { type: tags.cover.mime }), true)
       }
     } catch (err) {
@@ -555,10 +582,17 @@ export function useAudioToVideoForm() {
 
   // ── The pictures ─────────────────────────────────────────────────────────────
   let nextSlideId = 1
-  async function onPickPictures(event: Event) {
+  function onPickPictures(event: Event) {
     const input = event.target as HTMLInputElement
     const files = Array.from(input.files ?? [])
     input.value = ''
+    if (files.length) addPictures(files)
+  }
+  async function addPictures(files: File[]) {
+    if (picUploading.value) {
+      errors.value.cover = 'Wait for the pictures being uploaded, then add more'
+      return
+    }
     errors.value.cover = ''
     const room = MAX_SLIDES - slides.value.length
     if (files.length > room) errors.value.cover = `At most ${MAX_SLIDES} pictures; the first ${room} were used`
@@ -860,6 +894,10 @@ export function useAudioToVideoForm() {
     videoCountLabel,
     commitPartMinutes,
     previewOwnCover,
+    previewItemId,
+    previewItem,
+    blockerStep,
+    scrollToStep,
     readyItems,
     slideStarts,
     slideError,

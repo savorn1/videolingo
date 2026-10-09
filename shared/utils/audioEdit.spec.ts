@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import {
+  previewGainAt,
+  musicPositionAt,
+  musicSpans,
+  fadeSpans,
+  fadeFromHandle,
   addMute,
   assignLanes,
   clipAt,
@@ -149,5 +154,93 @@ describe('addMute / isMutedAt', () => {
     expect(m).toEqual([{ startMs: 1000, endMs: 4000 }])
     expect(isMutedAt(m, 3999)).toBe(true)
     expect(isMutedAt(m, 4000)).toBe(false)
+  })
+})
+
+describe('previewGainAt', () => {
+  const base = { volume: 1, mutes: [], fadeInMs: 0, fadeOutMs: 0, speed: 1 }
+  it('plays the volume, up to 100 %, and silences muted ranges', () => {
+    expect(previewGainAt(base, 10_000, 5000)).toBe(1)
+    expect(previewGainAt({ ...base, volume: 0.5 }, 10_000, 5000)).toBe(0.5)
+    expect(previewGainAt({ ...base, volume: 2 }, 10_000, 5000)).toBe(1)
+    expect(previewGainAt({ ...base, mutes: [{ startMs: 4000, endMs: 6000 }] }, 10_000, 5000)).toBe(0)
+  })
+  it('fades in from the start and out to the end', () => {
+    const s = { ...base, fadeInMs: 2000, fadeOutMs: 4000 }
+    expect(previewGainAt(s, 10_000, 0)).toBe(0)
+    expect(previewGainAt(s, 10_000, 1000)).toBe(0.5)
+    expect(previewGainAt(s, 10_000, 5000)).toBe(1)
+    expect(previewGainAt(s, 10_000, 8000)).toBe(0.5)
+    expect(previewGainAt(s, 10_000, 10_000)).toBe(0)
+  })
+  it('places the fades on the finished timeline when the speed changes', () => {
+    // At 2× the 10 s video lasts 5 s; a 1 s fade-in covers the first 2 s of the source.
+    expect(previewGainAt({ ...base, fadeInMs: 1000, speed: 2 }, 10_000, 1000)).toBe(0.5)
+    expect(previewGainAt({ ...base, fadeOutMs: 1000, speed: 2 }, 10_000, 9000)).toBe(0.5)
+  })
+})
+
+describe('musicPositionAt', () => {
+  const music = { startMs: 2000, loop: false, durationMs: 5000 }
+  it('is silent before the music starts', () => {
+    expect(musicPositionAt(music, 1000)).toBeNull()
+    expect(musicPositionAt(music, 2000)).toBe(0)
+  })
+  it('stops at its end, or goes round when looping', () => {
+    expect(musicPositionAt(music, 6500)).toBe(4500)
+    expect(musicPositionAt(music, 7000)).toBeNull()
+    expect(musicPositionAt({ ...music, loop: true }, 8000)).toBe(1000)
+  })
+  it('plays on when its length is unknown', () => {
+    expect(musicPositionAt({ ...music, durationMs: null }, 12_000)).toBe(10_000)
+  })
+})
+
+describe('musicSpans', () => {
+  it('is one span, cut at the video end, without looping', () => {
+    expect(musicSpans({ startMs: 2000, loop: false, durationMs: 5000 }, 10_000)).toEqual([{ startMs: 2000, endMs: 7000 }])
+    expect(musicSpans({ startMs: 8000, loop: false, durationMs: 5000 }, 10_000)).toEqual([{ startMs: 8000, endMs: 10_000 }])
+  })
+  it('is one span per loop round', () => {
+    expect(musicSpans({ startMs: 1000, loop: true, durationMs: 4000 }, 10_000)).toEqual([
+      { startMs: 1000, endMs: 5000 },
+      { startMs: 5000, endMs: 9000 },
+      { startMs: 9000, endMs: 10_000 }
+    ])
+  })
+  it('caps the rounds, the last one running to the end', () => {
+    const spans = musicSpans({ startMs: 0, loop: true, durationMs: 10 }, 10_000)
+    expect(spans).toHaveLength(100)
+    expect(spans.at(-1)!.endMs).toBe(10_000)
+  })
+  it('is nothing when it starts after the end, and runs to the end when its length is unknown', () => {
+    expect(musicSpans({ startMs: 12_000, loop: true, durationMs: 4000 }, 10_000)).toEqual([])
+    expect(musicSpans({ startMs: 0, loop: false, durationMs: null }, 10_000)).toEqual([{ startMs: 0, endMs: 10_000 }])
+  })
+})
+
+describe('fadeSpans', () => {
+  it('places the fades at the ends, stretched by the speed', () => {
+    expect(fadeSpans({ fadeInMs: 1000, fadeOutMs: 2000, speed: 1 }, 10_000)).toEqual({
+      fadeIn: { startMs: 0, endMs: 1000 },
+      fadeOut: { startMs: 8000, endMs: 10_000 }
+    })
+    expect(fadeSpans({ fadeInMs: 1000, fadeOutMs: 0, speed: 2 }, 10_000)).toEqual({ fadeIn: { startMs: 0, endMs: 2000 }, fadeOut: null })
+  })
+})
+
+describe('fadeFromHandle', () => {
+  const s = { fadeInMs: 0, fadeOutMs: 0, speed: 1 }
+  it('measures the fade-in from the start and the fade-out to the end, to 0.1 s', () => {
+    expect(fadeFromHandle('in', 2340, s, 10_000)).toBe(2300)
+    expect(fadeFromHandle('out', 7000, s, 10_000)).toBe(3000)
+    expect(fadeFromHandle('in', -500, s, 10_000)).toBe(0)
+  })
+  it('is on the finished timeline after a speed change', () => {
+    expect(fadeFromHandle('in', 4000, { ...s, speed: 2 }, 10_000)).toBe(2000)
+  })
+  it('leaves room for the other fade, and stops at a minute', () => {
+    expect(fadeFromHandle('in', 9000, { ...s, fadeOutMs: 4000 }, 10_000)).toBe(6000)
+    expect(fadeFromHandle('in', 90_000, s, 120_000)).toBe(60_000)
   })
 })

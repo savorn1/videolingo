@@ -79,8 +79,12 @@
           size="sm"
           maxlength="200"
           class="w-full"
+          :color="it.status === 'ready' && !it.title.trim() ? 'error' : undefined"
+          :highlight="it.status === 'ready' && !it.title.trim()"
+          :data-untitled="it.status === 'ready' && !it.title.trim() ? '' : undefined"
+          :aria-invalid="it.status === 'ready' && !it.title.trim()"
           :aria-label="`Title for ${it.name}`"
-          placeholder="Title"
+          placeholder="Title (needed)"
         />
         <div v-if="it.status !== 'error'" class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500 dark:text-gray-400">
           <template v-if="it.coverKey">
@@ -103,9 +107,10 @@
     </ul>
 
     <label
-      class="flex cursor-pointer flex-col items-center gap-1 rounded-lg border-2 border-dashed border-gray-300 px-4 py-6 text-center transition-colors hover:border-primary-400 hover:bg-primary-50/40 focus-within:border-primary-500 dark:border-gray-700 dark:hover:bg-primary-950/20"
+      class="flex cursor-pointer flex-col items-center gap-1 rounded-lg border-2 border-dashed border-gray-300 px-4 text-center transition-colors hover:border-primary-400 hover:bg-primary-50/40 focus-within:border-primary-500 dark:border-gray-700 dark:hover:bg-primary-950/20"
+      :class="items.length ? 'py-4' : 'py-10'"
     >
-      <UIcon name="i-lucide-upload" class="h-6 w-6 text-gray-400" />
+      <UIcon name="i-lucide-upload" class="text-gray-400" :class="items.length ? 'h-6 w-6' : 'h-8 w-8'" />
       <span class="text-sm font-medium text-gray-900 dark:text-white">{{ items.length ? 'Add more audio files' : 'Choose audio files' }}</span>
       <span class="text-xs text-gray-500 dark:text-gray-400">
         or drop them anywhere on this page · MP3, M4A, AAC, WAV, OGG, Opus or FLAC · up to {{ maxUploadMb }} MB each · up to {{ MAX_BATCH }} files
