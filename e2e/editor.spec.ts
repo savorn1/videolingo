@@ -177,12 +177,7 @@ test('Trim: a look can be compared before and after on the preview', async ({ pa
   await openEditor(page)
   await page.getByRole('heading', { name: 'Look' }).click()
   await page.getByRole('switch', { name: 'Black & white' }).click()
-  await page
-    .getByTestId('look-compare-switch')
-    .getByRole('switch')
-    .or(page.getByRole('switch', { name: 'Compare before / after' }))
-    .first()
-    .click()
+  await page.getByRole('switch', { name: 'Compare before / after' }).click()
   const compare = page.getByTestId('look-compare')
   await expect(compare).toBeVisible()
   await expect(compare).toContainText('Before')

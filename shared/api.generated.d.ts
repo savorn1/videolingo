@@ -196,6 +196,22 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/admin/videos/{id}/schedule': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put: operations['schedule']
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/api/admin/videos/{id}/owner': {
     parameters: {
       query?: never
@@ -212,6 +228,22 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/admin/videos/{id}/notes/{noteId}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put: operations['resolve']
+    post?: never
+    delete: operations['delete_5']
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/api/admin/users/{id}': {
     parameters: {
       query?: never
@@ -222,7 +254,7 @@ export interface paths {
     get: operations['getById_1']
     put: operations['update_4']
     post?: never
-    delete: operations['delete_5']
+    delete: operations['delete_6']
     options?: never
     head?: never
     patch?: never
@@ -302,7 +334,7 @@ export interface paths {
     get: operations['getById_2']
     put: operations['update_5']
     post?: never
-    delete: operations['delete_6']
+    delete: operations['delete_7']
     options?: never
     head?: never
     patch?: never
@@ -318,7 +350,7 @@ export interface paths {
     get: operations['getById_3']
     put: operations['update_6']
     post?: never
-    delete: operations['delete_7']
+    delete: operations['delete_8']
     options?: never
     head?: never
     patch?: never
@@ -334,7 +366,7 @@ export interface paths {
     get: operations['getById_4']
     put: operations['update_7']
     post?: never
-    delete: operations['delete_8']
+    delete: operations['delete_9']
     options?: never
     head?: never
     patch?: never
@@ -364,7 +396,7 @@ export interface paths {
       cookie?: never
     }
     get?: never
-    put: operations['resolve']
+    put: operations['resolve_1']
     post?: never
     delete: operations['deleteComment']
     options?: never
@@ -494,7 +526,7 @@ export interface paths {
     get: operations['getById_5']
     put: operations['update_8']
     post?: never
-    delete: operations['delete_9']
+    delete: operations['delete_10']
     options?: never
     head?: never
     patch?: never
@@ -542,7 +574,7 @@ export interface paths {
     get: operations['getById_6']
     put: operations['update_9']
     post?: never
-    delete: operations['delete_10']
+    delete: operations['delete_11']
     options?: never
     head?: never
     patch?: never
@@ -558,7 +590,7 @@ export interface paths {
     get: operations['getById_7']
     put: operations['update_10']
     post?: never
-    delete: operations['delete_11']
+    delete: operations['delete_12']
     options?: never
     head?: never
     patch?: never
@@ -574,7 +606,7 @@ export interface paths {
     get: operations['getById_8']
     put: operations['update_11']
     post?: never
-    delete: operations['delete_12']
+    delete: operations['delete_13']
     options?: never
     head?: never
     patch?: never
@@ -622,7 +654,7 @@ export interface paths {
     get: operations['getById_9']
     put: operations['update_12']
     post?: never
-    delete: operations['delete_13']
+    delete: operations['delete_14']
     options?: never
     head?: never
     patch?: never
@@ -1230,6 +1262,38 @@ export interface paths {
     get?: never
     put?: never
     post: operations['replace']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/admin/videos/{id}/remake': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get: operations['remakeStatus']
+    put?: never
+    post: operations['remake']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/admin/videos/{id}/notes': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get: operations['notes']
+    put?: never
+    post: operations['add']
     delete?: never
     options?: never
     head?: never
@@ -2340,6 +2404,22 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/admin/videos/{videoId}/edits/pauses': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get: operations['pauses']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/api/admin/videos/{videoId}/edits/fonts': {
     parameters: {
       query?: never
@@ -2380,6 +2460,22 @@ export interface paths {
       cookie?: never
     }
     get: operations['statistics']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/admin/videos/edit-results': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get: operations['results']
     put?: never
     post?: never
     delete?: never
@@ -2558,7 +2654,7 @@ export interface paths {
     get: operations['getById_10']
     put?: never
     post?: never
-    delete: operations['delete_14']
+    delete: operations['delete_15']
     options?: never
     head?: never
     patch?: never
@@ -3022,7 +3118,7 @@ export interface paths {
     get?: never
     put?: never
     post?: never
-    delete: operations['delete_15']
+    delete: operations['delete_16']
     options?: never
     head?: never
     patch?: never
@@ -3038,7 +3134,7 @@ export interface paths {
     get?: never
     put?: never
     post?: never
-    delete: operations['delete_16']
+    delete: operations['delete_17']
     options?: never
     head?: never
     patch?: never
@@ -3054,7 +3150,7 @@ export interface paths {
     get?: never
     put?: never
     post?: never
-    delete: operations['delete_17']
+    delete: operations['delete_18']
     options?: never
     head?: never
     patch?: never
@@ -3070,7 +3166,7 @@ export interface paths {
     get?: never
     put?: never
     post?: never
-    delete: operations['delete_18']
+    delete: operations['delete_19']
     options?: never
     head?: never
     patch?: never
@@ -3367,6 +3463,7 @@ export interface components {
       atMs?: number
       label?: string
       color?: string
+      chapter?: boolean
     }
     ApiResponseMarkerResponse: {
       traceId?: string
@@ -3382,6 +3479,7 @@ export interface components {
       atMs?: number
       label?: string
       color?: string
+      chapter?: boolean
       createdBy?: string
       /** Format: date-time */
       createdAt?: string
@@ -3510,6 +3608,30 @@ export interface components {
     MoveVideoOwnerRequest: {
       /** Format: int64 */
       ownerId?: number
+    }
+    ResolveRequest: {
+      resolved?: boolean
+    }
+    ApiResponseNoteResponse: {
+      traceId?: string
+      /** Format: int32 */
+      statusCode?: number
+      message?: string
+      data?: components['schemas']['NoteResponse']
+    }
+    NoteResponse: {
+      /** Format: int64 */
+      id?: number
+      /** Format: int64 */
+      videoId?: number
+      body?: string
+      author?: string
+      resolved?: boolean
+      resolvedBy?: string
+      /** Format: date-time */
+      resolvedAt?: string
+      /** Format: date-time */
+      createdAt?: string
     }
     UpdateUserRequest: {
       /** Format: email */
@@ -3705,9 +3827,6 @@ export interface components {
       cues?: components['schemas']['SubtitleCueDto'][]
       issues?: components['schemas']['SubtitleIssueDto'][]
       warnings?: string[]
-    }
-    ResolveRequest: {
-      resolved?: boolean
     }
     ApiResponseCommentResponse: {
       traceId?: string
@@ -4309,6 +4428,12 @@ export interface components {
       /** Format: int64 */
       durationMs?: number
     }
+    GreenScreen: {
+      keyColor?: string
+      /** Format: double */
+      similarity?: number
+      background?: string
+    }
     Look: {
       /** Format: double */
       brightness?: number
@@ -4380,6 +4505,18 @@ export interface components {
       speed?: components['schemas']['SpeedRange']
       pip?: components['schemas']['Pip']
       cards?: components['schemas']['Cards']
+      reverse?: boolean
+      stabilize?: boolean
+      zoomTo?: components['schemas']['ZoomTo']
+      greenScreen?: components['schemas']['GreenScreen']
+    }
+    ZoomTo: {
+      /** Format: double */
+      cx?: number
+      /** Format: double */
+      cy?: number
+      /** Format: double */
+      size?: number
     }
     ApiResponseProcessingJobResponse: {
       traceId?: string
@@ -4475,6 +4612,12 @@ export interface components {
       /** Format: int64 */
       endMs?: number
       animation?: string
+      /** Format: double */
+      toX?: number
+      /** Format: double */
+      toY?: number
+      /** Format: double */
+      toScale?: number
     }
     Spec: {
       layers?: components['schemas']['Layer'][]
@@ -4525,6 +4668,8 @@ export interface components {
       balance?: number
       channels?: string
       music?: components['schemas']['MusicInput']
+      tracks?: components['schemas']['MusicInput'][]
+      keepSoundSpeed?: boolean
     }
     RangeInput: {
       /** Format: int64 */
@@ -4555,6 +4700,9 @@ export interface components {
       width?: number
       /** Format: int32 */
       height?: number
+    }
+    NoteRequest: {
+      body: string
     }
     UploadRequest: {
       kind: string
@@ -5255,6 +5403,11 @@ export interface components {
       message?: string
       data?: components['schemas']['WatchPage']
     }
+    Chapter: {
+      /** Format: int64 */
+      atMs?: number
+      label?: string
+    }
     Track: {
       /** Format: int64 */
       id?: number
@@ -5272,6 +5425,7 @@ export interface components {
       video?: components['schemas']['VideoResponse']
       tracks?: components['schemas']['Track'][]
       voiceOvers?: components['schemas']['VoiceOver'][]
+      chapters?: components['schemas']['Chapter'][]
     }
     ApiResponseListStudyItem: {
       traceId?: string
@@ -5486,6 +5640,24 @@ export interface components {
       durationMs?: number
       peaks?: number[]
     }
+    ApiResponsePauses: {
+      traceId?: string
+      /** Format: int32 */
+      statusCode?: number
+      message?: string
+      data?: components['schemas']['Pauses']
+    }
+    Pauses: {
+      /** Format: int64 */
+      durationMs?: number
+      pauses?: components['schemas']['Silence'][]
+    }
+    Silence: {
+      /** Format: int64 */
+      startMs?: number
+      /** Format: int64 */
+      endMs?: number
+    }
     ApiResponseCropRect: {
       traceId?: string
       /** Format: int32 */
@@ -5577,6 +5749,40 @@ export interface components {
       /** Format: int32 */
       days?: number
       dailyViews?: components['schemas']['DailyViewCount'][]
+    }
+    ApiResponseRemakeStatus: {
+      traceId?: string
+      /** Format: int32 */
+      statusCode?: number
+      message?: string
+      data?: components['schemas']['RemakeStatus']
+    }
+    RemakeStatus: {
+      available?: boolean
+      reason?: string
+      /** Format: date-time */
+      keptUntil?: string
+    }
+    ApiResponseListNoteResponse: {
+      traceId?: string
+      /** Format: int32 */
+      statusCode?: number
+      message?: string
+      data?: components['schemas']['NoteResponse'][]
+    }
+    ApiResponseListResultRow: {
+      traceId?: string
+      /** Format: int32 */
+      statusCode?: number
+      message?: string
+      data?: components['schemas']['ResultRow'][]
+    }
+    ResultRow: {
+      /** Format: int64 */
+      videoId?: number
+      videoTitle?: string
+      videoDeleted?: boolean
+      clip?: components['schemas']['ClipResponse']
     }
     PageResponseUserResponse: {
       traceId?: string
@@ -6919,6 +7125,32 @@ export interface operations {
       }
     }
   }
+  schedule: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ScheduleVideoRequest']
+      }
+    }
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseVideoResponse']
+        }
+      }
+    }
+  }
   moveOwner: {
     parameters: {
       query?: never
@@ -6941,6 +7173,56 @@ export interface operations {
         }
         content: {
           '*/*': components['schemas']['ApiResponseVideoResponse']
+        }
+      }
+    }
+  }
+  resolve: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        id: number
+        noteId: number
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ResolveRequest']
+      }
+    }
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseNoteResponse']
+        }
+      }
+    }
+  }
+  delete_5: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        id: number
+        noteId: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseVoid']
         }
       }
     }
@@ -6993,7 +7275,7 @@ export interface operations {
       }
     }
   }
-  delete_5: {
+  delete_6: {
     parameters: {
       query?: never
       header?: never
@@ -7167,7 +7449,7 @@ export interface operations {
       }
     }
   }
-  delete_6: {
+  delete_7: {
     parameters: {
       query?: never
       header?: never
@@ -7237,7 +7519,7 @@ export interface operations {
       }
     }
   }
-  delete_7: {
+  delete_8: {
     parameters: {
       query?: never
       header?: never
@@ -7307,7 +7589,7 @@ export interface operations {
       }
     }
   }
-  delete_8: {
+  delete_9: {
     parameters: {
       query?: never
       header?: never
@@ -7351,7 +7633,7 @@ export interface operations {
       }
     }
   }
-  resolve: {
+  resolve_1: {
     parameters: {
       query?: never
       header?: never
@@ -7693,7 +7975,7 @@ export interface operations {
       }
     }
   }
-  delete_9: {
+  delete_10: {
     parameters: {
       query?: never
       header?: never
@@ -7811,7 +8093,7 @@ export interface operations {
       }
     }
   }
-  delete_10: {
+  delete_11: {
     parameters: {
       query?: never
       header?: never
@@ -7881,7 +8163,7 @@ export interface operations {
       }
     }
   }
-  delete_11: {
+  delete_12: {
     parameters: {
       query?: never
       header?: never
@@ -7951,7 +8233,7 @@ export interface operations {
       }
     }
   }
-  delete_12: {
+  delete_13: {
     parameters: {
       query?: never
       header?: never
@@ -8073,7 +8355,7 @@ export interface operations {
       }
     }
   }
-  delete_13: {
+  delete_14: {
     parameters: {
       query?: never
       header?: never
@@ -9207,6 +9489,98 @@ export interface operations {
         }
         content: {
           '*/*': components['schemas']['ApiResponseVideoResponse']
+        }
+      }
+    }
+  }
+  remakeStatus: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseRemakeStatus']
+        }
+      }
+    }
+  }
+  remake: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseProcessingJobResponse']
+        }
+      }
+    }
+  }
+  notes: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseListNoteResponse']
+        }
+      }
+    }
+  }
+  add: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['NoteRequest']
+      }
+    }
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseNoteResponse']
         }
       }
     }
@@ -11220,6 +11594,30 @@ export interface operations {
       }
     }
   }
+  pauses: {
+    parameters: {
+      query?: {
+        noiseDb?: number
+      }
+      header?: never
+      path: {
+        videoId: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponsePauses']
+        }
+      }
+    }
+  }
   fonts: {
     parameters: {
       query?: never
@@ -11286,6 +11684,26 @@ export interface operations {
         }
         content: {
           '*/*': components['schemas']['ApiResponseVideoStatisticsResponse']
+        }
+      }
+    }
+  }
+  results: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseListResultRow']
         }
       }
     }
@@ -11573,7 +11991,7 @@ export interface operations {
       }
     }
   }
-  delete_14: {
+  delete_15: {
     parameters: {
       query?: never
       header?: never
@@ -12309,7 +12727,7 @@ export interface operations {
       }
     }
   }
-  delete_15: {
+  delete_16: {
     parameters: {
       query?: never
       header?: never
@@ -12332,7 +12750,7 @@ export interface operations {
       }
     }
   }
-  delete_16: {
+  delete_17: {
     parameters: {
       query?: never
       header?: never
@@ -12355,7 +12773,7 @@ export interface operations {
       }
     }
   }
-  delete_17: {
+  delete_18: {
     parameters: {
       query?: never
       header?: never
@@ -12378,7 +12796,7 @@ export interface operations {
       }
     }
   }
-  delete_18: {
+  delete_19: {
     parameters: {
       query?: never
       header?: never
