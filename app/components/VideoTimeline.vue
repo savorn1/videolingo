@@ -115,12 +115,27 @@
                 @pointerdown.stop="onMarkerPointerDown(m, $event)"
                 @click.stop="seekTo(m.atMs)"
               >
-                <UIcon name="i-lucide-flag" class="w-3.5 h-3.5 text-warning-500 group-hover:text-warning-600" />
+                <UIcon
+                  :name="m.chapter ? 'i-lucide-bookmark' : 'i-lucide-flag'"
+                  class="w-3.5 h-3.5"
+                  :class="m.chapter ? 'text-primary-500 group-hover:text-primary-600' : 'text-warning-500 group-hover:text-warning-600'"
+                />
                 <span
                   class="absolute top-4 whitespace-nowrap rounded bg-gray-900 px-1.5 py-0.5 text-[10px] text-white opacity-0 group-hover:opacity-100 transition-opacity"
                 >
-                  {{ m.label }}
-                  <button v-if="canWrite" type="button" class="ml-1 text-white/70 hover:text-white" @click.stop="onDeleteMarker(m)">✕</button>
+                  {{ m.label }}<template v-if="m.chapter"> · chapter</template>
+                  <button
+                    v-if="canWrite"
+                    type="button"
+                    class="ml-1 text-white/70 hover:text-white"
+                    :title="m.chapter ? 'Stop showing it as a chapter' : 'Show it to learners as a chapter'"
+                    @click.stop="onToggleChapter(m)"
+                  >
+                    {{ m.chapter ? '☆' : '★' }}
+                  </button>
+                  <button v-if="canWrite" type="button" class="ml-1 text-white/70 hover:text-white" title="Delete marker" @click.stop="onDeleteMarker(m)">
+                    ✕
+                  </button>
                 </span>
               </button>
             </div>
@@ -177,6 +192,7 @@
             <UInput v-model="newMarkerLabel" autofocus maxlength="200" class="w-full" placeholder="e.g. Intro ends" />
           </UFormField>
           <p class="text-xs text-gray-500">At {{ formatTimestamp(pendingMarkerMs) }}</p>
+          <USwitch v-model="newMarkerChapter" label="Show to learners as a chapter" description="They see it in the Chapters list on the watch page." />
           <div class="flex justify-end gap-2">
             <UButton color="neutral" variant="ghost" @click="showMarkerForm = false">Cancel</UButton>
             <UButton type="submit" :loading="creatingMarker" :disabled="!newMarkerLabel.trim()">Add</UButton>
@@ -333,6 +349,7 @@ function onRulerDblClick(e: MouseEvent) {
   if (!props.canWrite) return
   pendingMarkerMs.value = snapped(msAtClientX(e.clientX))
   newMarkerLabel.value = ''
+  newMarkerChapter.value = false
   showMarkerForm.value = true
 }
 const creatingMarker = ref(false)
@@ -340,13 +357,27 @@ async function onCreateMarker() {
   if (!newMarkerLabel.value.trim()) return
   creatingMarker.value = true
   try {
-    const marker = await createMarkerApi(props.video.id, { atMs: pendingMarkerMs.value, label: newMarkerLabel.value.trim() })
+    const marker = await createMarkerApi(props.video.id, {
+      atMs: pendingMarkerMs.value,
+      label: newMarkerLabel.value.trim(),
+      chapter: newMarkerChapter.value
+    })
     markers.value = [...markers.value, marker].sort((a, b) => a.atMs - b.atMs)
     showMarkerForm.value = false
   } catch (err) {
     toast.add({ title: 'Could not add the marker', description: apiErrorMessage(err), color: 'error' })
   } finally {
     creatingMarker.value = false
+  }
+}
+const newMarkerChapter = ref(false)
+async function onToggleChapter(m: VideoMarker) {
+  try {
+    const updated = await updateMarkerApi(props.video.id, m.id, { atMs: m.atMs, label: m.label, color: m.color ?? undefined, chapter: !m.chapter })
+    markers.value = markers.value.map((x) => (x.id === m.id ? updated : x))
+    toast.add({ title: updated.chapter ? `“${m.label}” is a chapter` : `“${m.label}” is no longer a chapter`, color: 'success' })
+  } catch (err) {
+    toast.add({ title: 'Could not change the marker', description: apiErrorMessage(err), color: 'error' })
   }
 }
 async function onDeleteMarker(m: VideoMarker) {

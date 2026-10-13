@@ -9,6 +9,8 @@ export interface VideoMarker {
   atMs: number
   label: string
   color: string | null
+  /** Also shown to learners as a chapter on the watch page. */
+  chapter: boolean
   createdBy: string | null
   createdAt: string
 }
@@ -21,11 +23,11 @@ export function useVideoMarkers() {
     return (await api<ApiEnvelope<VideoMarker[]>>(base(videoId))).data
   }
 
-  async function create(videoId: number, body: { atMs: number; label: string; color?: string }) {
+  async function create(videoId: number, body: { atMs: number; label: string; color?: string; chapter?: boolean }) {
     return (await api<ApiEnvelope<VideoMarker>>(base(videoId), { method: 'POST', body })).data
   }
 
-  async function update(videoId: number, markerId: number, body: { atMs: number; label: string; color?: string }) {
+  async function update(videoId: number, markerId: number, body: { atMs: number; label: string; color?: string; chapter?: boolean }) {
     return (await api<ApiEnvelope<VideoMarker>>(`${base(videoId)}/${markerId}`, { method: 'PUT', body })).data
   }
 

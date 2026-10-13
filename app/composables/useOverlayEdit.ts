@@ -3,8 +3,19 @@
 // video). Becomes the request POSTed to /edits/overlay; the backend checks it
 // again (OverlayRules) and draws text with the server's fonts.
 
+import type { BurnPosition, BurnStyle } from '#shared/utils/audioVideo'
 import type { OverlayLayer } from '~/composables/useVideoEdits'
 import { moveItem } from '#shared/utils/reorder'
+
+/** Subtitles burned into the picture: a transcript of the video, optionally a second one (a translation) under it. */
+export interface BurnedCaptions {
+  transcriptId: number | null
+  secondTranscriptId: number | null
+  style: BurnStyle
+  position: BurnPosition
+  /** Text size, % of the video's height (3–10). */
+  sizePct: number
+}
 
 export interface EditorLayer extends OverlayLayer {
   id: string
@@ -77,6 +88,8 @@ function base(): Omit<EditorLayer, 'kind' | 'text'> {
 export function useOverlayEdit(durationMs: Ref<number>) {
   const state = reactive({
     layers: [] as EditorLayer[],
+    /** Subtitles burned in from a transcript of the video (backend OverlayRules.Captions); null = none. */
+    captions: null as BurnedCaptions | null,
     selectedId: null as string | null,
     /** Layers picked along with `selectedId` (shift/ctrl-click); they move, copy and go together. */
     multi: [] as string[]
@@ -298,7 +311,9 @@ export function useOverlayEdit(durationMs: Ref<number>) {
   const request = computed<OverlayLayer[]>(() => state.layers.map(({ id: _id, imageUrl: _url, imageName: _name, ...layer }) => layer))
 
   const error = computed(() => {
-    if (!state.layers.length) return 'Add a text or image layer first'
+    if (!state.layers.length && !state.captions) return 'Add a text or image layer, or subtitles, first'
+    if (state.captions && !state.captions.transcriptId) return 'Subtitles: choose the transcript'
+    if (state.captions && state.captions.secondTranscriptId === state.captions.transcriptId) return 'Subtitles: the second line must be another transcript'
     for (const [i, l] of state.layers.entries()) {
       const at = `Layer ${i + 1}: `
       if (l.kind === 'TEXT' && !l.text?.trim()) return `${at}the text is empty`

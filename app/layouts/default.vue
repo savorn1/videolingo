@@ -170,6 +170,7 @@ const items = computed<SidebarItem[]>(() => [
             { label: 'Transcripts', to: '/transcripts', icon: 'i-lucide-captions' },
             { label: 'Subtitles', to: '/subtitles', icon: 'i-lucide-subtitles' },
             { label: 'Glossaries', to: '/glossaries', icon: 'i-lucide-book-a' },
+            { label: 'Edit results', to: '/videos/edit-results', icon: 'i-lucide-list-checks' },
             { label: 'Processing jobs', to: '/processing-jobs', icon: 'i-lucide-cpu' }
           ]
         },

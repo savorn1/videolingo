@@ -17,6 +17,9 @@
         Translate…
       </UButton>
       <UButton v-if="can('videos', 'WRITE')" size="xs" color="neutral" variant="soft" icon="i-lucide-copy" @click="openAction('duplicate')">Duplicate</UButton>
+      <UButton v-if="can('videos', 'WRITE')" size="xs" color="primary" variant="soft" icon="i-lucide-book-marked" @click="openAction('recipe')">
+        Apply a recipe
+      </UButton>
       <UButton v-if="can('videos', 'WRITE')" size="xs" color="neutral" variant="soft" icon="i-lucide-archive" @click="openAction('archive')">Archive</UButton>
       <UButton v-if="can('videos', 'WRITE')" size="xs" color="neutral" variant="soft" icon="i-lucide-archive-restore" @click="openAction('unarchive')">
         Unarchive
@@ -74,6 +77,24 @@
             </p>
           </template>
 
+          <template v-else-if="action === 'recipe'">
+            <p v-if="!recipes.saved.value.length" class="text-sm text-gray-600 dark:text-gray-300">
+              No saved recipes yet. Save one in the video editor (Recipes, in its header) — a crop shape and size, sound settings and text layers.
+            </p>
+            <UFormField v-else label="Recipe" description="Saved in the video editor, in this browser.">
+              <USelect
+                v-model="recipeId"
+                :items="recipes.saved.value.map((r) => ({ label: r.name, value: r.id }))"
+                placeholder="Choose a recipe"
+                class="w-full"
+              />
+            </UFormField>
+            <p v-if="chosenRecipe" class="text-xs text-gray-500 dark:text-gray-400">
+              {{ describeRecipe(chosenRecipe.data) }}. Queues an edit per part (picture, sound, layers) on each video; the results appear under Results in each
+              video's editor, to replace the original or add as a new video.
+            </p>
+          </template>
+
           <p v-else-if="action === 'duplicate'" class="text-sm text-gray-600 dark:text-gray-300">
             Makes a full copy of each — same file, metadata, categories and tags — disabled until reviewed.
           </p>
@@ -121,6 +142,9 @@
 // delete. Each runs per video (the API is per-video) and reports every
 // outcome, so a partial failure is visible.
 import type { Video } from '~/composables/useVideos'
+import type { AudioEditRequest, OverlayLayer } from '~/composables/useVideoEdits'
+import { recipeJobsFor } from '#shared/utils/bulkRecipe'
+import { describeRecipe } from '#shared/utils/editRecipe'
 
 const props = defineProps<{ videos: Video[]; trash?: boolean }>()
 const emit = defineEmits<{ done: [] }>()
@@ -131,9 +155,13 @@ const { list: listCollections, addVideos } = useCollections()
 const { list: listTranscripts, create: createTranscript, regenerate } = useTranscripts()
 const { duplicate, archive, unarchive, restore, purge } = useVideos()
 const { settings: clientSettings } = useClientSettings()
+const { startTrim, startAudio, startOverlay } = useVideoEdits()
+const recipes = useEditRecipes()
+const recipeId = ref<string | undefined>()
+const chosenRecipe = computed(() => recipes.saved.value.find((r) => r.id === recipeId.value) ?? null)
 const toast = useToast()
 
-type Action = 'tags' | 'collection' | 'translate' | 'duplicate' | 'archive' | 'unarchive' | 'restore' | 'purge'
+type Action = 'tags' | 'collection' | 'translate' | 'duplicate' | 'archive' | 'unarchive' | 'restore' | 'purge' | 'recipe'
 const action = ref<Action>('tags')
 const show = ref(false)
 const running = ref(false)
@@ -150,7 +178,8 @@ const title = computed(
       archive: 'Archive videos',
       unarchive: 'Unarchive videos',
       restore: 'Restore videos',
-      purge: 'Delete permanently'
+      purge: 'Delete permanently',
+      recipe: 'Apply a recipe'
     })[action.value]
 )
 const icon = computed(
@@ -163,7 +192,8 @@ const icon = computed(
       archive: 'i-lucide-archive',
       unarchive: 'i-lucide-archive-restore',
       restore: 'i-lucide-rotate-ccw',
-      purge: 'i-lucide-trash-2'
+      purge: 'i-lucide-trash-2',
+      recipe: 'i-lucide-book-marked'
     })[action.value]
 )
 
@@ -190,7 +220,9 @@ const ready = computed(() =>
       ? !!collectionId.value
       : action.value === 'translate'
         ? plannedJobs.value > 0
-        : true
+        : action.value === 'recipe'
+          ? !!chosenRecipe.value
+          : true
 )
 
 async function openAction(a: Action) {
@@ -245,6 +277,21 @@ async function run() {
           push(v.title, 'ok', `duplicated as “${copy.title}”`)
         } catch (err) {
           push(v.title, 'failed', apiErrorMessage(err))
+        }
+      }
+    } else if (action.value === 'recipe') {
+      const recipe = chosenRecipe.value!.data
+      for (const v of props.videos) {
+        const plan = recipeJobsFor(recipe, v)
+        const queued: string[] = []
+        try {
+          if (plan.trim) queued.push(`picture #${(await startTrim(v.id, plan.trim)).id}`)
+          if (plan.audio) queued.push(`sound #${(await startAudio(v.id, plan.audio as AudioEditRequest)).id}`)
+          if (plan.overlay) queued.push(`layers #${(await startOverlay(v.id, plan.overlay as unknown as OverlayLayer[])).id}`)
+          if (queued.length) push(v.title, 'ok', `queued ${queued.join(', ')}${plan.note ? ` — ${plan.note}` : ''}`)
+          else push(v.title, 'skipped', plan.note ?? 'nothing in the recipe applies')
+        } catch (err) {
+          push(v.title, 'failed', `${queued.length ? `queued ${queued.join(', ')}, then: ` : ''}${apiErrorMessage(err)}`)
         }
       }
     } else if (action.value === 'archive' || action.value === 'unarchive') {

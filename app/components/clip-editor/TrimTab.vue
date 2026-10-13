@@ -393,9 +393,22 @@
       </div>
     </section>
 
-    <LookPanel v-model="look" />
+    <LookPanel v-model="look" v-model:compare="lookCompare" />
+
+    <ClipEditorMotionPanel />
 
     <TrimAudioPanel v-model="trimAudio" />
+
+    <TranscriptCutPanel
+      v-model="cuts"
+      :video-id="video.id"
+      :video-language="video.language"
+      :current-ms="currentMs"
+      :duration-ms="durationMs"
+      @seek="(ms: number) => preview?.seek(ms, false)"
+    />
+
+    <PauseCutPanel v-model="cuts" :video-id="video.id" :duration-ms="durationMs" />
 
     <CutOutPanel
       v-model="cuts"
@@ -443,6 +456,8 @@ import { ratioLabel } from '#shared/utils/exportPreset'
 import { TAB_ACCENTS } from '#shared/utils/tabAccent'
 import { MAX_NAMED_ENTRIES } from '#shared/utils/namedList'
 const {
+  video,
+  lookCompare,
   preview,
   currentMs,
   durationMs,

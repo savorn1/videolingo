@@ -64,6 +64,13 @@
       <USwitch :model-value="look.sepia" label="Sepia" :disabled="look.grayscale" @update:model-value="(v: boolean) => (look = { ...look, sepia: v })" />
       <USwitch :model-value="look.vignette" label="Dark corners" @update:model-value="(v: boolean) => (look = { ...look, vignette: v })" />
     </div>
+    <USwitch
+      v-if="!isPlainLook(look)"
+      v-model="compare"
+      label="Compare before / after"
+      description="A divider on the preview: as it is on the left, with the look on the right."
+      data-testid="look-compare-switch"
+    />
     <p class="text-xs text-gray-500 dark:text-gray-400">The preview is a close match; dark corners show only in the rendered result.</p>
   </EditorSection>
 </template>
@@ -72,6 +79,8 @@
 import { LOOK_PRESETS, MAX_LOOK_BLUR, PLAIN_LOOK, describeVideoLook, isPlainLook, matchingPreset, type VideoLook } from '#shared/utils/videoLook'
 
 const look = defineModel<VideoLook>({ required: true })
+/** The before/after divider on the preview (not part of the edit). */
+const compare = defineModel<boolean>('compare', { default: false })
 
 const open = ref(false)
 // A look from a draft or an undo shows up open.

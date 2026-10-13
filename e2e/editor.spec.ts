@@ -94,6 +94,105 @@ test('Audio: an extra sound track and slow motion with the sound at normal speed
     .toMatchObject({ speed: 0.5, keepSoundSpeed: true, tracks: [{ key: expect.stringMatching(/^uploads\//), volume: 1, loop: false, duck: false }] })
 })
 
+test('Trim: crossing out sentences of the transcript cuts them, with the pause between', async ({ page }) => {
+  await openEditor(page)
+  await page.getByRole('heading', { name: 'Edit by transcript' }).click()
+  const panel = page.getByTestId('transcript-cut')
+  await panel.getByRole('button', { name: 'Um, let me find my notes.' }).click()
+  await panel.getByRole('button', { name: 'Okay, sorry about that.' }).click()
+  await expect(panel).toContainText('2 of 4 sentences cut')
+  // One cut from the start of the first to the end of the second, under Cut out
+  await expect(page.getByTestId('cut-row')).toHaveCount(1)
+  await expect(page.getByTestId('cut-row').getByLabel('Cut 1 start')).toHaveValue(/0:02\.3/)
+  await expect(page.getByTestId('cut-row').getByLabel('Cut 1 end')).toHaveValue(/0:06/)
+
+  await panel.getByRole('button', { name: 'Um, let me find my notes.' }).click()
+  await expect(panel).toContainText('1 of 4 sentences cut')
+})
+
+test('Trim: long pauses are found and added to Cut out', async ({ page }) => {
+  await openEditor(page)
+  await page.getByRole('heading', { name: 'Remove the pauses' }).click()
+  const panel = page.getByTestId('pause-cut')
+  await panel.getByRole('button', { name: 'Find the pauses' }).click()
+  // Only the 2 s pause is longer than 1 s; 0.2 s of quiet stays on each side.
+  await expect(page.getByTestId('pause-summary')).toContainText('1 pause to cut, saving 0:01.6')
+  await panel.getByRole('button', { name: 'Cut 1 pause' }).click()
+  await expect(page.getByTestId('cut-row')).toHaveCount(1)
+  await expect(page.getByTestId('cut-row').getByLabel('Cut 1 start')).toHaveValue(/0:02\.2/)
+  await expect(page.getByTestId('cut-row').getByLabel('Cut 1 end')).toHaveValue(/0:03\.8/)
+})
+
+test('Trim: motion and effects are sent with the trim', async ({ page }) => {
+  await openEditor(page)
+  await page.getByRole('heading', { name: 'Motion & effects' }).click()
+  const panel = page.getByTestId('motion')
+  await panel.getByRole('switch', { name: 'Hold a frame' }).click()
+  await panel.getByRole('switch', { name: 'Play backwards' }).click()
+  await panel.getByRole('switch', { name: 'Zoom into an area' }).click()
+  await panel.getByRole('radio', { name: 'Zoom to the top right' }).click()
+  await panel.getByRole('switch', { name: 'Replace a green screen' }).click()
+  await page.getByRole('button', { name: 'Start trim' }).click()
+
+  await expect
+    .poll(async () => (await mockRequests()).find((r) => r.path === '/api/admin/videos/7/edits/trim')?.body)
+    .toMatchObject({
+      freeze: { durationMs: 2000 },
+      reverse: true,
+      zoomTo: { cx: 0.8, cy: 0.2, size: 0.5 },
+      greenScreen: { keyColor: '#00ff00', similarity: 0.3, background: '#1e3a8a' }
+    })
+})
+
+test('Text: a layer can move across the picture and grow over its time', async ({ page }) => {
+  await openEditor(page)
+  await page.getByRole('tab', { name: /Text/ }).click()
+  await page.getByRole('button', { name: 'Add text' }).click()
+  await page.getByRole('heading', { name: 'Timing' }).click()
+  const moves = page.getByTestId('layer-moves')
+  await moves.getByRole('switch', { name: 'Moves over time' }).click()
+  await expect(page.getByTestId('layer-end-ghost')).toBeVisible()
+  await moves.getByLabel('Ends at size value').fill('200')
+  await moves.getByLabel('Ends at size value').press('Enter')
+  await page.getByRole('button', { name: /Render layers/ }).click()
+
+  await expect
+    .poll(async () => (await mockRequests()).find((r) => r.path === '/api/admin/videos/7/edits/overlay')?.body?.layers?.[0])
+    .toMatchObject({ kind: 'TEXT', toScale: 2, toX: expect.any(Number), toY: expect.any(Number) })
+})
+
+test('Text: subtitles from the transcript can be burned in, without any layer', async ({ page }) => {
+  await openEditor(page)
+  await page.getByRole('tab', { name: /Text/ }).click()
+  await page.getByRole('heading', { name: 'Burned-in subtitles' }).click()
+  await page.getByTestId('burned-captions').getByRole('switch', { name: 'Burn the subtitles into the picture' }).click()
+  await page.getByRole('button', { name: /Render layers/ }).click()
+
+  await expect
+    .poll(async () => (await mockRequests()).find((r) => r.path === '/api/admin/videos/7/edits/overlay')?.body)
+    .toMatchObject({ layers: [], captions: { transcriptId: 21, secondTranscriptId: null, style: 'BOX', position: 'BOTTOM', sizePct: 5 } })
+})
+
+test('Trim: a look can be compared before and after on the preview', async ({ page }) => {
+  await openEditor(page)
+  await page.getByRole('heading', { name: 'Look' }).click()
+  await page.getByRole('switch', { name: 'Black & white' }).click()
+  await page
+    .getByTestId('look-compare-switch')
+    .getByRole('switch')
+    .or(page.getByRole('switch', { name: 'Compare before / after' }))
+    .first()
+    .click()
+  const compare = page.getByTestId('look-compare')
+  await expect(compare).toBeVisible()
+  await expect(compare).toContainText('Before')
+  const divider = compare.getByRole('slider', { name: 'Before and after divider' })
+  await divider.focus()
+  await divider.press('ArrowLeft')
+  await expect(divider).toHaveAttribute('aria-valuenow', '45')
+  if (process.env.SHOT) await page.locator('video').first().locator('..').screenshot({ path: process.env.SHOT })
+})
+
 test('Split: three even parts queue a split into three segments', async ({ page }) => {
   await openEditor(page)
   await page.getByRole('tab', { name: /Split/ }).click()

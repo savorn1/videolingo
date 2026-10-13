@@ -463,6 +463,50 @@
             @update:model-value="(v) => layer && (layer.endMs = v ? null : Math.min(durationMs || layer.startMs + 3000, layer.startMs + 3000))"
           />
         </div>
+        <!-- Moves over time: from where it is now to the end position, growing or shrinking on the way -->
+        <div class="space-y-2" data-testid="layer-moves">
+          <USwitch
+            :model-value="isMovingLayer(layer)"
+            label="Moves over time"
+            description="From where it is now to the end position (shown dashed), across its time on screen."
+            @update:model-value="
+              (on) =>
+                layer && Object.assign(layer, on ? { toX: Math.min(0.9, layer.x + 0.3), toY: layer.y, toScale: 1 } : { toX: null, toY: null, toScale: null })
+            "
+          />
+          <template v-if="isMovingLayer(layer)">
+            <SliderRow
+              label="Ends across"
+              :model-value="Math.round((layer.toX ?? layer.x) * 100)"
+              :min="0"
+              :max="100"
+              :step="1"
+              :default-value="Math.round(layer.x * 100)"
+              unit="%"
+              @update:model-value="(v) => layer && (layer.toX = v / 100)"
+            />
+            <SliderRow
+              label="Ends down"
+              :model-value="Math.round((layer.toY ?? layer.y) * 100)"
+              :min="0"
+              :max="100"
+              :step="1"
+              :default-value="Math.round(layer.y * 100)"
+              unit="%"
+              @update:model-value="(v) => layer && (layer.toY = v / 100)"
+            />
+            <SliderRow
+              label="Ends at size"
+              :model-value="Math.round((layer.toScale ?? 1) * 100)"
+              :min="MIN_TO_SCALE * 100"
+              :max="MAX_TO_SCALE * 100"
+              :step="5"
+              :default-value="100"
+              unit="%"
+              @update:model-value="(v) => layer && (layer.toScale = v / 100)"
+            />
+          </template>
+        </div>
         <UFormField label="Animation">
           <div class="flex items-center gap-2">
             <USelect v-model="layer.animation" :items="LAYER_ANIMATIONS" class="flex-1" size="sm" aria-label="Animation" />
@@ -541,6 +585,66 @@
       </ul>
     </EditorSection>
 
+    <!-- ── Burned-in subtitles ─────────────────────────────────────────── -->
+    <EditorSection v-model:open="open.captions" title="Burned-in subtitles" :changed="!!s.captions" data-testid="burned-captions">
+      <USwitch
+        :model-value="!!s.captions"
+        label="Burn the subtitles into the picture"
+        description="From a transcript of this video — readable anywhere, even with the sound off. A second transcript adds a smaller line under each."
+        @update:model-value="toggleCaptions"
+      />
+      <template v-if="s.captions">
+        <p v-if="!captionTracks.length" class="text-xs text-gray-500 dark:text-gray-400">
+          This video has no transcript yet. Make one from its page (Transcribe), then come back.
+        </p>
+        <div v-else class="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <UFormField label="Subtitles">
+            <USelect
+              :model-value="s.captions.transcriptId ?? undefined"
+              :items="captionTracks"
+              size="sm"
+              class="w-full"
+              aria-label="Subtitle transcript"
+              @update:model-value="(v) => s.captions && (s.captions.transcriptId = Number(v) || null)"
+            />
+          </UFormField>
+          <UFormField label="Second line (optional)">
+            <USelect
+              :model-value="s.captions.secondTranscriptId ?? 0"
+              :items="[{ label: 'None', value: 0 }, ...captionTracks.filter((t) => t.value !== s.captions?.transcriptId)]"
+              size="sm"
+              class="w-full"
+              aria-label="Second line transcript"
+              @update:model-value="(v) => s.captions && (s.captions.secondTranscriptId = Number(v) || null)"
+            />
+          </UFormField>
+          <UFormField label="Style">
+            <USelect
+              v-model="s.captions.style"
+              :items="BURN_STYLES.map((b) => ({ label: b.label, value: b.value }))"
+              size="sm"
+              class="w-full"
+              aria-label="Subtitle style"
+            />
+          </UFormField>
+          <UFormField label="Where">
+            <USelect
+              v-model="s.captions.position"
+              :items="[
+                { label: 'Bottom', value: 'BOTTOM' },
+                { label: 'Top', value: 'TOP' }
+              ]"
+              size="sm"
+              class="w-full"
+              aria-label="Subtitle position"
+            />
+          </UFormField>
+        </div>
+        <SliderRow v-model="s.captions.sizePct" label="Text size" :min="3" :max="10" :step="0.5" :default-value="5" unit="% of the height" />
+        <p class="text-xs text-gray-500 dark:text-gray-400">The preview doesn't draw them; they are in the rendered result.</p>
+      </template>
+    </EditorSection>
+
     <!-- ── Render ──────────────────────────────────────────────────────── -->
     <section :class="ACTION_SECTION">
       <p class="text-xs text-gray-500 dark:text-gray-400">
@@ -609,6 +713,8 @@ import {
 import { LAYER_ANIMATIONS, LAYER_SPOTS, LAYER_WEIGHTS, fontCss, type OverlayEdit } from '~/composables/useOverlayEdit'
 import { uploadToStorage } from '~/composables/useVideos'
 import { formatTimecode } from '#shared/utils/transport'
+import { BURN_STYLES } from '#shared/utils/audioVideo'
+import { isMovingLayer, MAX_TO_SCALE, MIN_TO_SCALE } from '#shared/utils/layerMotion'
 import { dropIndex } from '#shared/utils/reorder'
 import { useOverlayTemplates, type OverlayTemplate } from '~/composables/useOverlayTemplates'
 
@@ -626,7 +732,7 @@ const ALIGNS = [
 const SPOT_NAMES = ['top left', 'top centre', 'top right', 'middle left', 'centre', 'middle right', 'bottom left', 'bottom centre', 'bottom right']
 
 // Which groups of the selected layer are unfolded; timing is rarely touched, so it starts folded.
-const open = reactive({ content: true, style: true, position: true, timing: false, templates: !props.edit.state.layers.length })
+const open = reactive({ content: true, style: true, position: true, timing: false, templates: !props.edit.state.layers.length, captions: false })
 const SWATCHES = ['#ffffff', '#000000', '#ffd60a', '#ff453a', '#30d158', '#0a84ff']
 
 const s = props.edit.state
@@ -890,11 +996,40 @@ async function onSticker(sticker: { emoji: string; name: string }) {
 
 // ── Render ───────────────────────────────────────────────────────────────────
 const starting = ref(false)
+// ── Burned-in subtitles: the video's transcripts (those with lines) to choose from ──
+const { list: listTranscriptsApi } = useTranscripts()
+const captionTracks = ref<{ label: string; value: number }[]>([])
+async function loadCaptionTracks() {
+  try {
+    const list = (await listTranscriptsApi({ videoId: props.videoId, size: 50 })).data.filter((t) => t.segmentCount > 0)
+    captionTracks.value = list.map((t) => ({ label: languageLabel(t.language), value: t.id }))
+    return list
+  } catch {
+    captionTracks.value = []
+    return []
+  }
+}
+async function toggleCaptions(on: boolean) {
+  if (!on) {
+    s.captions = null
+    return
+  }
+  const list = await loadCaptionTracks()
+  s.captions = { transcriptId: list[0]?.id ?? null, secondTranscriptId: null, style: 'BOX', position: 'BOTTOM', sizePct: 5 }
+}
+// A draft or undo can bring subtitles back: have the list ready.
+watch(
+  () => !!s.captions,
+  (on) => on && !captionTracks.value.length && loadCaptionTracks(),
+  { immediate: true }
+)
+
 async function onRender() {
   if (props.edit.error.value) return
   starting.value = true
   try {
-    const job = await startOverlay(props.videoId, props.edit.request.value)
+    const c = s.captions
+    const job = await startOverlay(props.videoId, props.edit.request.value, c && c.transcriptId ? { ...c, transcriptId: c.transcriptId } : null)
     toast.add({ title: `Text & overlay queued — job #${job.id}`, color: 'success' })
     emit('queued')
   } catch (err) {

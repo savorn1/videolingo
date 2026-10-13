@@ -26,6 +26,8 @@ export interface WatchPage {
   /** Published tracks with cues; the default one first. */
   tracks: LearnTrack[]
   voiceOvers: LearnVoiceOver[]
+  /** Markers flagged as chapters, in time order (older servers leave it out). */
+  chapters?: { atMs: number; label: string }[]
 }
 
 export interface LearnCue {

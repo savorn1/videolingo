@@ -27,6 +27,14 @@ export interface SegmentRange {
   endMs: number | null
 }
 
+/** A result on the Edit results page: the video it was made from, and the result. */
+export interface EditResultRow {
+  videoId: number
+  videoTitle: string | null
+  videoDeleted: boolean
+  clip: VideoClip
+}
+
 export interface VideoClip {
   id: number
   jobId: number | null
@@ -101,6 +109,10 @@ export interface OverlayLayer {
   /** Null = to the end. */
   endMs: number | null
   animation: 'NONE' | 'FADE' | 'SLIDE_UP' | 'SLIDE_LEFT'
+  /** Moves over its time to here (centre, 0–1) and/or grows to toScale × its size; left out = stays put. */
+  toX?: number | null
+  toY?: number | null
+  toScale?: number | null
 }
 
 export interface Waveform {
@@ -145,6 +157,15 @@ export function useVideoEdits() {
       look?: { brightness: number; contrast: number; saturation: number; blur: number; grayscale: boolean; sepia: boolean; vignette: boolean } | null
       /** Sound added to the trimmed result: music mixed in, or a file used instead of the video's own sound. */
       audio?: { replaceKey?: string; music?: { key: string; volume: number; loop: boolean; duck: boolean; startMs: number } } | null
+      /** Motion & effects (shared/utils/videoMotion.ts); times on the trimmed clip. */
+      effect?: string
+      fade?: { inMs: number; outMs: number; color: 'BLACK' | 'WHITE' }
+      freeze?: { atMs: number; durationMs: number }
+      speed?: { startMs: number; endMs: number; speed: number }
+      reverse?: boolean
+      stabilize?: boolean
+      zoomTo?: { cx: number; cy: number; size: number }
+      greenScreen?: { keyColor: string; similarity: number; background: string }
     }
   ) {
     return (await api<ApiEnvelope<ProcessingJob>>(`${base(videoId)}/trim`, { method: 'POST', body })).data
@@ -167,8 +188,13 @@ export function useVideoEdits() {
     return (await api<ApiEnvelope<ProcessingJob>>(`${base(videoId)}/extract-audio`, { method: 'POST', body: { format } })).data
   }
 
-  async function startOverlay(videoId: number, layers: OverlayLayer[]) {
-    return (await api<ApiEnvelope<ProcessingJob>>(`${base(videoId)}/overlay`, { method: 'POST', body: { layers } })).data
+  /** Layers and/or subtitles burned in from a transcript of the video. */
+  async function startOverlay(
+    videoId: number,
+    layers: OverlayLayer[],
+    captions?: { transcriptId: number; secondTranscriptId: number | null; style: string; position: string; sizePct: number } | null
+  ) {
+    return (await api<ApiEnvelope<ProcessingJob>>(`${base(videoId)}/overlay`, { method: 'POST', body: { layers, captions: captions ?? null } })).data
   }
 
   /** Font families the server can draw text with. */
@@ -182,6 +208,11 @@ export function useVideoEdits() {
   }
 
   /** The video's sound (or an uploaded audio file's) as peaks, for drawing a waveform. */
+  /** The quiet stretches in the video's sound, quieter than `noiseDb` (backend PauseRules), for "Remove the pauses". */
+  async function pauses(videoId: number, noiseDb: number) {
+    return (await api<ApiEnvelope<{ durationMs: number; pauses: { startMs: number; endMs: number }[] }>>(`${base(videoId)}/pauses?noiseDb=${noiseDb}`)).data
+  }
+
   async function waveform(videoId: number, options: { key?: string | null; points?: number } = {}) {
     const query = new URLSearchParams({ points: String(options.points ?? 2000) })
     if (options.key) query.set('key', options.key)
@@ -198,5 +229,10 @@ export function useVideoEdits() {
     await api(`${base(videoId)}/${clipId}`, { method: 'DELETE' })
   }
 
-  return { overview, startTrim, startSplit, startCut, startAudio, startExtract, startOverlay, fonts, waveform, autoCrop, promote, remove }
+  /** Every edit result still kept, across all videos, newest first (at most 200). */
+  async function allResults() {
+    return (await api<ApiEnvelope<EditResultRow[]>>('/api/admin/videos/edit-results')).data
+  }
+
+  return { overview, startTrim, startSplit, startCut, startAudio, startExtract, startOverlay, fonts, waveform, pauses, autoCrop, promote, remove, allResults }
 }

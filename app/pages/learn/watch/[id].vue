@@ -252,6 +252,8 @@
           </div>
         </div>
 
+        <ChaptersCard :chapters="page.chapters ?? []" :current-ms="currentMs" @seek="(ms: number) => seek(ms)" />
+
         <PracticePanel :cues="primaryCues" :current-ms="currentMs" :language="primaryTrack?.language ?? page.video.language" @play="playLine" />
 
         <div ref="studyPanelEl">

@@ -70,7 +70,8 @@
                 @time="onTime"
                 @duration="onDuration"
               >
-                <template v-if="cropActive || overlayEdit.state.layers.length || mode === 'overlay' || showGuides" #overlay>
+                <template v-if="cropActive || overlayEdit.state.layers.length || mode === 'overlay' || showGuides || lookCompareShown" #overlay>
+                  <LookCompare v-if="lookCompareShown && !cropActive" :video-el="preview?.videoEl" />
                   <OverlayLayers
                     v-if="mode === 'overlay' || overlayEdit.state.layers.length"
                     :readonly="mode !== 'overlay'"
@@ -482,6 +483,7 @@ const {
   spaceHeld,
   panning,
   cropActive,
+  lookCompareShown,
   showGuides,
   guideBox,
   zoomBy,

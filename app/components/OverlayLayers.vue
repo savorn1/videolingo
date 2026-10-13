@@ -48,6 +48,14 @@
         </div>
         <img v-else-if="l.imageUrl" :src="l.imageUrl" alt="" draggable="false" class="block w-full h-auto" />
       </div>
+      <!-- Where the selected layer ends up, when it moves over time -->
+      <div
+        v-if="endGhost"
+        class="pointer-events-none absolute rounded-sm border-2 border-dashed border-primary-300"
+        :style="endGhost"
+        data-testid="layer-end-ghost"
+        aria-hidden="true"
+      />
     </template>
   </div>
 </template>
@@ -58,6 +66,7 @@
 // relative to it, with opacity and the fade/slide worked out for the
 // current time. Drag a layer to move it; it snaps to the centre lines.
 import { animationSeconds, fontCss, type EditorLayer, type OverlayEdit } from '~/composables/useOverlayEdit'
+import { isMovingLayer, layerAt } from '#shared/utils/layerMotion'
 import { snapAxis } from '#shared/utils/layerSnap'
 
 const props = defineProps<{
@@ -119,10 +128,12 @@ function layerStyle(l: EditorLayer) {
   const active = props.currentMs >= l.startMs && props.currentMs < endOf(l)
   const { alpha, t } = active ? entrance(l) : { alpha: 1, t: 1 }
   const dy = active && l.animation === 'SLIDE_UP' ? p.h * 0.06 * (1 - t) : 0
+  // A moving layer is drawn where it is at this moment (dragging it moves where it starts).
+  const at = active && isMovingLayer(l) ? layerAt(l, props.currentMs, props.durationMs) : { x: l.x, y: l.y, scale: 1 }
   const style: Record<string, string> = {
-    left: `${p.left + l.x * p.w}px`,
-    top: `${p.top + l.y * p.h}px`,
-    transform: `translate(-50%, -50%) translateY(${dy}px)`,
+    left: `${p.left + at.x * p.w}px`,
+    top: `${p.top + at.y * p.h}px`,
+    transform: `translate(-50%, -50%) translateY(${dy}px) scale(${at.scale})`,
     opacity: String(active ? l.opacity * alpha : 0.35)
   }
   if (active && l.animation === 'SLIDE_LEFT' && t < 1) {
@@ -133,6 +144,17 @@ function layerStyle(l: EditorLayer) {
   if (l.kind === 'IMAGE') style.width = `${(l.widthPct / 100) * p.w}px`
   return style
 }
+
+/** The outline of where the selected moving layer ends, at its end size (about its size now). */
+const endGhost = computed(() => {
+  const p = picture.value
+  const l = props.edit.state.layers.find((x) => x.id === props.edit.state.selectedId)
+  if (!p || !l || !isMovingLayer(l) || props.readonly) return null
+  const end = layerAt(l, Number.MAX_SAFE_INTEGER, props.durationMs)
+  const w = (l.kind === 'IMAGE' ? (l.widthPct / 100) * p.w : (l.sizePct / 100) * p.h * Math.max(2, (l.text?.length ?? 4) * 0.5)) * end.scale
+  const h = l.kind === 'IMAGE' ? w * 0.6 : (l.sizePct / 100) * p.h * 1.4 * end.scale
+  return { left: `${p.left + end.x * p.w - w / 2}px`, top: `${p.top + end.y * p.h - h / 2}px`, width: `${w}px`, height: `${h}px` }
+})
 
 function textStyle(l: EditorLayer) {
   const p = picture.value!

@@ -226,6 +226,78 @@ function route(method, path, body) {
     return ok(job(entry))
   }
   if (method === 'GET' && /^\/api\/admin\/videos\/\d+$/.test(path)) return ok(video(Number(path.split('/').pop())))
+  // Results waiting across videos, for the Edit results page.
+  if (method === 'GET' && path === '/api/admin/videos/edit-results') {
+    const clip = (id, operation, extra = {}) => ({
+      id,
+      jobId: id,
+      operation,
+      segmentIndex: null,
+      startMs: 0,
+      endMs: 5000,
+      crop: null,
+      scale: null,
+      url: '/api/__media/sample.mp4',
+      sizeBytes: 100_000,
+      durationSeconds: 5,
+      width: 320,
+      height: 180,
+      summary: null,
+      createdAt: '2026-10-13T09:00:00',
+      expiresAt: '2026-10-16T09:00:00',
+      ...extra
+    })
+    return ok([
+      { videoId: 7, videoTitle: 'Sample lesson', videoDeleted: false, clip: clip(301, 'TRIM') },
+      { videoId: 7, videoTitle: 'Sample lesson', videoDeleted: false, clip: clip(302, 'EXTRACT', { summary: 'MP3' }) },
+      { videoId: 8, videoTitle: 'Old lesson', videoDeleted: false, clip: clip(303, 'SPLIT', { segmentIndex: 1 }) }
+    ])
+  }
+  // The learner's watch page of the sample video, with two chapters.
+  if (method === 'GET' && path === '/api/learn/videos/7')
+    return ok({
+      video: { ...video(7), enabled: true },
+      tracks: [],
+      voiceOvers: [],
+      chapters: [
+        { atMs: 0, label: 'Greetings' },
+        { atMs: 5000, label: 'Practice' }
+      ]
+    })
+  // The Videos list, when a test asks for it (config.videoList): the sample video, live and in storage.
+  if (method === 'GET' && path === '/api/admin/videos' && config.videoList)
+    return page([{ ...video(7), storageKey: 'videos/sample.mp4', width: 320, height: 180, deleted: false }])
+  // Pauses in the sample video's sound, for Remove the pauses.
+  if (method === 'GET' && path === '/api/admin/videos/7/edits/pauses')
+    return ok({
+      durationMs: 10_000,
+      pauses: [
+        { startMs: 0, endMs: 600 },
+        { startMs: 2000, endMs: 4000 },
+        { startMs: 6000, endMs: 6500 }
+      ]
+    })
+  // An English transcript of the sample video, for Edit by transcript.
+  if (method === 'GET' && (path === '/api/admin/transcripts' || path === '/api/admin/transcripts/21')) {
+    const transcript = {
+      id: 21,
+      videoId: 7,
+      videoTitle: 'Sample lesson',
+      language: 'en',
+      source: 'AUTO',
+      segmentCount: 4,
+      wordCount: 16,
+      durationMs: 10_000,
+      version: 1,
+      segments: [
+        { startMs: 0, endMs: 2000, text: 'Hello and welcome.' },
+        { startMs: 2300, endMs: 4000, text: 'Um, let me find my notes.' },
+        { startMs: 4500, endMs: 6000, text: 'Okay, sorry about that.' },
+        { startMs: 6500, endMs: 10_000, text: 'Today we learn greetings.' }
+      ]
+    }
+    return path.endsWith('/21') ? ok(transcript) : page([{ ...transcript, segments: null }])
+  }
   // "Make again": possible unless a test says otherwise (config.remake); doing it queues a job.
   if (/^\/api\/admin\/videos\/\d+\/remake$/.test(path)) {
     if (method === 'GET') return ok(config.remake ?? { available: true, reason: null, keptUntil: '2026-10-11T10:00:00' })

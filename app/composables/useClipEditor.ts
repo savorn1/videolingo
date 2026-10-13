@@ -47,6 +47,8 @@ import { musicPositionAt, previewGainAt } from '#shared/utils/audioEdit'
 import { formatTimecode, parseTimecode } from '#shared/utils/transport'
 import { presetFromSettings, ratioLabel } from '#shared/utils/exportPreset'
 import { PLAIN_LOOK, cssFilter, describeVideoLook, isPlainLook, lookRequest, validateLook, type VideoLook } from '#shared/utils/videoLook'
+import { CLIP_OPERATION_ICONS, clipLabel } from '#shared/utils/editResults'
+import { PLAIN_MOTION, describeMotion, isPlainMotion, motionProblem, motionRequest, sanitizeMotion, type VideoMotion } from '#shared/utils/videoMotion'
 import { describeTrimAudio, trimAudioRequest, validateTrimAudio, type TrimAudioSettings } from '#shared/utils/trimAudio'
 import { cutSkipTarget, mergeCutRanges, validateCutOut, type CutRange } from '#shared/utils/cutOut'
 import { audioDifferences, fullAudio, isRecipeEmpty, type EditRecipe, type RecipeLayer } from '#shared/utils/editRecipe'
@@ -798,7 +800,11 @@ export function useClipEditor(props: ClipEditorProps, emit: ClipEditorEmit) {
       const e = validateScale(scale.w, scale.h)
       if (e) return e
     }
-    return validateLook(look.value) ?? validateTrimAudio(trimAudio.value, Math.round(range.value[1] - range.value[0]))
+    return (
+      validateLook(look.value) ??
+      motionProblem(motion.value, Math.round(range.value[1] - range.value[0]) || null) ??
+      validateTrimAudio(trimAudio.value, Math.round(range.value[1] - range.value[0]))
+    )
   })
 
   const starting = ref(false)
@@ -814,7 +820,8 @@ export function useClipEditor(props: ClipEditorProps, emit: ClipEditorEmit) {
         ...orientationRequest(orient.value),
         audio: trimAudioRequest(trimAudio.value),
         extend: extension.value > 0 || undefined,
-        look: lookRequest(look.value)
+        look: lookRequest(look.value),
+        ...motionRequest(motion.value)
       })
       toast.add({ title: `Trim queued — job #${job.id}`, color: 'success' })
       await load()
@@ -830,6 +837,11 @@ export function useClipEditor(props: ClipEditorProps, emit: ClipEditorEmit) {
   const cuts = ref<CutRange[]>([])
   const trimAudio = ref<TrimAudioSettings | null>(null)
   const look = ref<VideoLook>({ ...PLAIN_LOOK })
+  /** The before/after divider on the preview, while a look is set (a way of looking, not part of the edit). */
+  const lookCompare = ref(false)
+  const lookCompareShown = computed(() => mode.value === 'trim' && lookCompare.value && !isPlainLook(look.value))
+  /** Motion & effects on the trim (videoMotion.ts); times on the trimmed clip. */
+  const motion = ref<VideoMotion>({ ...PLAIN_MOTION })
   const cutStarting = ref(false)
   async function onStartCut() {
     if (validateCutOut(cuts.value, Math.round(durationMs.value) || null)) return
@@ -1221,6 +1233,7 @@ export function useClipEditor(props: ClipEditorProps, emit: ClipEditorEmit) {
   const trimDirty = computed(
     () =>
       !isPlainLook(look.value) ||
+      !isPlainMotion(motion.value) ||
       !!trimAudio.value ||
       cropOn.value ||
       scaleOn.value ||
@@ -1258,6 +1271,8 @@ export function useClipEditor(props: ClipEditorProps, emit: ClipEditorEmit) {
     if (extension.value) parts.push(`${formatMsShort(extension.value)} past the end (last frame held)`)
     const lookLine = describeVideoLook(look.value)
     if (lookLine) parts.push(lookLine)
+    const motionLine = describeMotion(motion.value)
+    if (motionLine) parts.push(motionLine)
     const audioLine = describeTrimAudio(trimAudio.value)
     if (audioLine) parts.push(audioLine)
     return parts.join(' · ')
@@ -1360,11 +1375,13 @@ export function useClipEditor(props: ClipEditorProps, emit: ClipEditorEmit) {
         cuts: cuts.value.map((c) => ({ ...c })),
         audio: trimAudio.value ? { ...trimAudio.value } : null,
         extend: extendOn.value,
-        look: { ...look.value }
+        look: { ...look.value },
+        motion: JSON.parse(JSON.stringify(motion.value)) as VideoMotion
       },
       split: segments.value,
       audio,
       overlay: overlayEdit.state.layers,
+      captions: overlayEdit.state.captions ? { ...overlayEdit.state.captions } : null,
       join: { clips: joinEdit.state.clips }
     }
   }
@@ -1384,12 +1401,16 @@ export function useClipEditor(props: ClipEditorProps, emit: ClipEditorEmit) {
     extendOn.value = !!st.trim.extend
     // And a look.
     look.value = st.trim.look ? { ...PLAIN_LOOK, ...st.trim.look } : { ...PLAIN_LOOK }
+    // And motion & effects.
+    motion.value = sanitizeMotion(st.trim.motion)
     segments.value = st.split
     const { clips, ...audio } = st.audio
     // Drafts saved before extra sound tracks existed have neither of these.
     Object.assign(audioEdit.state, { tracks: [], keepSoundSpeed: false }, audio)
     audioEdit.state.clips = clips
     overlayEdit.state.layers = st.overlay
+    // Drafts saved before burned-in subtitles have none.
+    overlayEdit.state.captions = st.captions ? { ...st.captions } : null
     // Drafts saved before the Join tab existed have no `join`.
     if (st.join) Object.assign(joinEdit.state, st.join)
     if (!st.overlay.some((l) => l.id === overlayEdit.state.selectedId)) overlayEdit.state.selectedId = null
@@ -1435,29 +1456,12 @@ export function useClipEditor(props: ClipEditorProps, emit: ClipEditorEmit) {
   }
 
   // ── Promote / discard ────────────────────────────────────────────────────────
-  const CLIP_ICONS: Record<VideoClip['operation'], string> = {
-    TRIM: 'i-lucide-scissors',
-    SPLIT: 'i-lucide-split',
-    AUDIO: 'i-lucide-audio-lines',
-    EXTRACT: 'i-lucide-file-audio',
-    OVERLAY: 'i-lucide-layers'
-  }
+  const CLIP_ICONS = CLIP_OPERATION_ICONS
   function replaces(clip: VideoClip) {
     return clip.operation === 'TRIM' || clip.operation === 'AUDIO' || clip.operation === 'OVERLAY'
   }
   function clipTitle(clip: VideoClip) {
-    switch (clip.operation) {
-      case 'SPLIT':
-        return `Segment ${(clip.segmentIndex ?? 0) + 1} · ${formatMsShort(clip.startMs)}${clip.endMs != null ? ` – ${formatMsShort(clip.endMs)}` : ' – end'}`
-      case 'AUDIO':
-        return 'Video with new audio'
-      case 'EXTRACT':
-        return 'Extracted audio'
-      case 'OVERLAY':
-        return 'Text & overlay'
-      default:
-        return `Trim · ${formatMsShort(clip.startMs)}${clip.endMs != null ? ` – ${formatMsShort(clip.endMs)}` : ' – end'}`
-    }
+    return clipLabel(clip)
   }
   const confirmPromote = ref<VideoClip | null>(null)
   const promoting = ref(false)
@@ -1806,6 +1810,9 @@ export function useClipEditor(props: ClipEditorProps, emit: ClipEditorEmit) {
     starting,
     onStartTrim,
     cuts,
+    motion,
+    lookCompare,
+    lookCompareShown,
     trimAudio,
     look,
     cutStarting,
