@@ -17,6 +17,9 @@
         Translate…
       </UButton>
       <UButton v-if="can('videos', 'WRITE')" size="xs" color="neutral" variant="soft" icon="i-lucide-copy" @click="openAction('duplicate')">Duplicate</UButton>
+      <UButton v-if="can('videos', 'WRITE')" size="xs" color="primary" variant="soft" icon="i-lucide-calendar-clock" @click="openAction('schedule')">
+        Schedule
+      </UButton>
       <UButton v-if="can('videos', 'WRITE')" size="xs" color="primary" variant="soft" icon="i-lucide-book-marked" @click="openAction('recipe')">
         Apply a recipe
       </UButton>
@@ -74,6 +77,33 @@
             <p class="text-xs text-gray-500 dark:text-gray-400">
               Queues one translation job per video and language ({{ plannedJobs }} at most). Languages a video already has a transcript in are skipped, so
               nothing hand-edited is overwritten. Each translation needs the video's spoken-language transcript — transcribe first if it's missing.
+            </p>
+          </template>
+
+          <template v-else-if="action === 'schedule'">
+            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <UFormField label="The first one on">
+                <UInput v-model="scheduleStart" type="datetime-local" class="w-full" aria-label="First one on" />
+              </UFormField>
+              <UFormField label="Then">
+                <USelect
+                  v-model="scheduleStep"
+                  :items="SCHEDULE_STEPS.map((s) => ({ label: s.label, value: s.value }))"
+                  class="w-full"
+                  aria-label="How far apart"
+                />
+              </UFormField>
+            </div>
+            <ul class="max-h-48 space-y-0.5 overflow-y-auto text-xs" data-testid="schedule-plan">
+              <li v-for="p in schedulePlan" :key="p.video.id" class="flex justify-between gap-2">
+                <span class="truncate">{{ p.video.title }}</span>
+                <span class="shrink-0 tabular-nums" :class="p.at ? 'text-gray-700 dark:text-gray-300' : 'text-gray-400'">{{
+                  p.at ? p.at.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : p.skipped
+                }}</span>
+              </li>
+            </ul>
+            <p class="text-xs text-gray-500 dark:text-gray-400">
+              In the order shown, in your own time. Each is enabled by itself then; enabled videos are left as they are.
             </p>
           </template>
 
@@ -144,6 +174,7 @@
 import type { Video } from '~/composables/useVideos'
 import type { AudioEditRequest, OverlayLayer } from '~/composables/useVideoEdits'
 import { recipeJobsFor } from '#shared/utils/bulkRecipe'
+import { fromDateTimeLocal, SCHEDULE_STEPS, schedulePresets, scheduleSeries, toDateTimeLocal } from '#shared/utils/publishSchedule'
 import { describeRecipe } from '#shared/utils/editRecipe'
 
 const props = defineProps<{ videos: Video[]; trash?: boolean }>()
@@ -153,15 +184,23 @@ const { can } = useAuth()
 const { list: listTags, assignToVideo } = useTags()
 const { list: listCollections, addVideos } = useCollections()
 const { list: listTranscripts, create: createTranscript, regenerate } = useTranscripts()
-const { duplicate, archive, unarchive, restore, purge } = useVideos()
+const { duplicate, archive, unarchive, restore, purge, schedulePublish } = useVideos()
 const { settings: clientSettings } = useClientSettings()
 const { startTrim, startAudio, startOverlay } = useVideoEdits()
 const recipes = useEditRecipes()
 const recipeId = ref<string | undefined>()
+const scheduleStart = ref(toDateTimeLocal(schedulePresets(new Date())[1]!.at))
+const scheduleStep = ref<number>(SCHEDULE_STEPS[1].value)
+const schedulePlan = computed(() => {
+  const start = fromDateTimeLocal(scheduleStart.value)
+  return start
+    ? scheduleSeries(props.videos, start, scheduleStep.value, new Date())
+    : props.videos.map((video) => ({ video, at: null, skipped: 'choose a time' }))
+})
 const chosenRecipe = computed(() => recipes.saved.value.find((r) => r.id === recipeId.value) ?? null)
 const toast = useToast()
 
-type Action = 'tags' | 'collection' | 'translate' | 'duplicate' | 'archive' | 'unarchive' | 'restore' | 'purge' | 'recipe'
+type Action = 'tags' | 'collection' | 'translate' | 'duplicate' | 'archive' | 'unarchive' | 'restore' | 'purge' | 'recipe' | 'schedule'
 const action = ref<Action>('tags')
 const show = ref(false)
 const running = ref(false)
@@ -179,7 +218,8 @@ const title = computed(
       unarchive: 'Unarchive videos',
       restore: 'Restore videos',
       purge: 'Delete permanently',
-      recipe: 'Apply a recipe'
+      recipe: 'Apply a recipe',
+      schedule: 'Schedule videos'
     })[action.value]
 )
 const icon = computed(
@@ -193,7 +233,8 @@ const icon = computed(
       unarchive: 'i-lucide-archive-restore',
       restore: 'i-lucide-rotate-ccw',
       purge: 'i-lucide-trash-2',
-      recipe: 'i-lucide-book-marked'
+      recipe: 'i-lucide-book-marked',
+      schedule: 'i-lucide-calendar-clock'
     })[action.value]
 )
 
@@ -222,7 +263,9 @@ const ready = computed(() =>
         ? plannedJobs.value > 0
         : action.value === 'recipe'
           ? !!chosenRecipe.value
-          : true
+          : action.value === 'schedule'
+            ? schedulePlan.value.some((p) => p.at)
+            : true
 )
 
 async function openAction(a: Action) {
@@ -277,6 +320,19 @@ async function run() {
           push(v.title, 'ok', `duplicated as “${copy.title}”`)
         } catch (err) {
           push(v.title, 'failed', apiErrorMessage(err))
+        }
+      }
+    } else if (action.value === 'schedule') {
+      for (const p of schedulePlan.value) {
+        if (!p.at) {
+          push(p.video.title, 'skipped', p.skipped ?? '')
+          continue
+        }
+        try {
+          await schedulePublish(p.video.id, p.at)
+          push(p.video.title, 'ok', `scheduled for ${p.at.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}`)
+        } catch (err) {
+          push(p.video.title, 'failed', apiErrorMessage(err))
         }
       }
     } else if (action.value === 'recipe') {

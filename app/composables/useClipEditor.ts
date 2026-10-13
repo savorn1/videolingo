@@ -48,6 +48,7 @@ import { formatTimecode, parseTimecode } from '#shared/utils/transport'
 import { presetFromSettings, ratioLabel } from '#shared/utils/exportPreset'
 import { PLAIN_LOOK, cssFilter, describeVideoLook, isPlainLook, lookRequest, validateLook, type VideoLook } from '#shared/utils/videoLook'
 import { CLIP_OPERATION_ICONS, clipLabel } from '#shared/utils/editResults'
+import { describeExtras, extrasProblem, extrasRequest, isPlainExtras, sanitizeExtras, type TrimExtras } from '#shared/utils/trimExtras'
 import { PLAIN_MOTION, describeMotion, isPlainMotion, motionProblem, motionRequest, sanitizeMotion, type VideoMotion } from '#shared/utils/videoMotion'
 import { describeTrimAudio, trimAudioRequest, validateTrimAudio, type TrimAudioSettings } from '#shared/utils/trimAudio'
 import { cutSkipTarget, mergeCutRanges, validateCutOut, type CutRange } from '#shared/utils/cutOut'
@@ -143,13 +144,13 @@ export function useClipEditor(props: ClipEditorProps, emit: ClipEditorEmit) {
 
   const EDITOR_SHORTCUTS = [
     { keys: 'space', label: 'Play / pause' },
-    { keys: 'K', label: 'Play / pause' },
+    { keys: 'K', label: 'Pause (and back to normal speed)' },
     { keys: '←', label: 'Previous frame' },
     { keys: '→', label: 'Next frame' },
     { keys: 'shift ←', label: 'Back 10 seconds' },
     { keys: 'shift →', label: 'Forward 10 seconds' },
-    { keys: 'J', label: 'Back 10 seconds' },
-    { keys: 'L', label: 'Forward 10 seconds' },
+    { keys: 'J', label: 'Slower; at normal speed, back 10 seconds' },
+    { keys: 'L', label: 'Play; press again to play faster (up to 4×)' },
     { keys: 'F', label: 'Full screen' },
     { keys: 'I', label: 'Set the trim start to the playhead (Trim tab)' },
     { keys: 'O', label: 'Set the trim end to the playhead (Trim tab)' },
@@ -420,6 +421,9 @@ export function useClipEditor(props: ClipEditorProps, emit: ClipEditorEmit) {
     { label: '4:3', value: 4 / 3 }
   ]
   const cropAspect = ref<number | null>(null)
+  /** Follow the action: the crop's shape, moved along with the motion by the server (auto-reframe), not the box drawn. */
+  const followAction = ref(false)
+  const reframing = computed(() => followAction.value && cropOn.value && !!cropAspect.value)
   // Picking a shape fits the largest box of that shape, centred on the current crop.
   function setAspect(aspect: number | null) {
     cropAspect.value = aspect
@@ -791,7 +795,8 @@ export function useClipEditor(props: ClipEditorProps, emit: ClipEditorEmit) {
   const trimError = computed(() => {
     const err = validateTrim(Math.round(range.value[0]), Math.round(range.value[1]), Math.round(durationMs.value) || null, extendOn.value)
     if (err) return err
-    if (cropOn.value) {
+    if (reframing.value && orientActive.value) return "Follow the action can't be used with a turn"
+    if (cropOn.value && !reframing.value) {
       if (!crop.w || !crop.h) return 'Drag on the video to choose the area to keep'
       const e = validateCrop(crop.x, crop.y, crop.w, crop.h, naturalWidth.value || null, naturalHeight.value || null)
       if (e) return e
@@ -803,6 +808,7 @@ export function useClipEditor(props: ClipEditorProps, emit: ClipEditorEmit) {
     return (
       validateLook(look.value) ??
       motionProblem(motion.value, Math.round(range.value[1] - range.value[0]) || null) ??
+      extrasProblem(extras.value, naturalWidth.value, naturalHeight.value) ??
       validateTrimAudio(trimAudio.value, Math.round(range.value[1] - range.value[0]))
     )
   })
@@ -815,13 +821,15 @@ export function useClipEditor(props: ClipEditorProps, emit: ClipEditorEmit) {
       const job = await startTrim(props.video.id, {
         startMs: Math.round(range.value[0]),
         endMs: Math.round(range.value[1]),
-        crop: cropOn.value ? { x: crop.x, y: crop.y, w: crop.w, h: crop.h } : null,
+        crop: cropOn.value && !reframing.value ? { x: crop.x, y: crop.y, w: crop.w, h: crop.h } : null,
         scale: scaleOn.value ? { w: scale.w, h: scale.h } : null,
         ...orientationRequest(orient.value),
+        ...(reframing.value ? { reframe: { aspect: cropAspect.value! } } : {}),
         audio: trimAudioRequest(trimAudio.value),
         extend: extension.value > 0 || undefined,
         look: lookRequest(look.value),
-        ...motionRequest(motion.value)
+        ...motionRequest(motion.value),
+        ...extrasRequest(extras.value)
       })
       toast.add({ title: `Trim queued — job #${job.id}`, color: 'success' })
       await load()
@@ -842,6 +850,11 @@ export function useClipEditor(props: ClipEditorProps, emit: ClipEditorEmit) {
   const lookCompareShown = computed(() => mode.value === 'trim' && lookCompare.value && !isPlainLook(look.value))
   /** Motion & effects on the trim (videoMotion.ts); times on the trimmed clip. */
   const motion = ref<VideoMotion>({ ...PLAIN_MOTION })
+  /** Blur areas, picture in picture and title cards on the trim (trimExtras.ts). */
+  const extras = ref<TrimExtras>(sanitizeExtras(null))
+  /** The blur boxes show (and can be dragged) on the preview while their section is open. */
+  const blurEditing = ref(false)
+  const blursShown = computed(() => mode.value === 'trim' && blurEditing.value && extras.value.blurs.length > 0)
   const cutStarting = ref(false)
   async function onStartCut() {
     if (validateCutOut(cuts.value, Math.round(durationMs.value) || null)) return
@@ -1234,6 +1247,7 @@ export function useClipEditor(props: ClipEditorProps, emit: ClipEditorEmit) {
     () =>
       !isPlainLook(look.value) ||
       !isPlainMotion(motion.value) ||
+      !isPlainExtras(extras.value) ||
       !!trimAudio.value ||
       cropOn.value ||
       scaleOn.value ||
@@ -1264,15 +1278,18 @@ export function useClipEditor(props: ClipEditorProps, emit: ClipEditorEmit) {
     const parts = [`Trim ${formatMsShort(range.value[0])}–${formatMsShort(range.value[1])} (${formatMsShort(range.value[1] - range.value[0])})`]
     if (activePreset.value) parts.push(activePreset.value.label)
     else {
-      if (cropOn.value && crop.w && crop.h) parts.push(`crop ${crop.w}×${crop.h}`)
+      if (cropOn.value && crop.w && crop.h && !reframing.value) parts.push(`crop ${crop.w}×${crop.h}`)
       if (scaleOn.value && scale.w && scale.h) parts.push(`resize ${scale.w}×${scale.h}`)
     }
+    if (reframing.value) parts.push('crop follows the action')
     if (orientActive.value) parts.push(describeOrientation(orient.value))
     if (extension.value) parts.push(`${formatMsShort(extension.value)} past the end (last frame held)`)
     const lookLine = describeVideoLook(look.value)
     if (lookLine) parts.push(lookLine)
     const motionLine = describeMotion(motion.value)
     if (motionLine) parts.push(motionLine)
+    const extrasLine = describeExtras(extras.value)
+    if (extrasLine) parts.push(extrasLine)
     const audioLine = describeTrimAudio(trimAudio.value)
     if (audioLine) parts.push(audioLine)
     return parts.join(' · ')
@@ -1369,6 +1386,7 @@ export function useClipEditor(props: ClipEditorProps, emit: ClipEditorEmit) {
         cropOn: cropOn.value,
         crop: { ...crop },
         cropAspect: cropAspect.value,
+        followAction: followAction.value,
         scaleOn: scaleOn.value,
         scale: { ...scale },
         orient: { ...orient.value },
@@ -1376,7 +1394,8 @@ export function useClipEditor(props: ClipEditorProps, emit: ClipEditorEmit) {
         audio: trimAudio.value ? { ...trimAudio.value } : null,
         extend: extendOn.value,
         look: { ...look.value },
-        motion: JSON.parse(JSON.stringify(motion.value)) as VideoMotion
+        motion: JSON.parse(JSON.stringify(motion.value)) as VideoMotion,
+        extras: JSON.parse(JSON.stringify(extras.value)) as TrimExtras
       },
       split: segments.value,
       audio,
@@ -1390,6 +1409,7 @@ export function useClipEditor(props: ClipEditorProps, emit: ClipEditorEmit) {
     cropOn.value = st.trim.cropOn
     Object.assign(crop, st.trim.crop)
     cropAspect.value = st.trim.cropAspect
+    followAction.value = !!st.trim.followAction
     scaleOn.value = st.trim.scaleOn
     // Drafts saved before turning existed have no `orient`.
     orient.value = st.trim.orient ? { ...st.trim.orient } : { ...NO_ORIENTATION }
@@ -1403,6 +1423,7 @@ export function useClipEditor(props: ClipEditorProps, emit: ClipEditorEmit) {
     look.value = st.trim.look ? { ...PLAIN_LOOK, ...st.trim.look } : { ...PLAIN_LOOK }
     // And motion & effects.
     motion.value = sanitizeMotion(st.trim.motion)
+    extras.value = sanitizeExtras(st.trim.extras)
     segments.value = st.split
     const { clips, ...audio } = st.audio
     // Drafts saved before extra sound tracks existed have neither of these.
@@ -1811,6 +1832,10 @@ export function useClipEditor(props: ClipEditorProps, emit: ClipEditorEmit) {
     onStartTrim,
     cuts,
     motion,
+    extras,
+    followAction,
+    blurEditing,
+    blursShown,
     lookCompare,
     lookCompareShown,
     trimAudio,

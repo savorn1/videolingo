@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isSentenceCut, subtractCutRange, toggleSentenceCut } from './transcriptCuts'
+import { fillerWordCuts, fillerWords, isSentenceCut, subtractCutRange, toggleSentenceCut, toggleWordCut } from './transcriptCuts'
 
 // Three sentences with short pauses, then one after a long pause.
 const S = [
@@ -56,5 +56,28 @@ describe('subtractCutRange', () => {
       { startMs: 0, endMs: 500 },
       { startMs: 2500, endMs: 5000 }
     ])
+  })
+})
+
+describe('by word', () => {
+  const words = [
+    { startMs: 0, endMs: 400, text: 'Hello,' },
+    { startMs: 600, endMs: 800, text: 'Um,' },
+    { startMs: 1000, endMs: 1500, text: 'welcome' },
+    { startMs: 2600, endMs: 2800, text: 'uh' }
+  ]
+  it('cuts a word and brings it back', () => {
+    const cut = toggleWordCut(words[2]!, [])
+    expect(cut).toEqual([{ startMs: 1000, endMs: 1500 }])
+    expect(toggleWordCut(words[2]!, cut)).toEqual([])
+  })
+  it('finds the filler words whatever their case or punctuation', () => {
+    expect(fillerWords([{ words }, { words: null }]).map((w) => w.text)).toEqual(['Um,', 'uh'])
+  })
+  it('cuts the filler words that fit, leaving no piece under half a second', () => {
+    // "uh" ends 0.2 s before an existing cut, so cutting it would leave a 0.2 s sliver: it stays in.
+    const r = fillerWordCuts(fillerWords([{ words }]), [{ startMs: 3000, endMs: 4000 }], 10_000)
+    expect(r.cuts).toEqual([{ startMs: 600, endMs: 800 }])
+    expect(r.skipped).toBe(1)
   })
 })

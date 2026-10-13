@@ -265,6 +265,13 @@
             >Whole frame</UButton
           >
         </div>
+        <USwitch
+          v-if="cropAspect"
+          v-model="followAction"
+          label="Follow the action"
+          description="Instead of one fixed box, the crop moves with whatever moves in the picture (auto-reframe) — handy for turning a wide video into a Short."
+          data-testid="follow-action"
+        />
       </template>
       <EditorSection
         v-if="cropOn"
@@ -397,6 +404,8 @@
 
     <ClipEditorMotionPanel />
 
+    <ClipEditorExtrasPanel />
+
     <TrimAudioPanel v-model="trimAudio" />
 
     <TranscriptCutPanel
@@ -457,6 +466,7 @@ import { TAB_ACCENTS } from '#shared/utils/tabAccent'
 import { MAX_NAMED_ENTRIES } from '#shared/utils/namedList'
 const {
   video,
+  followAction,
   lookCompare,
   preview,
   currentMs,

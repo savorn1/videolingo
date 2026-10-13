@@ -14,6 +14,8 @@ export interface TranscriptSegment {
   endMs: number
   text: string
   speaker?: string | null
+  /** When each word is said, if speech-to-text timed them (lost when the segment is edited by hand). */
+  words?: { startMs: number; endMs: number; text: string }[] | null
 }
 
 export interface Transcript {

@@ -152,7 +152,7 @@
 
           <VideoDubPanel v-model="dubUrl" :video-id="video.id" :can-write="canWriteVideos && !video.deleted" />
 
-          <VideoNotesPanel :video-id="video.id" :can-write="canWriteVideos" />
+          <VideoNotesPanel :video-id="video.id" :can-write="canWriteVideos" :current-ms="currentMs" @seek="(ms: number) => player?.seek(ms)" />
         </div>
       </div>
 

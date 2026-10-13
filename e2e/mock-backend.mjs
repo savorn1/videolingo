@@ -21,6 +21,8 @@ let uploads = 0
 let made = []
 /** Review notes written in a test. */
 let notes = []
+/** Markers added in a test. */
+let markers = []
 
 function clientSettings() {
   return {
@@ -266,7 +268,10 @@ function route(method, path, body) {
     })
   // The Videos list, when a test asks for it (config.videoList): the sample video, live and in storage.
   if (method === 'GET' && path === '/api/admin/videos' && config.videoList)
-    return page([{ ...video(7), storageKey: 'videos/sample.mp4', width: 320, height: 180, deleted: false }])
+    return page([
+      { ...video(7), storageKey: 'videos/sample.mp4', width: 320, height: 180, deleted: false },
+      { ...video(8), title: 'Teacher camera', storageKey: 'videos/teacher.mp4', width: 320, height: 180, deleted: false }
+    ])
   // Pauses in the sample video's sound, for Remove the pauses.
   if (method === 'GET' && path === '/api/admin/videos/7/edits/pauses')
     return ok({
@@ -291,7 +296,19 @@ function route(method, path, body) {
       version: 1,
       segments: [
         { startMs: 0, endMs: 2000, text: 'Hello and welcome.' },
-        { startMs: 2300, endMs: 4000, text: 'Um, let me find my notes.' },
+        {
+          startMs: 2300,
+          endMs: 4000,
+          text: 'Um, let me find my notes.',
+          words: [
+            { startMs: 2300, endMs: 2500, text: 'Um,' },
+            { startMs: 2600, endMs: 2800, text: 'let' },
+            { startMs: 2850, endMs: 3000, text: 'me' },
+            { startMs: 3050, endMs: 3300, text: 'find' },
+            { startMs: 3350, endMs: 3500, text: 'my' },
+            { startMs: 3550, endMs: 4000, text: 'notes.' }
+          ]
+        },
         { startMs: 4500, endMs: 6000, text: 'Okay, sorry about that.' },
         { startMs: 6500, endMs: 10_000, text: 'Today we learn greetings.' }
       ]
@@ -302,6 +319,38 @@ function route(method, path, body) {
   if (/^\/api\/admin\/videos\/\d+\/remake$/.test(path)) {
     if (method === 'GET') return ok(config.remake ?? { available: true, reason: null, keptUntil: '2026-10-11T10:00:00' })
     if (method === 'POST') return ok(job({ jobId: 77, videoId: Number(path.split('/')[4]), title: 'Sample lesson', status: 'QUEUED' }))
+  }
+  // AI chapters of the sample video, and its markers (kept in memory), for "Add AI chapters as markers".
+  if (method === 'GET' && path === '/api/admin/ai/videos/7/generations')
+    return ok([
+      {
+        id: 1,
+        videoId: 7,
+        transcriptId: 21,
+        transcriptLanguage: 'en',
+        type: 'CHAPTERS',
+        outputLanguage: 'en',
+        model: null,
+        content: {
+          chapters: [
+            { startSeconds: 0, title: 'Greetings', summary: '' },
+            { startSeconds: 5, title: 'Practice', summary: '' }
+          ]
+        },
+        itemCount: 2,
+        warnings: [],
+        createdBy: 'admin',
+        createdAt: '2026-10-13T09:00:00',
+        usage: null
+      }
+    ])
+  if (path === '/api/admin/videos/7/markers') {
+    if (method === 'GET') return ok(markers)
+    if (method === 'POST') {
+      const marker = { id: markers.length + 1, color: null, createdBy: 'admin', createdAt: '2026-10-13T09:00:00', chapter: false, ...body }
+      markers.push(marker)
+      return ok(marker)
+    }
   }
   // Review notes on a video, kept in memory until the next reset.
   const notesPath = /^\/api\/admin\/videos\/(\d+)\/notes(?:\/(\d+))?$/.exec(path)
@@ -314,6 +363,7 @@ function route(method, path, body) {
         id: notes.length + 1,
         videoId,
         body: body.body.trim(),
+        atMs: body.atMs ?? null,
         author: 'admin',
         resolved: false,
         resolvedBy: null,
@@ -387,6 +437,7 @@ createServer((req, res) => {
       uploads = 0
       made = []
       notes = []
+      markers = []
       config = body ?? {}
       return send(200, { ok: true })
     }

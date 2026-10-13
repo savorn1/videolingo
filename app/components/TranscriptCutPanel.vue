@@ -27,6 +27,12 @@
         />
         <UInput v-model="search" size="xs" icon="i-lucide-search" placeholder="Find words…" class="min-w-0 flex-1" aria-label="Find in the transcript" />
       </div>
+      <div v-if="hasWords" class="flex flex-wrap items-center gap-2">
+        <USwitch v-model="byWord" size="sm" label="Cut by word" />
+        <UButton v-if="fillers.length" size="xs" color="neutral" variant="soft" icon="i-lucide-eraser" @click="cutFillers">
+          Cut the filler words ({{ fillers.length }})
+        </UButton>
+      </div>
       <ol class="max-h-72 space-y-0.5 overflow-y-auto rounded-md border border-gray-200 p-1 dark:border-gray-800">
         <li
           v-for="row in shown"
@@ -43,7 +49,27 @@
           >
             {{ formatTimecode(row.s.startMs) }}
           </button>
+          <span v-if="byWord && row.s.words?.length" class="min-w-0 flex-1 text-sm leading-relaxed">
+            <button
+              v-for="(w, wi) in row.s.words"
+              :key="wi"
+              type="button"
+              class="mr-0.5 rounded px-0.5"
+              :class="
+                wordCut(w)
+                  ? 'text-gray-400 line-through decoration-error-500 dark:text-gray-500'
+                  : 'text-gray-900 hover:bg-primary-100 dark:text-white dark:hover:bg-primary-900/40'
+              "
+              :aria-pressed="wordCut(w)"
+              :title="wordCut(w) ? 'Bring this word back' : 'Cut this word out'"
+              data-testid="transcript-word"
+              @click="cuts = toggleWordCut(w, cuts)"
+            >
+              {{ w.text }}
+            </button>
+          </span>
           <button
+            v-else
             type="button"
             class="min-w-0 flex-1 text-left text-sm"
             :class="row.cut ? 'text-gray-400 line-through decoration-error-500 dark:text-gray-500' : 'text-gray-900 hover:text-primary-700 dark:text-white'"
@@ -66,8 +92,8 @@
 // Edit by transcript: the video's transcript as a list of sentences; crossing one out adds its stretch
 // (and the pause to a crossed-out neighbour) to the Cut out ranges, which render as one Cut job.
 import type { Transcript, TranscriptSegment } from '~/composables/useTranscripts'
-import { lengthAfterCuts, type CutRange } from '#shared/utils/cutOut'
-import { isSentenceCut, toggleSentenceCut } from '#shared/utils/transcriptCuts'
+import { lengthAfterCuts, MAX_CUTS, mergeCutRanges, type CutRange } from '#shared/utils/cutOut'
+import { fillerWordCuts, fillerWords, isSentenceCut, toggleSentenceCut, toggleWordCut, type TimedWord } from '#shared/utils/transcriptCuts'
 import { formatTimecode } from '#shared/utils/transport'
 
 const cuts = defineModel<CutRange[]>({ required: true })
@@ -121,6 +147,24 @@ const shown = computed(() => {
 const removedCount = computed(() => rows.value.filter((r) => r.cut).length)
 const resultMs = computed(() => lengthAfterCuts(cuts.value, props.durationMs))
 const playingIndex = computed(() => sentences.value.findIndex((s) => props.currentMs >= s.startMs && props.currentMs < s.endMs))
+
+// ── By word, when speech-to-text timed the words ──
+const hasWords = computed(() => sentences.value.some((s) => s.words?.length))
+const byWord = ref(false)
+const fillers = computed(() => fillerWords(sentences.value).filter((w) => !wordCut(w)))
+function wordCut(w: TimedWord) {
+  return isSentenceCut(w, cuts.value)
+}
+const toast = useToast()
+function cutFillers() {
+  const { cuts: add, skipped } = fillerWordCuts(fillers.value, cuts.value, props.durationMs)
+  cuts.value = mergeCutRanges([...cuts.value, ...add])
+  toast.add({
+    title: `${add.length} filler word${add.length === 1 ? '' : 's'} cut`,
+    description: skipped ? `${skipped} left in — at most ${MAX_CUTS} cuts, and no piece shorter than half a second.` : undefined,
+    color: 'success'
+  })
+}
 
 function toggle(index: number) {
   cuts.value = toggleSentenceCut(sentences.value, index, cuts.value, props.durationMs)

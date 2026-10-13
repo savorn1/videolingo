@@ -44,3 +44,30 @@ export function scheduleProblem(at: Date | null, now: Date): string | null {
   if (at.getTime() > now.getTime() + 366 * 24 * 60 * 60 * 1000) return 'A video can be scheduled at most a year ahead'
   return null
 }
+
+/** How far apart videos scheduled together are, as offered. */
+export const SCHEDULE_STEPS = [
+  { label: 'An hour apart', value: 60 * 60 * 1000 },
+  { label: 'A day apart', value: 24 * 60 * 60 * 1000 },
+  { label: 'A week apart', value: 7 * 24 * 60 * 60 * 1000 }
+] as const
+
+/**
+ * Scheduling several videos in turn: the first disabled one at `start`, each next one `stepMs` later. Enabled videos
+ * are left out (with why), and so is any time past what the server accepts (a year ahead).
+ */
+export function scheduleSeries<V extends { enabled: boolean; deleted?: boolean }>(
+  videos: V[],
+  start: Date,
+  stepMs: number,
+  now: Date
+): { video: V; at: Date | null; skipped: string | null }[] {
+  let n = 0
+  return videos.map((video) => {
+    if (video.deleted) return { video, at: null, skipped: 'in the trash' }
+    if (video.enabled) return { video, at: null, skipped: 'already enabled' }
+    const at = new Date(start.getTime() + n++ * stepMs)
+    const problem = scheduleProblem(at, now)
+    return problem ? { video, at: null, skipped: problem } : { video, at, skipped: null }
+  })
+}

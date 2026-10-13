@@ -164,6 +164,7 @@
 </template>
 
 <script setup lang="ts">
+import { shuttleKey } from '#shared/utils/shuttle'
 // Playback controls for the editor preview. The browser's own bar sits under
 // the crop layer while cropping, and has no frame stepping, looping or (in
 // most browsers) speed — so the editor drives the <video> from here.
@@ -468,6 +469,11 @@ function isEditable(t: HTMLElement | null) {
   return !!t && (t.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(t.tagName))
 }
 let spaceHandled = false
+/** Playing and speed as the video has them right now (the refs follow its events, a moment later). */
+function live() {
+  const v = el.value
+  return v ? { playing: !v.paused, rate: v.playbackRate } : { playing: playing.value, rate: rate.value }
+}
 function onKeyDown(e: KeyboardEvent) {
   if (e.metaKey || e.ctrlKey || e.altKey) return
   const t = e.target as HTMLElement | null
@@ -481,19 +487,23 @@ function onKeyDown(e: KeyboardEvent) {
       if (!e.repeat) togglePlay()
       break
     case 'KeyK':
-      togglePlay()
+    case 'KeyJ':
+    case 'KeyL': {
+      // Shuttle: L plays and speeds up, J slows down then jumps back, K pauses at normal speed (shuttle.ts).
+      const action = shuttleKey(e.code === 'KeyJ' ? 'J' : e.code === 'KeyK' ? 'K' : 'L', live(), SHIFT_SKIP_SECONDS)
+      if ('skipSeconds' in action) skip(action.skipSeconds)
+      else {
+        const now = live().playing
+        props.player?.setRate(action.rate)
+        if (action.play !== now) togglePlay()
+      }
       break
+    }
     case 'ArrowLeft':
     case 'ArrowRight':
       if (onSlider || props.arrowKeysTaken) return
       if (e.shiftKey) skip(e.code === 'ArrowLeft' ? -SHIFT_SKIP_SECONDS : SHIFT_SKIP_SECONDS)
       else step(e.code === 'ArrowLeft' ? -1 : 1)
-      break
-    case 'KeyJ':
-      skip(-SHIFT_SKIP_SECONDS)
-      break
-    case 'KeyL':
-      skip(SHIFT_SKIP_SECONDS)
       break
     case 'Home':
       if (onSlider) return

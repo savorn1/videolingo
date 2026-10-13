@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { mockRequests, openReady, resetMock, signInAsAdmin, wavFile } from './helpers'
+import { configureMock, mockRequests, openReady, resetMock, signInAsAdmin, wavFile } from './helpers'
 
 // The editor (docs/editor-scenarios.md, Trim and Split) on a 10-second sample clip from the mock backend.
 
@@ -186,6 +186,72 @@ test('Trim: a look can be compared before and after on the preview', async ({ pa
   await divider.press('ArrowLeft')
   await expect(divider).toHaveAttribute('aria-valuenow', '45')
   if (process.env.SHOT) await page.locator('video').first().locator('..').screenshot({ path: process.env.SHOT })
+})
+
+test('Trim: blur areas, picture in picture and title cards are sent with the trim', async ({ page }) => {
+  await configureMock({ videoList: true })
+  await openEditor(page)
+  await page.getByRole('heading', { name: 'Blur, picture in picture & cards' }).click()
+  const panel = page.getByTestId('trim-extras')
+  await panel.getByRole('button', { name: 'Add a blur area' }).click()
+  await expect(page.getByTestId('blur-boxes')).toBeVisible()
+  await expect(panel.getByTestId('blur-row')).toHaveCount(1)
+
+  await panel.getByRole('switch', { name: 'Picture in picture' }).click()
+  await panel.getByRole('button', { name: 'Video in the corner' }).click()
+  await page.getByRole('option', { name: 'Teacher camera' }).click()
+  await panel.getByRole('switch', { name: 'Title cards' }).click()
+  await page.getByRole('button', { name: 'Start trim' }).click()
+
+  await expect
+    .poll(async () => (await mockRequests()).find((r) => r.path === '/api/admin/videos/7/edits/trim')?.body)
+    .toMatchObject({
+      blurs: [{ x: expect.any(Number), y: expect.any(Number), w: expect.any(Number), h: expect.any(Number) }],
+      pip: { videoId: 8, corner: 'BOTTOM_RIGHT', sizePct: 30 },
+      cards: { intro: { text: 'Sample lesson', durationMs: 3000 }, outro: null, background: '#1e3a8a', color: '#ffffff' }
+    })
+})
+
+test('J, K and L shuttle the preview: L faster each time, J slower, K pauses at normal speed', async ({ page }) => {
+  await openEditor(page)
+  const video = page.locator('video').first()
+  const state = () => video.evaluate((v: HTMLVideoElement) => ({ paused: v.paused, rate: v.playbackRate }))
+  await page.locator('body').press('l')
+  await expect.poll(state).toEqual({ paused: false, rate: 1 })
+  await page.locator('body').press('l')
+  await page.locator('body').press('l')
+  await expect.poll(state).toEqual({ paused: false, rate: 2 })
+  await page.locator('body').press('j')
+  await expect.poll(state).toEqual({ paused: false, rate: 1.5 })
+  await page.locator('body').press('k')
+  await expect.poll(state).toEqual({ paused: true, rate: 1 })
+})
+
+test('Trim: a 9:16 crop can follow the action instead of staying put', async ({ page }) => {
+  await openEditor(page)
+  await page
+    .getByRole('button', { name: /Shorts/ })
+    .first()
+    .click()
+  await page.getByRole('switch', { name: 'Follow the action' }).click()
+  await page.getByRole('button', { name: 'Start trim' }).click()
+
+  await expect
+    .poll(async () => (await mockRequests()).find((r) => r.path === '/api/admin/videos/7/edits/trim')?.body)
+    .toMatchObject({ crop: null, reframe: { aspect: 9 / 16 }, scale: { w: 1080, h: 1920 } })
+})
+
+test('Trim: single words and the filler words can be cut when the transcript has word timings', async ({ page }) => {
+  await openEditor(page)
+  await page.getByRole('heading', { name: 'Edit by transcript' }).click()
+  const panel = page.getByTestId('transcript-cut')
+  await panel.getByRole('switch', { name: 'Cut by word' }).click()
+  await panel.getByRole('button', { name: 'Cut the filler words (1)' }).click()
+  await expect(page.getByTestId('cut-row')).toHaveCount(1)
+  await expect(page.getByTestId('cut-row').getByLabel('Cut 1 start')).toHaveValue(/0:02\.3/)
+  await expect(panel.getByRole('button', { name: 'Um,' })).toHaveAttribute('aria-pressed', 'true')
+  await panel.getByRole('button', { name: 'notes.' }).click()
+  await expect(page.getByTestId('cut-row')).toHaveCount(2)
 })
 
 test('Split: three even parts queue a split into three segments', async ({ page }) => {

@@ -24,7 +24,19 @@
         <span class="text-sm font-medium tabular-nums text-gray-900 dark:text-white ml-2">
           {{ formatTimestamp(playheadMs) }} <span class="text-gray-500 dark:text-gray-400">/ {{ formatTimestamp(durationMs) }}</span>
         </span>
-        <USelect v-model="selectedAudio" :items="audioOptions" size="sm" class="w-52 ml-auto" aria-label="Preview audio" />
+        <UTooltip v-if="canWrite && aiChapters.length" text="Each AI-made chapter becomes a chapter marker learners see; move or rename them after">
+          <UButton size="sm" color="neutral" variant="soft" icon="i-lucide-sparkles" class="ml-auto" :loading="addingAiChapters" @click="onAddAiChapters">
+            Add AI chapters as markers
+          </UButton>
+        </UTooltip>
+        <USelect
+          v-model="selectedAudio"
+          :items="audioOptions"
+          size="sm"
+          class="w-52"
+          :class="canWrite && aiChapters.length ? '' : 'ml-auto'"
+          aria-label="Preview audio"
+        />
       </div>
 
       <!-- Timeline: a fixed label column (outside the scroll area) beside a
@@ -215,6 +227,7 @@ import type { Subtitle } from '~/composables/useSubtitles'
 import type { VideoMarker } from '~/composables/useVideoMarkers'
 import type VideoPlayer from '~/components/VideoPlayer.vue'
 import { clampZoom, cueSnapTargets, msToPx, pxToMs, snapMs, ZOOM_STEP } from '#shared/utils/timeline'
+import { aiChaptersToMarkers, pickAiChapters, type AiChapter } from '#shared/utils/aiChapterMarkers'
 
 const props = defineProps<{ video: Video; canWrite: boolean }>()
 
@@ -222,6 +235,38 @@ const toast = useToast()
 const { overview: dubOverview, create: createDub, setLocked } = useDubs()
 const { list: listSubtitles, get: getSubtitle } = useSubtitles()
 const { list: listMarkers, create: createMarkerApi, update: updateMarkerApi, remove: removeMarkerApi } = useVideoMarkers()
+
+// ── AI chapters → chapter markers ───────────────────────────────────────────
+const { latest: latestAi } = useAi()
+const aiChapters = ref<AiChapter[]>([])
+const addingAiChapters = ref(false)
+onMounted(async () => {
+  try {
+    aiChapters.value = pickAiChapters(await latestAi(props.video.id), props.video.language)
+  } catch {
+    // No AI access or none made: the button just doesn't show.
+  }
+})
+async function onAddAiChapters() {
+  const toAdd = aiChaptersToMarkers(aiChapters.value, markers.value, durationMs.value)
+  if (!toAdd.length) {
+    toast.add({ title: 'Every AI chapter is already a chapter marker', color: 'info' })
+    return
+  }
+  addingAiChapters.value = true
+  let added = 0
+  try {
+    for (const m of toAdd) {
+      markers.value = [...markers.value, await createMarkerApi(props.video.id, { ...m, chapter: true })].sort((a, b) => a.atMs - b.atMs)
+      added++
+    }
+    toast.add({ title: `${added} chapter marker${added === 1 ? '' : 's'} added`, description: 'Learners see them under Chapters.', color: 'success' })
+  } catch (err) {
+    toast.add({ title: `Added ${added}, then it stopped`, description: apiErrorMessage(err), color: 'error' })
+  } finally {
+    addingAiChapters.value = false
+  }
+}
 
 const error = ref('')
 const dubs = ref<VideoDub[]>([])

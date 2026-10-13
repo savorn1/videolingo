@@ -29,6 +29,15 @@
           <UserAvatar :name="n.author" size="2xs" class="mt-0.5" />
           <div class="min-w-0 flex-1">
             <p class="text-xs text-gray-500 dark:text-gray-400">
+              <button
+                v-if="n.atMs != null"
+                type="button"
+                class="mr-1 rounded bg-primary-50 px-1 font-medium tabular-nums text-primary-700 hover:bg-primary-100 dark:bg-primary-950/50 dark:text-primary-300"
+                :title="`Play from ${formatTimecode(n.atMs)}`"
+                @click="emit('seek', n.atMs)"
+              >
+                {{ formatTimecode(n.atMs) }}
+              </button>
               <span class="font-medium text-gray-700 dark:text-gray-300">{{ n.author }}</span> · {{ formatDateTime(n.createdAt) }}
               <template v-if="n.resolved"> · resolved by {{ n.resolvedBy }}</template>
             </p>
@@ -81,7 +90,8 @@
         @keydown.meta.enter="onAdd"
         @keydown.ctrl.enter="onAdd"
       />
-      <div class="flex justify-end">
+      <div class="flex items-center justify-between gap-2">
+        <UCheckbox v-model="atNow" :label="`At ${formatTimecode(Math.round(currentMs ?? 0))}`" :disabled="currentMs == null" data-testid="note-at-time" />
         <UButton type="submit" size="sm" icon="i-lucide-send" :loading="adding" :disabled="!draft.trim()">Add note</UButton>
       </div>
     </form>
@@ -91,8 +101,16 @@
 <script setup lang="ts">
 // Review notes on a video (VideoNoteController): open ones first, resolved ones folded away.
 import type { VideoNote } from '~/composables/useVideoNotes'
+import { formatTimecode } from '#shared/utils/transport'
 
-const props = defineProps<{ videoId: number; canWrite: boolean }>()
+const props = defineProps<{ videoId: number; canWrite: boolean; currentMs?: number | null }>()
+const emit = defineEmits<{ seek: [ms: number] }>()
+/** Ties a new note to where the video is (on by default once it has been played). */
+const atNow = ref(false)
+watch(
+  () => (props.currentMs ?? 0) > 0,
+  (playing) => playing && (atNow.value = true)
+)
 
 const { list, add, setResolved, remove } = useVideoNotes()
 const { username, isAdmin } = useAuth()
@@ -125,7 +143,8 @@ async function onAdd() {
   if (!body || adding.value) return
   adding.value = true
   try {
-    notes.value = [...(notes.value ?? []), await add(props.videoId, body)]
+    const atMs = atNow.value && props.currentMs != null ? Math.round(props.currentMs) : null
+    notes.value = [...(notes.value ?? []), await add(props.videoId, body, atMs)]
     draft.value = ''
   } catch (err) {
     toast.add({ title: 'Could not add the note', description: apiErrorMessage(err), color: 'error' })

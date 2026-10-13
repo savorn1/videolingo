@@ -166,6 +166,18 @@ export function useVideoEdits() {
       stabilize?: boolean
       zoomTo?: { cx: number; cy: number; size: number }
       greenScreen?: { keyColor: string; similarity: number; background: string }
+      /** Follow the action: a crop of this shape (w/h) that moves with the motion, instead of `crop`. */
+      reframe?: { aspect: number }
+      /** Blur, picture in picture & cards (shared/utils/trimExtras.ts). */
+      blurs?: { x: number; y: number; w: number; h: number }[]
+      pip?: { videoId: number; corner: string; sizePct: number }
+      cards?: {
+        intro: { text: string; durationMs: number } | null
+        outro: { text: string; durationMs: number } | null
+        background: string
+        color: string
+        logoKey: string | null
+      }
     }
   ) {
     return (await api<ApiEnvelope<ProcessingJob>>(`${base(videoId)}/trim`, { method: 'POST', body })).data

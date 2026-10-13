@@ -1,7 +1,7 @@
 // Edit by transcript: crossing out sentences of the video's transcript cuts those stretches out (Cut out).
 // Sentences are the transcript's segments (no word timings exist). Cutting two neighbouring sentences
 // also cuts the short pause between them, so what is left doesn't keep a stray gap.
-import { mergeCutRanges, type CutRange } from './cutOut'
+import { MAX_CUTS, mergeCutRanges, validateCutOut, type CutRange } from './cutOut'
 
 /** A pause this short between two crossed-out sentences is cut with them. */
 export const BRIDGE_GAP_MS = 1500
@@ -49,4 +49,45 @@ export function toggleSentenceCut(sentences: Sentence[], index: number, cuts: Cu
   const start = bridgeBefore && isSentenceCut(prev!, cuts) ? prev!.endMs : s.startMs
   const end = bridgeAfter && isSentenceCut(next!, cuts) ? next!.startMs : s.endMs
   return mergeCutRanges([...cuts, { startMs: Math.max(0, start), endMs: Math.min(durationMs || end, end) }])
+}
+
+// ── By word (when speech-to-text timed the words) ──
+
+export interface TimedWord {
+  startMs: number
+  endMs: number
+  text: string
+}
+
+/** Cuts one word out, or brings it back. */
+export function toggleWordCut(word: TimedWord, cuts: CutRange[]): CutRange[] {
+  const range = { startMs: word.startMs, endMs: word.endMs }
+  return isSentenceCut(range, cuts) ? subtractCutRange(cuts, range) : mergeCutRanges([...cuts, range])
+}
+
+/** Hesitations worth cutting, in a few languages' spellings (compared without punctuation, case-blind). */
+export const FILLER_WORDS = ['um', 'uh', 'umm', 'uhm', 'er', 'erm', 'ah', 'eh', 'hmm', 'mm']
+
+const bare = (w: string) => w.toLowerCase().replace(/[^\p{L}\p{N}]/gu, '')
+
+/** The filler words of the transcript, in time order. */
+export function fillerWords(sentences: { words?: TimedWord[] | null }[], fillers: readonly string[] = FILLER_WORDS): TimedWord[] {
+  return sentences.flatMap((s) => s.words ?? []).filter((w) => fillers.includes(bare(w.text)))
+}
+
+/**
+ * Cuts for the filler words not already cut, in time order while they fit with the cuts there are: at most MAX_CUTS
+ * in all, never leaving a piece shorter than MIN_KEPT_MS. `skipped` counts the ones left in by those rules.
+ */
+export function fillerWordCuts(words: TimedWord[], existing: CutRange[], durationMs: number): { cuts: CutRange[]; skipped: number } {
+  const accepted: CutRange[] = []
+  let skipped = 0
+  for (const w of words) {
+    const range = { startMs: w.startMs, endMs: w.endMs }
+    if (isSentenceCut(range, [...existing, ...accepted])) continue
+    const trial = mergeCutRanges([...existing, ...accepted, range])
+    if (trial.length <= MAX_CUTS && validateCutOut(trial, durationMs || null) === null) accepted.push(range)
+    else skipped++
+  }
+  return { cuts: accepted, skipped }
 }

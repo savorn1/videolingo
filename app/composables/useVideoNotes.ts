@@ -7,6 +7,8 @@ export interface VideoNote {
   id: number
   videoId: number
   body: string
+  /** The moment of the video it is about; null = the whole video. */
+  atMs: number | null
   author: string
   resolved: boolean
   resolvedBy: string | null
@@ -21,8 +23,8 @@ export function useVideoNotes() {
   async function list(videoId: number) {
     return (await api<ApiEnvelope<VideoNote[]>>(base(videoId))).data
   }
-  async function add(videoId: number, body: string) {
-    return (await api<ApiEnvelope<VideoNote>>(base(videoId), { method: 'POST', body: { body } })).data
+  async function add(videoId: number, body: string, atMs: number | null = null) {
+    return (await api<ApiEnvelope<VideoNote>>(base(videoId), { method: 'POST', body: { body, atMs } })).data
   }
   async function setResolved(videoId: number, noteId: number, resolved: boolean) {
     return (await api<ApiEnvelope<VideoNote>>(`${base(videoId)}/${noteId}`, { method: 'PUT', body: { resolved } })).data

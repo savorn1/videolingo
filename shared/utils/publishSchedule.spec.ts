@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { fromDateTimeLocal, schedulePresets, scheduleProblem, toDateTimeLocal, videoStatusBadge } from './publishSchedule'
+import { fromDateTimeLocal, schedulePresets, scheduleProblem, scheduleSeries, toDateTimeLocal, videoStatusBadge } from './publishSchedule'
 
 describe('videoStatusBadge', () => {
   it('says enabled, scheduled with when, or disabled', () => {
@@ -42,5 +42,20 @@ describe('scheduleProblem', () => {
     expect(scheduleProblem(null, now)).toMatch(/Choose a date/)
     expect(scheduleProblem(new Date(2026, 9, 8, 11, 0), now)).toMatch(/future/)
     expect(scheduleProblem(new Date(2027, 11, 1), now)).toMatch(/year/)
+  })
+})
+
+describe('scheduleSeries', () => {
+  const now = new Date(2026, 9, 13, 12, 0)
+  const start = new Date(2026, 9, 14, 9, 0)
+  const day = 24 * 60 * 60 * 1000
+  it('spaces the disabled videos out from the start, skipping enabled ones and the trash', () => {
+    const plan = scheduleSeries([{ enabled: false }, { enabled: true }, { enabled: false, deleted: true }, { enabled: false }], start, day, now)
+    expect(plan.map((p) => (p.at ? toDateTimeLocal(p.at) : p.skipped))).toEqual(['2026-10-14T09:00', 'already enabled', 'in the trash', '2026-10-15T09:00'])
+  })
+  it('leaves out times further ahead than the server accepts', () => {
+    const plan = scheduleSeries([{ enabled: false }, { enabled: false }], new Date(2027, 9, 10), 7 * day, now)
+    expect(plan[0]!.at).not.toBeNull()
+    expect(plan[1]!.skipped).toMatch(/year/)
   })
 })

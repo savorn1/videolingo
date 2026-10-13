@@ -70,7 +70,8 @@
                 @time="onTime"
                 @duration="onDuration"
               >
-                <template v-if="cropActive || overlayEdit.state.layers.length || mode === 'overlay' || showGuides || lookCompareShown" #overlay>
+                <template v-if="cropActive || overlayEdit.state.layers.length || mode === 'overlay' || showGuides || lookCompareShown || blursShown" #overlay>
+                  <BlurBoxesOverlay v-if="blursShown && !cropActive" v-model="extras.blurs" :natural-width="naturalWidth" :natural-height="naturalHeight" />
                   <LookCompare v-if="lookCompareShown && !cropActive" :video-el="preview?.videoEl" />
                   <OverlayLayers
                     v-if="mode === 'overlay' || overlayEdit.state.layers.length"
@@ -484,6 +485,8 @@ const {
   panning,
   cropActive,
   lookCompareShown,
+  blursShown,
+  extras,
   showGuides,
   guideBox,
   zoomBy,
