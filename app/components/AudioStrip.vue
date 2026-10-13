@@ -130,32 +130,32 @@
       <div class="absolute -top-6 bottom-0 w-px bg-error-500 pointer-events-none z-20" :style="{ left: pct(currentMs) }" />
     </div>
 
-    <!-- Background music: where it plays (each loop round marked); drag it, or use ←/→, to change when it starts -->
+    <!-- The music and each sound track: where it plays (each loop round marked); drag it, or use ←/→, to change when it starts -->
     <div
-      v-if="music"
-      ref="musicEl"
+      v-for="(b, bi) in beds"
+      :key="b.id"
       class="relative h-6 rounded bg-gray-50 dark:bg-gray-800/60 overflow-x-clip focus-visible:outline-2 focus-visible:outline-primary-500"
       role="slider"
       tabindex="0"
-      :aria-label="`Music start: ${music.name}`"
+      :aria-label="`${b.isMusic ? 'Music' : `Sound track ${bi + (music ? 0 : 1)}`} start: ${b.bed.name}`"
       aria-valuemin="0"
-      :aria-valuemax="Math.round(maxMusicStart / 1000)"
-      :aria-valuenow="Math.round(music.startMs / 1000)"
-      :aria-valuetext="formatTimecode(music.startMs)"
-      data-testid="music-lane"
-      @keydown="onMusicKey"
+      :aria-valuemax="Math.round(maxBedStart / 1000)"
+      :aria-valuenow="Math.round(b.bed.startMs / 1000)"
+      :aria-valuetext="formatTimecode(b.bed.startMs)"
+      :data-testid="b.isMusic ? 'music-lane' : 'track-lane'"
+      @keydown="(e) => onBedKey(b.bed, e)"
     >
       <div
-        v-for="(sp, i) in musicRounds"
+        v-for="(sp, i) in b.rounds"
         :key="i"
-        class="absolute inset-y-0.5 flex items-center overflow-hidden border-l-2 border-amber-600 bg-amber-400/70 px-1.5 text-[11px] leading-none text-amber-950 cursor-grab active:cursor-grabbing dark:border-amber-400 dark:bg-amber-500/50 dark:text-amber-50"
-        :class="i === 0 ? 'rounded-l-md' : 'border-dashed'"
+        class="absolute inset-y-0.5 flex items-center overflow-hidden border-l-2 px-1.5 text-[11px] leading-none cursor-grab active:cursor-grabbing"
+        :class="[b.isMusic ? BED_TONES.music : BED_TONES.track, i === 0 ? 'rounded-l-md' : 'border-dashed']"
         :style="{ left: pct(sp.startMs), width: pct(sp.endMs - sp.startMs) }"
-        :title="i === 0 ? `${music.name} — drag to change when it starts` : 'Loops round'"
-        @pointerdown="onMusicDown"
+        :title="i === 0 ? `${b.bed.name} — drag to change when it starts` : 'Loops round'"
+        @pointerdown="(e) => onBedDown(b.bed, e)"
       >
         <span v-if="i === 0" class="flex items-center gap-1 truncate pointer-events-none">
-          <UIcon name="i-lucide-music" class="size-3 shrink-0" />{{ music.name }}
+          <UIcon :name="b.isMusic ? 'i-lucide-music' : 'i-lucide-audio-lines'" class="size-3 shrink-0" />{{ b.bed.name }}
         </span>
       </div>
       <div class="absolute inset-y-0 w-px bg-error-500 pointer-events-none z-20" :style="{ left: pct(currentMs) }" />
@@ -167,7 +167,7 @@
 // The audio edit's clips on the video's timeline (fit to width). Clips are
 // pieces of the source sound: drag one to move it, drag its edges to trim.
 // Drags snap to the playhead, the selected range and other clips' edges.
-import type { AudioEdit } from '~/composables/useAudioEdit'
+import type { AudioEdit, MusicSettings } from '~/composables/useAudioEdit'
 import {
   assignLanes,
   clipEnd,
@@ -191,7 +191,6 @@ const SNAP_PX = 8
 
 const ruler = useTemplateRef<HTMLDivElement>('ruler')
 const lanesEl = useTemplateRef<HTMLDivElement>('lanesEl')
-const musicEl = useTemplateRef<HTMLDivElement>('musicEl')
 const lanes = computed(() => assignLanes(props.edit.state.clips))
 const laneCount = computed(() => Math.max(1, ...[...lanes.value.values()].map((l) => l + 1)))
 
@@ -321,34 +320,45 @@ function onClipDown(c: AudioClip, what: 'move' | 'start' | 'end', e: PointerEven
   window.addEventListener('pointerup', () => window.removeEventListener('pointermove', move), { once: true })
 }
 
-// ── Fades and background music ──────────────────────────────────────────────
+// ── Fades, background music and sound tracks ────────────────────────────────
 const fades = computed(() => fadeSpans(props.edit.state, props.durationMs))
 const music = computed(() => props.edit.state.music)
-const musicRounds = computed(() => (music.value ? musicSpans(music.value, props.durationMs) : []))
-/** The music has to start a little before the end, or nothing of it would be heard. */
-const maxMusicStart = computed(() => Math.max(0, props.durationMs - 100))
-function setMusicStart(ms: number) {
-  if (music.value) music.value.startMs = Math.round(Math.min(Math.max(0, ms), maxMusicStart.value))
+// Literal classes (Tailwind can't see built-up names): the music amber, the extra tracks teal.
+const BED_TONES = {
+  music: 'border-amber-600 bg-amber-400/70 text-amber-950 dark:border-amber-400 dark:bg-amber-500/50 dark:text-amber-50',
+  track: 'border-teal-600 bg-teal-400/60 text-teal-950 dark:border-teal-400 dark:bg-teal-500/40 dark:text-teal-50'
 }
-function onMusicDown(e: PointerEvent) {
-  if (e.button !== 0 || !music.value) return
+/** The music, then each extra track, with where it plays. */
+const beds = computed(() =>
+  [
+    ...(music.value ? [{ id: 'music', isMusic: true, bed: music.value }] : []),
+    ...props.edit.state.tracks.map((t, i) => ({ id: `track${i}`, isMusic: false, bed: t }))
+  ].map((b) => ({ ...b, rounds: musicSpans(b.bed, props.durationMs) }))
+)
+/** A bed has to start a little before the end, or nothing of it would be heard. */
+const maxBedStart = computed(() => Math.max(0, props.durationMs - 100))
+function setBedStart(bed: MusicSettings, ms: number) {
+  bed.startMs = Math.round(Math.min(Math.max(0, ms), maxBedStart.value))
+}
+function onBedDown(bed: MusicSettings, e: PointerEvent) {
+  if (e.button !== 0) return
   e.preventDefault()
-  musicEl.value?.focus()
+  const row = (e.currentTarget as HTMLElement).parentElement
+  row?.focus()
   const startX = e.clientX
-  const startMs = music.value.startMs
-  const k = props.durationMs / Math.max(musicEl.value?.clientWidth ?? 1, 1)
+  const startMs = bed.startMs
+  const k = props.durationMs / Math.max(row?.clientWidth ?? 1, 1)
   const targets = snapTargets('')
-  const move = (ev: PointerEvent) => setMusicStart(snapMs(startMs + (ev.clientX - startX) * k, targets, SNAP_PX * k))
+  const move = (ev: PointerEvent) => setBedStart(bed, snapMs(startMs + (ev.clientX - startX) * k, targets, SNAP_PX * k))
   window.addEventListener('pointermove', move)
   window.addEventListener('pointerup', () => window.removeEventListener('pointermove', move), { once: true })
 }
 /** ←/→ move the start by 0.1 s (Shift: 1 s); Home puts it at the beginning. */
-function onMusicKey(e: KeyboardEvent) {
-  if (!music.value) return
+function onBedKey(bed: MusicSettings, e: KeyboardEvent) {
   const step = e.shiftKey ? 1000 : 100
-  if (e.key === 'ArrowLeft') setMusicStart(music.value.startMs - step)
-  else if (e.key === 'ArrowRight') setMusicStart(music.value.startMs + step)
-  else if (e.key === 'Home') setMusicStart(0)
+  if (e.key === 'ArrowLeft') setBedStart(bed, bed.startMs - step)
+  else if (e.key === 'ArrowRight') setBedStart(bed, bed.startMs + step)
+  else if (e.key === 'Home') setBedStart(bed, 0)
   else return
   e.preventDefault()
   e.stopPropagation()

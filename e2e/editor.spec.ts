@@ -51,7 +51,7 @@ test('Audio: music added in this visit plays along with the preview', async ({ p
   await page.getByRole('tab', { name: /Audio/ }).click()
   await page.getByRole('heading', { name: 'Background music' }).click()
   const section = page.getByRole('group').filter({ has: page.getByRole('heading', { name: 'Background music' }) })
-  await section.locator('input[type=file]').setInputFiles(wavFile('song.wav', 3))
+  await section.locator('input[type=file]').first().setInputFiles(wavFile('song.wav', 3))
   await expect(page.getByTestId('music-preview-note')).toContainText('Plays along with the preview')
 
   // It shows under the clips, and ←/→ move when it starts
@@ -72,6 +72,26 @@ test('Audio: music added in this visit plays along with the preview', async ({ p
   await fadeOut.focus()
   await fadeOut.press('ArrowLeft')
   await expect(fadeOut).toHaveAttribute('aria-valuetext', '0.1 s')
+})
+
+test('Audio: an extra sound track and slow motion with the sound at normal speed are sent with the render', async ({ page }) => {
+  await openEditor(page)
+  await page.getByRole('tab', { name: /Audio/ }).click()
+  await page.getByRole('heading', { name: /Background music/ }).click()
+  const tracks = page.getByTestId('sound-tracks')
+  await tracks.locator('input[type=file]').setInputFiles(wavFile('door.wav', 1))
+  await expect(tracks).toContainText('door.wav')
+  await expect(page.getByTestId('track-lane')).toBeVisible()
+
+  await page.getByRole('heading', { name: 'Speed & pitch' }).click()
+  await page.getByLabel('Speed value').fill('0.5')
+  await page.getByLabel('Speed value').press('Enter')
+  await page.getByRole('switch', { name: 'Keep the sound at normal speed' }).click()
+  await page.getByRole('button', { name: /Render video with this audio/ }).click()
+
+  await expect
+    .poll(async () => (await mockRequests()).find((r) => r.path === '/api/admin/videos/7/edits/audio')?.body)
+    .toMatchObject({ speed: 0.5, keepSoundSpeed: true, tracks: [{ key: expect.stringMatching(/^uploads\//), volume: 1, loop: false, duck: false }] })
 })
 
 test('Split: three even parts queue a split into three segments', async ({ page }) => {

@@ -8,6 +8,13 @@ import type { ApiEnvelope, PageEnvelope } from '#shared/types'
 import type { VideoSourceKind } from '#shared/utils/videoSources'
 import type { ProcessingJob } from '~/composables/useProcessingJobs'
 
+/** Backend VideoIngestService.RemakeStatus: whether "Make again" works now; `keptUntil` is when the uploads go (server time). */
+export interface RemakeStatus {
+  available: boolean
+  reason: string | null
+  keptUntil: string | null
+}
+
 export type VideoVisibility = 'PUBLIC' | 'UNLISTED' | 'PRIVATE'
 
 export const VIDEO_VISIBILITIES: {
@@ -50,6 +57,8 @@ export interface Video {
   fileSize: number | null
   mimeType: string | null
   enabled: boolean
+  /** When this disabled video will be enabled by itself (server time); null when not scheduled. */
+  publishAt: string | null
   archived: boolean
   archivedAt: string | null
   visibility: VideoVisibility
@@ -133,6 +142,20 @@ export function useVideos() {
 
   async function updateStatus(id: number, enabled: boolean) {
     return (await api<ApiEnvelope<Video>>(`/api/admin/videos/${id}/status`, { method: 'PUT', body: { enabled } })).data
+  }
+
+  /** Whether a video made from audio can be made again now (its recording is kept 72 hours), and if not, why. */
+  async function remakeStatus(id: number) {
+    return (await api<ApiEnvelope<RemakeStatus>>(`/api/admin/videos/${id}/remake`)).data
+  }
+  /** Renders a video made from audio once more with its last settings; the file it has now goes under Versions. */
+  async function remake(id: number) {
+    return (await api<ApiEnvelope<ProcessingJob>>(`/api/admin/videos/${id}/remake`, { method: 'POST' })).data
+  }
+
+  /** Enables a disabled video by itself at `publishAt` (sent as UTC); null clears the schedule. */
+  async function schedulePublish(id: number, publishAt: Date | null) {
+    return (await api<ApiEnvelope<Video>>(`/api/admin/videos/${id}/schedule`, { method: 'PUT', body: { publishAt: publishAt?.toISOString() ?? null } })).data
   }
 
   async function remove(id: number) {
@@ -301,6 +324,9 @@ export function useVideos() {
     statistics,
     update,
     updateStatus,
+    schedulePublish,
+    remakeStatus,
+    remake,
     remove,
     restore,
     purge,

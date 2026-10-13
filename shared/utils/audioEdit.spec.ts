@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   previewGainAt,
+  soundTracksProblem,
   musicPositionAt,
   musicSpans,
   fadeSpans,
@@ -242,5 +243,17 @@ describe('fadeFromHandle', () => {
   it('leaves room for the other fade, and stops at a minute', () => {
     expect(fadeFromHandle('in', 9000, { ...s, fadeOutMs: 4000 }, 10_000)).toBe(6000)
     expect(fadeFromHandle('in', 90_000, s, 120_000)).toBe(60_000)
+  })
+})
+
+describe('soundTracksProblem', () => {
+  const t = { startMs: 0, volume: 1 }
+  it('accepts up to four tracks within the video', () => {
+    expect(soundTracksProblem([t, t, t, t], 10_000)).toBeNull()
+  })
+  it('says what is wrong, numbering the track', () => {
+    expect(soundTracksProblem([t, t, t, t, t], 10_000)).toBe('At most 4 extra sound tracks')
+    expect(soundTracksProblem([t, { startMs: 0, volume: 3 }], 10_000)).toBe('Sound track 2: volume must be between 0% and 200%')
+    expect(soundTracksProblem([{ startMs: 12_000, volume: 1 }], 10_000)).toBe('Sound track 1 must start within the video')
   })
 })

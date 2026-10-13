@@ -3475,6 +3475,8 @@ export interface components {
       fileSize?: number
       mimeType?: string
       enabled?: boolean
+      /** Format: date-time */
+      publishAt?: string
       archived?: boolean
       /** Format: date-time */
       archivedAt?: string
@@ -3500,6 +3502,10 @@ export interface components {
     }
     UpdateVideoStatusRequest: {
       enabled: boolean
+    }
+    ScheduleVideoRequest: {
+      /** Format: date-time */
+      publishAt?: string
     }
     MoveVideoOwnerRequest: {
       /** Format: int64 */

@@ -1386,7 +1386,8 @@ export function useClipEditor(props: ClipEditorProps, emit: ClipEditorEmit) {
     look.value = st.trim.look ? { ...PLAIN_LOOK, ...st.trim.look } : { ...PLAIN_LOOK }
     segments.value = st.split
     const { clips, ...audio } = st.audio
-    Object.assign(audioEdit.state, audio)
+    // Drafts saved before extra sound tracks existed have neither of these.
+    Object.assign(audioEdit.state, { tracks: [], keepSoundSpeed: false }, audio)
     audioEdit.state.clips = clips
     overlayEdit.state.layers = st.overlay
     // Drafts saved before the Join tab existed have no `join`.
@@ -1614,7 +1615,8 @@ export function useClipEditor(props: ClipEditorProps, emit: ClipEditorEmit) {
         speed: a.speed,
         pitchSemitones: a.pitchSemitones,
         balance: a.balance,
-        channels: a.channels
+        channels: a.channels,
+        keepSoundSpeed: a.keepSoundSpeed
       }),
       layers: JSON.parse(JSON.stringify(overlayEdit.state.layers)) as RecipeLayer[]
     }

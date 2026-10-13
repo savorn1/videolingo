@@ -57,12 +57,27 @@
       <UAlert
         v-else-if="!video.enabled"
         class="mb-4"
-        color="warning"
+        :color="video.publishAt ? 'info' : 'warning'"
         variant="subtle"
-        icon="i-lucide-eye-off"
-        title="This video is disabled"
-        description="Learners can't watch it until it's enabled again."
+        :icon="video.publishAt ? 'i-lucide-calendar-clock' : 'i-lucide-eye-off'"
+        :title="video.publishAt ? `Scheduled: enabled ${formatDateTime(video.publishAt)}` : 'This video is disabled'"
+        :description="video.publishAt ? 'Learners can watch it from then on.' : 'Learners can\'t watch it until it\'s enabled again.'"
+        :actions="
+          canWriteVideos
+            ? [
+                {
+                  label: video.publishAt ? 'Change schedule' : 'Schedule…',
+                  icon: 'i-lucide-calendar-clock',
+                  color: 'neutral',
+                  variant: 'outline',
+                  onClick: () => (showSchedule = true)
+                }
+              ]
+            : undefined
+        "
+        data-testid="disabled-banner"
       />
+      <VideoScheduleModal v-if="canWriteVideos" v-model:open="showSchedule" :video="video" @saved="(v) => (video = v)" />
 
       <AudioVideoProgress :video-id="video.id" @finished="load" />
 
@@ -136,6 +151,8 @@
           />
 
           <VideoDubPanel v-model="dubUrl" :video-id="video.id" :can-write="canWriteVideos && !video.deleted" />
+
+          <VideoNotesPanel :video-id="video.id" :can-write="canWriteVideos" />
         </div>
       </div>
 
@@ -283,6 +300,14 @@
     <VideoMoveModal v-if="video" v-model="showMove" :video="video" @moved="(v) => (video = v)" />
 
     <ConfirmModal
+      v-model="confirmRemake"
+      title="Make this video again"
+      :description="`Render '${video?.title ?? ''}' again with the same recording and settings. The file it has now is kept under Versions; the transcript isn't made again.`"
+      confirm-label="Make again"
+      :loading="remaking"
+      @confirm="onRemake"
+    />
+    <ConfirmModal
       v-model="confirmDisable"
       title="Disable video"
       :description="`Disable '${video?.title ?? ''}'? Learners can no longer watch it until it's enabled again.`"
@@ -305,7 +330,7 @@
 
 <script setup lang="ts">
 import type { DropdownMenuItem, TabsItem } from '@nuxt/ui'
-import type { Video, VideoStatistics } from '~/composables/useVideos'
+import type { RemakeStatus, Video, VideoStatistics } from '~/composables/useVideos'
 import { VIDEO_VISIBILITIES } from '~/composables/useVideos'
 
 definePageMeta({ middleware: 'admin' })
@@ -313,7 +338,7 @@ definePageMeta({ middleware: 'admin' })
 const route = useRoute()
 const router = useRouter()
 const toast = useToast()
-const { get, statistics, updateStatus, remove, restore, archive, unarchive, duplicate } = useVideos()
+const { get, statistics, updateStatus, remove, restore, archive, unarchive, duplicate, remakeStatus, remake } = useVideos()
 
 const { can } = useAuth()
 
@@ -388,8 +413,53 @@ const moreItems = computed<DropdownMenuItem[][]>(() => [
     video.value?.archived
       ? { label: 'Unarchive', icon: 'i-lucide-archive-restore', onSelect: onUnarchive }
       : { label: 'Archive', icon: 'i-lucide-archive', onSelect: onArchive }
-  ]
+  ],
+  // Only for videos made from audio; greyed out with the reason while it can't be done.
+  ...(remakeInfo.value && remakeInfo.value.reason !== NOT_FROM_AUDIO
+    ? [
+        [
+          {
+            label: 'Make again…',
+            icon: 'i-lucide-refresh-cw',
+            description: remakeInfo.value.available
+              ? remakeInfo.value.keptUntil
+                ? `Possible until ${formatDateTime(remakeInfo.value.keptUntil)}`
+                : 'Same recording and settings'
+              : (remakeInfo.value.reason ?? undefined),
+            disabled: !remakeInfo.value.available,
+            onSelect: () => (confirmRemake.value = true)
+          }
+        ]
+      ]
+    : [])
 ])
+
+// ── Make again (videos made from audio) ────────────────────────────────────
+const NOT_FROM_AUDIO = 'Only a video made from audio can be made again'
+const remakeInfo = ref<RemakeStatus | null>(null)
+const confirmRemake = ref(false)
+const remaking = ref(false)
+async function loadRemake() {
+  if (!canWriteVideos.value) return
+  try {
+    remakeInfo.value = await remakeStatus(id.value)
+  } catch {
+    remakeInfo.value = null
+  }
+}
+async function onRemake() {
+  remaking.value = true
+  try {
+    await remake(id.value)
+    confirmRemake.value = false
+    toast.add({ title: 'Making the video again', description: 'It is being rendered with the same recording and settings.', color: 'success' })
+    await Promise.all([load(), loadRemake()])
+  } catch (err) {
+    toast.add({ title: 'Could not make the video again', description: apiErrorMessage(err), color: 'error' })
+  } finally {
+    remaking.value = false
+  }
+}
 
 // ── Tabs (the active one is kept in ?tab= so it can be linked to) ──────────
 const tabItems: TabsItem[] = [
@@ -495,6 +565,7 @@ const maxDailyViews = computed(() => Math.max(1, ...(stats.value?.dailyViews.map
 onMounted(() => {
   load()
   loadStats()
+  loadRemake()
 })
 
 // ── Actions ────────────────────────────────────────────────────────────────
@@ -504,6 +575,7 @@ const showShare = ref(false)
 const busy = ref(false)
 const { doneWithUndo } = useUndoToast()
 const confirmDisable = ref(false)
+const showSchedule = ref(false)
 const confirmDelete = ref(false)
 
 async function setStatus(enabled: boolean) {

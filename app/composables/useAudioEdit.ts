@@ -3,7 +3,7 @@
 // POSTed to /edits/audio; the backend validates it again (AudioEditRules).
 
 import type { AudioEditRequest } from '~/composables/useVideoEdits'
-import { initialClips, isIdentityClips, validateClips, type AudioClip, type TimeRange } from '#shared/utils/audioEdit'
+import { initialClips, isIdentityClips, soundTracksProblem, validateClips, type AudioClip, type TimeRange } from '#shared/utils/audioEdit'
 
 export interface UploadedAudio {
   key: string
@@ -41,7 +41,11 @@ export function useAudioEdit(durationMs: Ref<number>) {
     pitchSemitones: 0,
     balance: 0,
     channels: 'KEEP' as Channels,
-    music: null as MusicSettings | null
+    music: null as MusicSettings | null,
+    /** More sound beds besides the music (effects, a second bed). */
+    tracks: [] as MusicSettings[],
+    /** With a speed change, only the picture is re-timed; the sound keeps its own speed. */
+    keepSoundSpeed: false
   })
 
   /** How long the sound clips are cut from is (the video, or the replacement file). */
@@ -68,7 +72,9 @@ export function useAudioEdit(durationMs: Ref<number>) {
       pitchSemitones: 0,
       balance: 0,
       channels: 'KEEP',
-      music: null
+      music: null,
+      tracks: [],
+      keepSoundSpeed: false
     })
     resetClips()
   }
@@ -96,10 +102,13 @@ export function useAudioEdit(durationMs: Ref<number>) {
     pitchSemitones: state.pitchSemitones,
     balance: state.balance,
     channels: state.channels,
-    music: state.music
-      ? { key: state.music.key, volume: state.music.volume, loop: state.music.loop, duck: state.music.duck, startMs: state.music.startMs }
-      : null
+    music: state.music ? bedRequest(state.music) : null,
+    tracks: state.tracks.map(bedRequest),
+    keepSoundSpeed: state.speed !== 1 && state.keepSoundSpeed
   }))
+  function bedRequest(m: MusicSettings) {
+    return { key: m.key, volume: m.volume, loop: m.loop, duck: m.duck, startMs: m.startMs }
+  }
 
   const changed = computed(
     () =>
@@ -116,16 +125,20 @@ export function useAudioEdit(durationMs: Ref<number>) {
       state.pitchSemitones !== 0 ||
       state.balance !== 0 ||
       state.channels !== 'KEEP' ||
-      !!state.music
+      !!state.music ||
+      state.tracks.length > 0
   )
 
   /** Why it can't be rendered yet, or null. */
   const error = computed(() => {
     if (state.source === 'UPLOAD' && !state.replacement) return 'Upload the replacement audio first'
     if (!changed.value) return 'Change something first'
-    if (!state.clips.length && !state.music) return 'Every clip was deleted — there would be no sound left (use Volume 0% to silence it)'
+    if (!state.clips.length && !state.music && !state.tracks.length)
+      return 'Every clip was deleted — there would be no sound left (use Volume 0% to silence it)'
     const clipError = validateClips(state.clips, durationMs.value)
     if (clipError) return clipError
+    const trackError = soundTracksProblem(state.tracks, durationMs.value)
+    if (trackError) return trackError
     const outMs = durationMs.value / state.speed
     if (durationMs.value && state.fadeInMs + state.fadeOutMs > outMs) return 'The fades are longer than the video'
     return null

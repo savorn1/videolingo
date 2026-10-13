@@ -18,6 +18,8 @@ export interface RecipeAudio {
   pitchSemitones: number
   balance: number
   channels: 'KEEP' | 'MONO' | 'STEREO'
+  /** With a speed change, only the picture is re-timed. */
+  keepSoundSpeed: boolean
 }
 
 export const DEFAULT_RECIPE_AUDIO: RecipeAudio = {
@@ -30,7 +32,8 @@ export const DEFAULT_RECIPE_AUDIO: RecipeAudio = {
   speed: 1,
   pitchSemitones: 0,
   balance: 0,
-  channels: 'KEEP'
+  channels: 'KEEP',
+  keepSoundSpeed: false
 }
 
 export interface RecipeLayer {

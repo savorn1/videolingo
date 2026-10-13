@@ -419,11 +419,10 @@ const columns = computed<ColumnDef<Video>[]>(() => [
         {
           key: 'enabled',
           label: 'Status',
-          type: 'boolean',
+          type: 'badge',
           sortable: true,
-          trueLabel: 'Enabled',
-          falseLabel: 'Disabled',
-          falseColor: 'warning'
+          value: (row) => videoStatusBadge(row).label,
+          color: (row) => videoStatusBadge(row).color
         } satisfies ColumnDef<Video>,
         { key: 'createdAt', label: 'Uploaded', type: 'date', sortable: true } satisfies ColumnDef<Video>
       ]),

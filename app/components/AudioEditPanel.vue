@@ -169,7 +169,12 @@
     </EditorSection>
 
     <!-- ── Music ───────────────────────────────────────────────────────── -->
-    <EditorSection v-model:open="open.music" title="Background music" :changed="changed.music">
+    <EditorSection
+      v-model:open="open.music"
+      title="Background music & sound tracks"
+      :changed="changed.music"
+      :hint="s.tracks.length ? `+ ${s.tracks.length} track${s.tracks.length === 1 ? '' : 's'}` : undefined"
+    >
       <template v-if="s.music">
         <div class="flex items-center gap-2 rounded-md bg-gray-50 dark:bg-gray-800 px-2 py-1.5">
           <UIcon name="i-lucide-music" class="w-4 h-4 shrink-0" :class="TAB_ACCENTS.audio.icon" />
@@ -215,14 +220,74 @@
         :progress="uploading === 'music' ? uploadProgress : null"
         @pick="(f) => onUpload(f, 'music')"
       />
+
+      <!-- More sound beds besides the music: effects, a second bed — each mixed the same way -->
+      <div class="space-y-2 border-t border-gray-100 pt-3 dark:border-gray-800" data-testid="sound-tracks">
+        <p class="text-xs font-medium text-gray-700 dark:text-gray-300">Sound tracks <span class="font-normal text-gray-500">(effects, a second bed)</span></p>
+        <div v-for="(t, i) in s.tracks" :key="t.key + i" class="space-y-2 rounded-md border border-gray-200 p-2 dark:border-gray-800">
+          <div class="flex items-center gap-2">
+            <UIcon name="i-lucide-audio-lines" class="w-4 h-4 shrink-0" :class="TAB_ACCENTS.audio.icon" />
+            <span class="truncate flex-1 text-sm" :title="t.name">{{ t.name }}</span>
+            <UButton size="xs" color="neutral" variant="ghost" icon="i-lucide-x" :aria-label="`Remove sound track ${t.name}`" @click="s.tracks.splice(i, 1)" />
+          </div>
+          <SliderRow
+            label="Volume"
+            :model-value="Math.round(t.volume * 100)"
+            :min="0"
+            :max="200"
+            :step="5"
+            :default-value="100"
+            unit="%"
+            @update:model-value="(v) => (t.volume = v / 100)"
+          />
+          <div class="flex flex-wrap items-end gap-x-4 gap-y-2">
+            <UFormField label="Starts at (s)" class="w-28">
+              <UInput
+                :model-value="sec(t.startMs)"
+                type="number"
+                step="0.1"
+                min="0"
+                size="sm"
+                :aria-label="`Sound track ${i + 1} starts at`"
+                @update:model-value="(v) => (t.startMs = ms(v))"
+              />
+            </UFormField>
+            <USwitch v-model="t.loop" label="Loop" />
+            <USwitch v-model="t.duck" label="Quieter under speech" />
+          </div>
+        </div>
+        <UploadButton
+          v-if="s.tracks.length < MAX_SOUND_TRACKS"
+          label="Add a sound track"
+          icon="i-lucide-plus"
+          :progress="uploading === 'track' ? uploadProgress : null"
+          @pick="(f) => onUpload(f, 'track')"
+        />
+        <p class="text-xs text-gray-500 dark:text-gray-400">
+          Up to {{ MAX_SOUND_TRACKS }}, each at its own volume and start — for example a sound effect at 0:12. They are heard in the result.
+        </p>
+      </div>
     </EditorSection>
 
     <!-- ── Speed & pitch ───────────────────────────────────────────────── -->
     <EditorSection v-model:open="open.speed" title="Speed & pitch" :changed="changed.speed" :hint="`${+s.speed.toFixed(2)}×`">
       <SliderRow v-model="s.speed" label="Speed" :min="0.5" :max="2" :step="0.05" :default-value="1" unit="×" />
-      <p v-if="s.speed !== 1" class="text-xs text-gray-500 dark:text-gray-400">
-        The picture speeds up too, so they stay in sync — the video becomes {{ formatTimecode(durationMs / s.speed) }} long.
-      </p>
+      <template v-if="s.speed !== 1">
+        <USwitch
+          v-model="s.keepSoundSpeed"
+          label="Keep the sound at normal speed"
+          :description="
+            s.speed < 1
+              ? 'Slow motion with the real sound: it plays at its own speed and the rest is silent.'
+              : 'Fast motion with the real sound: it plays at its own speed and is cut at the new end.'
+          "
+          data-testid="keep-sound-speed"
+        />
+        <p class="text-xs text-gray-500 dark:text-gray-400">
+          {{ s.keepSoundSpeed ? 'Only the picture is re-timed' : 'The picture and the sound change speed together, so they stay in sync' }} — the video becomes
+          {{ formatTimecode(durationMs / s.speed) }} long.
+        </p>
+      </template>
       <SliderRow v-model="s.pitchSemitones" label="Pitch" :min="-12" :max="12" :step="1" :default-value="0" unit="st" />
     </EditorSection>
 
@@ -339,6 +404,7 @@ import {
   duplicate,
   MAX_AUDIO_CLIPS,
   MAX_FADE_MS,
+  MAX_SOUND_TRACKS,
   MIN_CLIP_MS,
   mergeWithNext,
   splitAt,
@@ -439,7 +505,7 @@ const changed = computed(() => ({
   range: s.mutes.length > 0,
   level: s.volume !== 1 || s.normalize || s.fadeInMs > 0 || s.fadeOutMs > 0,
   cleanup: s.denoise !== 'OFF' || s.enhanceVoice,
-  music: !!s.music,
+  music: !!s.music || s.tracks.length > 0,
   speed: s.speed !== 1 || s.pitchSemitones !== 0,
   channels: s.balance !== 0 || s.channels !== 'KEEP'
 }))
@@ -474,6 +540,7 @@ const summary = computed(() => {
   if (s.denoise !== 'OFF') parts.push(`noise reduction ${s.denoise.toLowerCase()}`)
   if (s.enhanceVoice) parts.push('enhanced voice')
   if (s.music) parts.push('background music')
+  if (s.tracks.length) parts.push(`${s.tracks.length} sound track${s.tracks.length === 1 ? '' : 's'}`)
   if (s.speed !== 1) parts.push(`speed ${+s.speed.toFixed(2)}×`)
   if (s.pitchSemitones !== 0) parts.push(`pitch ${s.pitchSemitones > 0 ? '+' : ''}${s.pitchSemitones} st`)
   if (s.balance !== 0) parts.push(`balance ${balanceLabel.value.toLowerCase()}`)
@@ -482,10 +549,10 @@ const summary = computed(() => {
 })
 
 // ── Uploads ──────────────────────────────────────────────────────────────────
-const uploading = ref<'replacement' | 'music' | null>(null)
+const uploading = ref<'replacement' | 'music' | 'track' | null>(null)
 const uploadProgress = ref(0)
 
-async function onUpload(file: File, what: 'replacement' | 'music') {
+async function onUpload(file: File, what: 'replacement' | 'music' | 'track') {
   uploading.value = what
   uploadProgress.value = 0
   try {
@@ -494,6 +561,7 @@ async function onUpload(file: File, what: 'replacement' | 'music') {
     const uploaded = { key: ticket.key, name: file.name, durationMs }
     props.edit.rememberLocalFile(ticket.key, file)
     if (what === 'replacement') s.replacement = uploaded
+    else if (what === 'track') s.tracks.push({ ...uploaded, volume: 1, loop: false, duck: false, startMs: Math.max(0, Math.round(props.currentMs)) })
     else s.music = { ...uploaded, volume: 0.3, loop: true, duck: true, startMs: 0 }
   } catch (err) {
     toast.add({ title: 'Could not upload the audio', description: apiErrorMessage(err), color: 'error' })

@@ -19,6 +19,8 @@ let requests = []
 let uploads = 0
 /** Videos made from audio in this test, by job id: the first succeeds, the others fail (and succeed once retried). */
 let made = []
+/** Review notes written in a test. */
+let notes = []
 
 function clientSettings() {
   return {
@@ -224,6 +226,44 @@ function route(method, path, body) {
     return ok(job(entry))
   }
   if (method === 'GET' && /^\/api\/admin\/videos\/\d+$/.test(path)) return ok(video(Number(path.split('/').pop())))
+  // "Make again": possible unless a test says otherwise (config.remake); doing it queues a job.
+  if (/^\/api\/admin\/videos\/\d+\/remake$/.test(path)) {
+    if (method === 'GET') return ok(config.remake ?? { available: true, reason: null, keptUntil: '2026-10-11T10:00:00' })
+    if (method === 'POST') return ok(job({ jobId: 77, videoId: Number(path.split('/')[4]), title: 'Sample lesson', status: 'QUEUED' }))
+  }
+  // Review notes on a video, kept in memory until the next reset.
+  const notesPath = /^\/api\/admin\/videos\/(\d+)\/notes(?:\/(\d+))?$/.exec(path)
+  if (notesPath) {
+    const videoId = Number(notesPath[1])
+    const noteId = notesPath[2] ? Number(notesPath[2]) : null
+    if (method === 'GET') return ok(notes.filter((n) => n.videoId === videoId))
+    if (method === 'POST') {
+      const note = {
+        id: notes.length + 1,
+        videoId,
+        body: body.body.trim(),
+        author: 'admin',
+        resolved: false,
+        resolvedBy: null,
+        resolvedAt: null,
+        createdAt: '2026-10-09T10:00:00'
+      }
+      notes.push(note)
+      return ok(note)
+    }
+    const note = notes.find((n) => n.id === noteId)
+    if (method === 'PUT' && note) {
+      Object.assign(note, { resolved: body.resolved, resolvedBy: body.resolved ? 'admin' : null, resolvedAt: body.resolved ? '2026-10-09T10:05:00' : null })
+      return ok(note)
+    }
+    if (method === 'DELETE') {
+      notes = notes.filter((n) => n.id !== noteId)
+      return ok(null)
+    }
+  }
+  // Scheduling answers with the time as the server keeps it: its own wall-clock, no zone (here, UTC).
+  const sched = /^\/api\/admin\/videos\/(\d+)\/schedule$/.exec(path)
+  if (method === 'PUT' && sched) return ok({ ...video(Number(sched[1])), publishAt: body?.publishAt ? body.publishAt.replace('Z', '').slice(0, 19) : null })
   // Archive, unarchive and restore answer with the video as it is afterwards (for "Undo" on the toast).
   const flip = /^\/api\/admin\/videos\/(\d+)\/(archive|unarchive|restore)$/.exec(path)
   if (method === 'POST' && flip) return ok({ ...video(Number(flip[1])), archived: flip[2] === 'archive', deleted: false })
@@ -274,6 +314,7 @@ createServer((req, res) => {
       requests = []
       uploads = 0
       made = []
+      notes = []
       config = body ?? {}
       return send(200, { ok: true })
     }

@@ -279,3 +279,17 @@ export function previewGainAt(
   if (s.fadeOutMs > 0 && outLength > 0) fade = Math.min(fade, (outLength - outMs) / s.fadeOutMs)
   return Math.max(0, Math.min(1, s.volume * Math.max(0, fade)))
 }
+
+/** Extra sound tracks besides the background music (backend AudioEditRules.MAX_TRACKS). */
+export const MAX_SOUND_TRACKS = 4
+
+/** Why the extra sound tracks can't be rendered (as the backend says), or null. */
+export function soundTracksProblem(tracks: { startMs: number; volume: number }[], durationMs: number): string | null {
+  if (tracks.length > MAX_SOUND_TRACKS) return `At most ${MAX_SOUND_TRACKS} extra sound tracks`
+  for (let i = 0; i < tracks.length; i++) {
+    const t = tracks[i]!
+    if (t.volume < 0 || t.volume > 2) return `Sound track ${i + 1}: volume must be between 0% and 200%`
+    if (t.startMs < 0 || (durationMs > 0 && t.startMs >= durationMs)) return `Sound track ${i + 1} must start within the video`
+  }
+  return null
+}

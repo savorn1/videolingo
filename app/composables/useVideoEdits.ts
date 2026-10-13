@@ -62,7 +62,7 @@ export interface AudioEditRequest {
   normalize?: boolean
   denoise?: 'OFF' | 'LIGHT' | 'STRONG'
   enhanceVoice?: boolean
-  /** 0.5–2; the picture follows. */
+  /** 0.5–2; the picture follows (and the sound too, unless keepSoundSpeed). */
   speed?: number
   /** -12…12 */
   pitchSemitones?: number
@@ -70,6 +70,10 @@ export interface AudioEditRequest {
   balance?: number
   channels?: 'KEEP' | 'MONO' | 'STEREO'
   music?: { key: string; volume: number; loop: boolean; duck: boolean; startMs: number } | null
+  /** More sound beds besides the music (effects, a second bed), mixed the same way; up to 4. */
+  tracks?: { key: string; volume: number; loop: boolean; duck: boolean; startMs: number }[]
+  /** With a speed change: re-time only the picture, the sound plays at its own speed (padded or cut at the end). */
+  keepSoundSpeed?: boolean
 }
 
 /** A text or image layer drawn over the video; x/y is its centre as fractions of the frame. */
