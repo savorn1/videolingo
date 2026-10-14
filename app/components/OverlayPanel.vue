@@ -640,6 +640,66 @@
             />
           </UFormField>
         </div>
+        <!-- A look of one's own: colours, a box or an outline, bold -->
+        <div class="space-y-2" data-testid="caption-look">
+          <USwitch
+            :model-value="!!s.captions.look"
+            label="Customise the look"
+            description="Colours, a box or an outline, and bold — starting from the style above."
+            @update:model-value="(on) => s.captions && (s.captions.look = on ? captionLookFor(s.captions.style) : null)"
+          />
+          <template v-if="s.captions.look">
+            <div class="flex flex-wrap items-center gap-3 text-xs text-gray-600 dark:text-gray-300">
+              <label class="flex items-center gap-1.5"
+                >Text
+                <input
+                  v-model="s.captions.look.color"
+                  type="color"
+                  class="h-7 w-9 cursor-pointer rounded border border-gray-200 dark:border-gray-700"
+                  aria-label="Subtitle text colour"
+              /></label>
+              <label class="flex items-center gap-1.5"
+                >Second line
+                <input
+                  v-model="s.captions.look.secondColor"
+                  type="color"
+                  class="h-7 w-9 cursor-pointer rounded border border-gray-200 dark:border-gray-700"
+                  aria-label="Second line colour"
+              /></label>
+              <label class="flex items-center gap-1.5"
+                >{{ s.captions.look.box ? 'Box' : 'Outline' }}
+                <input
+                  v-model="s.captions.look.edgeColor"
+                  type="color"
+                  class="h-7 w-9 cursor-pointer rounded border border-gray-200 dark:border-gray-700"
+                  :aria-label="s.captions.look.box ? 'Box colour' : 'Outline colour'"
+              /></label>
+              <USwitch v-model="s.captions.look.box" size="sm" label="Box behind" />
+              <USwitch v-model="s.captions.look.bold" size="sm" label="Bold" />
+            </div>
+            <SliderRow
+              v-if="s.captions.look.box"
+              label="Box opacity"
+              :model-value="Math.round(s.captions.look.boxOpacity * 100)"
+              :min="0"
+              :max="100"
+              :step="5"
+              :default-value="50"
+              unit="%"
+              @update:model-value="(v) => s.captions?.look && (s.captions.look.boxOpacity = v / 100)"
+            />
+          </template>
+          <!-- A sample line in this look (the server draws it in Noto Sans) -->
+          <div
+            class="flex flex-col items-center gap-0.5 rounded-md bg-gray-700 bg-[linear-gradient(135deg,#334155,#64748b)] px-3 py-4 text-center"
+            data-testid="caption-sample"
+          >
+            <span :style="captionSampleStyle(sampleLook, 15)">The spoken words appear here</span>
+            <span v-if="s.captions.secondTranscriptId" :style="captionSampleStyle({ ...sampleLook, color: sampleLook.secondColor }, 12)"
+              >and the translation here</span
+            >
+          </div>
+        </div>
         <SliderRow v-model="s.captions.sizePct" label="Text size" :min="3" :max="10" :step="0.5" :default-value="5" unit="% of the height" />
         <p class="text-xs text-gray-500 dark:text-gray-400">The preview doesn't draw them; they are in the rendered result.</p>
       </template>
@@ -714,6 +774,7 @@ import { LAYER_ANIMATIONS, LAYER_SPOTS, LAYER_WEIGHTS, fontCss, type OverlayEdit
 import { uploadToStorage } from '~/composables/useVideos'
 import { formatTimecode } from '#shared/utils/transport'
 import { BURN_STYLES } from '#shared/utils/audioVideo'
+import { captionLookFor, captionSampleStyle } from '#shared/utils/captionLook'
 import { isMovingLayer, MAX_TO_SCALE, MIN_TO_SCALE } from '#shared/utils/layerMotion'
 import { dropIndex } from '#shared/utils/reorder'
 import { useOverlayTemplates, type OverlayTemplate } from '~/composables/useOverlayTemplates'
@@ -1009,6 +1070,9 @@ async function loadCaptionTracks() {
     return []
   }
 }
+/** The sample shows the look of one's own, or the style's. */
+const sampleLook = computed(() => s.captions?.look ?? captionLookFor(s.captions?.style ?? 'BOX'))
+
 async function toggleCaptions(on: boolean) {
   if (!on) {
     s.captions = null

@@ -130,6 +130,57 @@
       <div class="absolute -top-6 bottom-0 w-px bg-error-500 pointer-events-none z-20" :style="{ left: pct(currentMs) }" />
     </div>
 
+    <!-- Volume curve: click to add a point, drag one to move it, double-click (or Delete) to remove it -->
+    <div
+      ref="curveEl"
+      class="relative h-12 rounded bg-gray-50 dark:bg-gray-800/60 cursor-crosshair"
+      data-testid="volume-curve"
+      title="Volume curve — click to add a point, drag to move, double-click to remove"
+      @pointerdown.self="onCurveDown"
+    >
+      <span class="pointer-events-none absolute left-1 top-0.5 text-[10px] leading-none text-gray-500 dark:text-gray-400">
+        Volume<template v-if="!curve.length"> — click to draw a curve</template>
+      </span>
+      <svg class="pointer-events-none absolute inset-0 h-full w-full" viewBox="0 0 1000 100" preserveAspectRatio="none" aria-hidden="true">
+        <line
+          x1="0"
+          x2="1000"
+          :y1="gainY(1)"
+          :y2="gainY(1)"
+          class="stroke-gray-300 dark:stroke-gray-600"
+          stroke-dasharray="4 4"
+          vector-effect="non-scaling-stroke"
+        />
+        <polyline
+          v-if="curve.length"
+          :points="curveLine"
+          fill="none"
+          class="stroke-primary-600 dark:stroke-primary-400"
+          stroke-width="2"
+          vector-effect="non-scaling-stroke"
+        />
+      </svg>
+      <div
+        v-for="(p, i) in curve"
+        :key="i"
+        class="absolute z-10 size-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-primary-600 shadow cursor-move focus-visible:outline-2 focus-visible:outline-primary-500 dark:border-gray-900 dark:bg-primary-400"
+        :style="{ left: pct(p.atMs), top: `${gainY(p.gain)}%` }"
+        role="slider"
+        tabindex="0"
+        :aria-label="`Volume point ${i + 1} at ${formatTimecode(p.atMs)}`"
+        aria-valuemin="0"
+        :aria-valuemax="MAX_CURVE_GAIN * 100"
+        :aria-valuenow="Math.round(p.gain * 100)"
+        :aria-valuetext="`${Math.round(p.gain * 100)}% at ${formatTimecode(p.atMs)}`"
+        :title="`${Math.round(p.gain * 100)}% at ${formatTimecode(p.atMs)} — drag to move, double-click to remove`"
+        data-testid="curve-point"
+        @pointerdown.stop="onPointDown(i, $event)"
+        @dblclick.stop="removePoint(i)"
+        @keydown="onPointKey(i, $event)"
+      />
+      <div class="absolute inset-y-0 w-px bg-error-500 pointer-events-none z-20" :style="{ left: pct(currentMs) }" />
+    </div>
+
     <!-- The music and each sound track: where it plays (each loop round marked); drag it, or use ←/→, to change when it starts -->
     <div
       v-for="(b, bi) in beds"
@@ -169,12 +220,15 @@
 // Drags snap to the playhead, the selected range and other clips' edges.
 import type { AudioEdit, MusicSettings } from '~/composables/useAudioEdit'
 import {
+  addCurvePoint,
   assignLanes,
   clipEnd,
   clipLength,
   fadeFromHandle,
   fadeSpans,
+  MAX_CURVE_GAIN,
   MAX_FADE_MS,
+  moveCurvePoint,
   moveTo,
   musicSpans,
   trimEdges,
@@ -191,6 +245,7 @@ const SNAP_PX = 8
 
 const ruler = useTemplateRef<HTMLDivElement>('ruler')
 const lanesEl = useTemplateRef<HTMLDivElement>('lanesEl')
+const curveEl = useTemplateRef<HTMLDivElement>('curveEl')
 const lanes = computed(() => assignLanes(props.edit.state.clips))
 const laneCount = computed(() => Math.max(1, ...[...lanes.value.values()].map((l) => l + 1)))
 
@@ -392,5 +447,61 @@ function onFadeKey(edge: 'in' | 'out', e: KeyboardEvent) {
   // Where the handle is now on the video's timeline, moved by the step on the finished one.
   const at = edge === 'in' ? s.fadeInMs * speed : props.durationMs - s.fadeOutMs * speed
   setFade(edge, fadeFromHandle(edge, at + step * speed, s, props.durationMs))
+}
+
+// ── Volume curve ────────────────────────────────────────────────────────────
+const curve = computed(() => props.edit.state.volumeCurve)
+/** A level's height in the lane, 0 % at the bottom and MAX_CURVE_GAIN at the top (in % of the lane, a little inset). */
+function gainY(gain: number) {
+  return 92 - (gain / MAX_CURVE_GAIN) * 84
+}
+function gainAt(clientY: number) {
+  const r = curveEl.value!.getBoundingClientRect()
+  const y = ((clientY - r.top) / r.height) * 100
+  return ((92 - y) / 84) * MAX_CURVE_GAIN
+}
+/** The line across the whole lane: flat before the first point and after the last. */
+const curveLine = computed(() => {
+  const pts = curve.value
+  if (!pts.length) return ''
+  const x = (ms: number) => (Math.max(0, ms) / Math.max(props.durationMs, 1)) * 1000
+  return [`0,${gainY(pts[0]!.gain)}`, ...pts.map((p) => `${x(p.atMs)},${gainY(p.gain)}`), `1000,${gainY(pts[pts.length - 1]!.gain)}`].join(' ')
+})
+function onCurveDown(e: PointerEvent) {
+  if (e.button !== 0) return
+  const s = props.edit.state
+  const at = msAt(e.clientX, curveEl.value)
+  s.volumeCurve = addCurvePoint(s.volumeCurve, at, gainAt(e.clientY), props.durationMs)
+  // Carry on as a drag of the new point.
+  const i = s.volumeCurve.findIndex((p) => Math.abs(p.atMs - Math.round(at)) < 1)
+  if (i >= 0) onPointDown(i, e)
+}
+function onPointDown(i: number, e: PointerEvent) {
+  if (e.button !== 0) return
+  e.preventDefault()
+  const s = props.edit.state
+  const move = (ev: PointerEvent) => {
+    s.volumeCurve = moveCurvePoint(s.volumeCurve, i, msAt(ev.clientX, curveEl.value), gainAt(ev.clientY), props.durationMs)
+  }
+  window.addEventListener('pointermove', move)
+  window.addEventListener('pointerup', () => window.removeEventListener('pointermove', move), { once: true })
+}
+function removePoint(i: number) {
+  props.edit.state.volumeCurve = props.edit.state.volumeCurve.filter((_, j) => j !== i)
+}
+/** ↑/↓ the level by 5 % (Shift: 25 %), ←/→ the time by 0.1 s (Shift: 1 s), Delete/Backspace removes it. */
+function onPointKey(i: number, e: KeyboardEvent) {
+  const s = props.edit.state
+  const p = s.volumeCurve[i]
+  if (!p) return
+  const big = e.shiftKey
+  if (e.key === 'Delete' || e.key === 'Backspace') removePoint(i)
+  else if (e.key === 'ArrowUp' || e.key === 'ArrowDown')
+    s.volumeCurve = moveCurvePoint(s.volumeCurve, i, p.atMs, p.gain + (big ? 0.25 : 0.05) * (e.key === 'ArrowUp' ? 1 : -1), props.durationMs)
+  else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight')
+    s.volumeCurve = moveCurvePoint(s.volumeCurve, i, p.atMs + (big ? 1000 : 100) * (e.key === 'ArrowRight' ? 1 : -1), p.gain, props.durationMs)
+  else return
+  e.preventDefault()
+  e.stopPropagation()
 }
 </script>

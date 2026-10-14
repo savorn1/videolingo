@@ -79,15 +79,71 @@
             >
           </div>
           <p v-if="subtitleClash" class="text-xs text-warning-700 dark:text-warning-400">{{ subtitleClash }}</p>
+          <UFormField label="Second line in another language" description="The subtitles are translated and shown as a smaller line under each one.">
+            <USelectMenu
+              v-model="secondLanguage"
+              :items="secondLanguageItems"
+              value-key="value"
+              placeholder="None"
+              :search-input="{ placeholder: 'Search languages…' }"
+              aria-label="Second subtitle language"
+              class="w-full sm:w-64"
+            />
+          </UFormField>
         </template>
+      </div>
+
+      <div class="space-y-2" data-testid="highlight">
+        <USwitch
+          v-model="highlight"
+          label="Also make a highlight clip"
+          description="A short tall video (9:16) of each recording's liveliest stretch, for Shorts, Reels or TikTok — starting and ending at pauses."
+        />
+        <div v-if="highlight" class="flex flex-wrap items-center gap-1 pl-11" role="radiogroup" aria-label="Highlight length">
+          <UButton
+            v-for="sec in HIGHLIGHT_LENGTHS"
+            :key="sec"
+            size="xs"
+            role="radio"
+            :aria-checked="highlightSeconds === sec"
+            :color="highlightSeconds === sec ? 'primary' : 'neutral'"
+            :variant="highlightSeconds === sec ? 'soft' : 'ghost'"
+            @click="highlightSeconds = sec"
+            >About {{ sec }} s</UButton
+          >
+        </div>
+      </div>
+
+      <div class="space-y-2" data-testid="schedule-on-make">
+        <USwitch
+          v-model="schedule"
+          label="Publish them on a schedule"
+          description="Each video enables itself in turn, in the order of the files — once it is made. Highlight clips aren't scheduled."
+        />
+        <div v-if="schedule" class="flex flex-wrap items-end gap-3 pl-11">
+          <UFormField label="First one">
+            <UInput v-model="scheduleStart" type="datetime-local" size="sm" aria-label="First video publishes at" />
+          </UFormField>
+          <UFormField label="Then">
+            <USelect
+              v-model="scheduleStep"
+              :items="SCHEDULE_STEPS.map((s) => ({ label: s.label, value: s.value }))"
+              size="sm"
+              class="w-40"
+              aria-label="Time between videos"
+            />
+          </UFormField>
+        </div>
       </div>
     </div>
   </AudioVideoStepCard>
 </template>
 
 <script setup lang="ts">
-// Step 4 of "Video from audio": what the videos are filed under, and transcripts.
+// Step 4 of "Video from audio": what the videos are filed under, transcripts and subtitles, a highlight clip, and a schedule.
 import { BURN_STYLES } from '#shared/utils/audioVideo'
+import { HIGHLIGHT_LENGTHS } from '#shared/utils/audioVideoExtras'
+import { SCHEDULE_STEPS } from '#shared/utils/publishSchedule'
 const {
   maxCategories,
   requireCategory,
@@ -104,6 +160,14 @@ const {
   categoryItems,
   collectionItems,
   collectionsLoading,
-  subtitleClash
+  subtitleClash,
+  secondLanguage,
+  highlight,
+  highlightSeconds,
+  schedule,
+  scheduleStart,
+  scheduleStep
 } = useAudioToVideoFormContext()
+// Any language but the spoken one.
+const secondLanguageItems = computed(() => [{ label: 'None', value: undefined }, ...languageItems.value.filter((o) => o.value && o.value !== language.value)])
 </script>

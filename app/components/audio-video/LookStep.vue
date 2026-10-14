@@ -156,6 +156,7 @@
           <USwitch v-if="slides.length > 1" v-model="spreadPerRecording" size="sm" label="Spread over each recording" />
           <USwitch v-model="motion" size="sm" label="Slow zoom" />
           <USwitch v-if="slides.length > 1" v-model="crossfade" size="sm" label="Dissolve between pictures" />
+          <USwitch v-model="blurBackdrop" size="sm" label="Blurred backdrop" description="Fills the space around the picture with a soft, darker copy of it." />
         </div>
 
         <!-- Title card -->
@@ -202,6 +203,17 @@
             @update:model-value="(v) => (backgroundText = String(v))"
             @change="commitBackgroundText"
           />
+          <UButton
+            v-if="paletteSource"
+            size="xs"
+            color="neutral"
+            variant="soft"
+            icon="i-lucide-pipette"
+            title="A dark background and a bright waveform colour from the picture"
+            @click="useCoverColours"
+          >
+            Use the picture's colours
+          </UButton>
         </div>
       </section>
 
@@ -344,6 +356,52 @@
           >
         </div>
       </section>
+
+      <!-- Progress, chapters and cards -->
+      <section class="space-y-3 pt-5 first:pt-0" data-testid="on-picture" aria-labelledby="look-more">
+        <h3 id="look-more" class="flex items-center gap-1.5 text-sm font-medium text-gray-900 dark:text-white">
+          <UIcon name="i-lucide-layers" class="size-4 text-gray-400" />Progress, chapters and cards
+        </h3>
+        <USwitch
+          v-model="progressBar"
+          label="Progress bar"
+          description="A thin bar along the bottom fills up as the recording plays, so viewers see how much is left."
+        />
+        <USwitch
+          v-if="chapterCount"
+          v-model="useChapters"
+          :label="`Use the chapters in the files (${chapterCount})`"
+          description="Each chapter's title shows top left for a few seconds as it starts, and learners can jump between them under Chapters."
+        />
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div v-for="c in cards" :key="c.name" class="space-y-1">
+            <UFormField :label="`${c.name} card`" :description="c.hint">
+              <div class="flex items-center gap-2">
+                <UInput
+                  v-model="c.card.text"
+                  :maxlength="MAX_CARD_TEXT"
+                  size="sm"
+                  class="min-w-0 flex-1"
+                  :placeholder="c.placeholder"
+                  :aria-label="`${c.name} card text`"
+                />
+                <UInput
+                  v-model.number="c.card.seconds"
+                  type="number"
+                  :min="MIN_CARD_SECONDS"
+                  :max="MAX_CARD_SECONDS"
+                  step="0.5"
+                  size="sm"
+                  class="w-20"
+                  :aria-label="`${c.name} card seconds`"
+                />
+                <span class="text-xs text-gray-500 dark:text-gray-400">s</span>
+              </div>
+            </UFormField>
+          </div>
+        </div>
+        <p v-if="cardsError" class="text-xs text-error-600 dark:text-error-400" role="alert">{{ cardsError }}</p>
+      </section>
     </div>
   </AudioVideoStepCard>
 </template>
@@ -364,6 +422,8 @@ import {
 } from '#shared/utils/audioVideo'
 import { formatTimecode } from '#shared/utils/transport'
 import { MAX_SLIDES } from '#shared/utils/slides'
+import { MAX_CARD_SECONDS, MIN_CARD_SECONDS } from '#shared/utils/audioVideoExtras'
+import { MAX_CARD_TEXT } from '#shared/utils/trimExtras'
 const picInput = useTemplateRef<HTMLInputElement>('picInput')
 const {
   items,
@@ -416,6 +476,19 @@ const {
   removeSlide,
   spread,
   onPickLogo,
-  clearLogo
+  clearLogo,
+  blurBackdrop,
+  progressBar,
+  useChapters,
+  chapterCount,
+  intro,
+  outro,
+  cardsError,
+  paletteSource,
+  useCoverColours
 } = useAudioToVideoFormContext()
+const cards = [
+  { name: 'Intro', card: intro, hint: 'Before the recording, on the background with the logo.', placeholder: 'e.g. Lesson 4 — Greetings' },
+  { name: 'Outro', card: outro, hint: 'After it. Leave empty for none.', placeholder: 'e.g. Thanks for listening!' }
+]
 </script>

@@ -148,6 +148,24 @@
           />
         </UFormField>
       </div>
+      <!-- Volume curve: drawn on the "Volume" lane of the strip under the video -->
+      <div class="space-y-1.5" data-testid="curve-tools">
+        <p class="text-xs text-gray-500 dark:text-gray-400">
+          <span class="font-medium text-gray-700 dark:text-gray-300">Volume curve</span> —
+          {{
+            s.volumeCurve.length
+              ? `${s.volumeCurve.length} point${s.volumeCurve.length === 1 ? '' : 's'}; drag them on the Volume lane under the video.`
+              : 'click the Volume lane under the video to add points, or dip the sound under the range.'
+          }}
+        </p>
+        <div class="flex flex-wrap items-center gap-2">
+          <UButton size="xs" color="neutral" variant="soft" icon="i-lucide-arrow-down-to-line" :disabled="s.range[1] - s.range[0] < 200" @click="dipRange">
+            Dip under the range to {{ Math.round(dipGain * 100) }}%
+          </UButton>
+          <USelect v-model="dipGain" :items="DIP_LEVELS" size="xs" class="w-20" aria-label="Dip level" />
+          <UButton v-if="s.volumeCurve.length" size="xs" color="neutral" variant="ghost" icon="i-lucide-x" @click="s.volumeCurve = []">Clear the curve</UButton>
+        </div>
+      </div>
     </EditorSection>
 
     <!-- ── Clean-up ────────────────────────────────────────────────────── -->
@@ -166,6 +184,25 @@
         </UButton>
       </div>
       <USwitch v-model="s.enhanceVoice" label="Enhance voice" description="Cuts rumble and hiss, brings speech forward, evens out the level." />
+      <USwitch v-model="s.deEss" label="Soften the “s” sounds" description="A de-esser: tames sharp, hissing s and sh sounds." />
+      <div class="space-y-1" role="radiogroup" aria-label="Sound preset">
+        <span class="text-xs text-gray-500">Sound like</span>
+        <div class="flex flex-wrap gap-1">
+          <UButton
+            v-for="p in SOUND_PRESETS"
+            :key="p.value"
+            size="xs"
+            role="radio"
+            :aria-checked="s.preset === p.value"
+            :title="p.hint || undefined"
+            :color="s.preset === p.value ? 'primary' : 'neutral'"
+            :variant="s.preset === p.value ? 'soft' : 'ghost'"
+            @click="s.preset = p.value"
+          >
+            {{ p.label }}
+          </UButton>
+        </div>
+      </div>
     </EditorSection>
 
     <!-- ── Music ───────────────────────────────────────────────────────── -->
@@ -263,6 +300,52 @@
           :progress="uploading === 'track' ? uploadProgress : null"
           @pick="(f) => onUpload(f, 'track')"
         />
+        <!-- Speak a line: text-to-speech, added as a sound track at the playhead -->
+        <div
+          v-if="s.tracks.length < MAX_SOUND_TRACKS"
+          class="space-y-2 rounded-md border border-dashed border-gray-300 p-2 dark:border-gray-700"
+          data-testid="narration"
+        >
+          <p class="text-xs font-medium text-gray-700 dark:text-gray-300">Speak a line</p>
+          <p v-if="narration.ready === false" class="text-xs text-gray-500 dark:text-gray-400">
+            Text-to-speech isn't set up on the server (it needs an OpenAI API key).
+          </p>
+          <template v-else>
+            <UTextarea
+              v-model="narration.text"
+              :rows="2"
+              autoresize
+              :maxrows="5"
+              :maxlength="1000"
+              placeholder="e.g. Listen, then repeat after me."
+              class="w-full"
+              aria-label="Line to speak"
+            />
+            <div class="flex flex-wrap items-center gap-2">
+              <USelect v-model="narration.voice" :items="narration.voices" size="xs" class="w-36" aria-label="Voice" />
+              <USelect
+                v-model="narration.rate"
+                :items="[
+                  { label: 'Slower', value: 0.85 },
+                  { label: 'Normal speed', value: 1 },
+                  { label: 'Faster', value: 1.15 }
+                ]"
+                size="xs"
+                class="w-32"
+                aria-label="Speaking speed"
+              />
+              <UButton
+                size="xs"
+                icon="i-lucide-mic-vocal"
+                :loading="narration.busy"
+                :disabled="!narration.text.trim() || !narration.voice"
+                class="ml-auto"
+                @click="onNarrate"
+                >Speak and add</UButton
+              >
+            </div>
+          </template>
+        </div>
         <p class="text-xs text-gray-500 dark:text-gray-400">
           Up to {{ MAX_SOUND_TRACKS }}, each at its own volume and start — for example a sound effect at 0:12. They are heard in the result.
         </p>
@@ -401,12 +484,14 @@ import {
   clipAt,
   clipEnd,
   deleteRange,
+  dipPoints,
   duplicate,
   MAX_AUDIO_CLIPS,
   MAX_FADE_MS,
   MAX_SOUND_TRACKS,
   MIN_CLIP_MS,
   mergeWithNext,
+  SOUND_PRESETS,
   splitAt,
   type AudioClip
 } from '#shared/utils/audioEdit'
@@ -496,6 +581,13 @@ function onConfirmDeleteRange() {
   if (!s.clips.some((c) => c.id === s.selectedId)) s.selectedId = null
 }
 
+// ── Volume curve: dip under the range ──
+const DIP_LEVELS = [0, 0.15, 0.3, 0.5, 0.7].map((g) => ({ label: `${Math.round(g * 100)}%`, value: g }))
+const dipGain = ref(0.3)
+function dipRange() {
+  s.volumeCurve = dipPoints(s.volumeCurve, { startMs: s.range[0], endMs: s.range[1] }, dipGain.value, props.durationMs)
+}
+
 // ── Groups: open state, and which hold changes ───────────────────────────────
 // What differs from the defaults (see useAudioEdit) — shown as a dot on the
 // group heading, and used to open a group that has something in it.
@@ -503,8 +595,8 @@ const changed = computed(() => ({
   sound: s.source !== 'ORIGINAL',
   clips: props.edit.clipsChanged.value,
   range: s.mutes.length > 0,
-  level: s.volume !== 1 || s.normalize || s.fadeInMs > 0 || s.fadeOutMs > 0,
-  cleanup: s.denoise !== 'OFF' || s.enhanceVoice,
+  level: s.volume !== 1 || s.normalize || s.fadeInMs > 0 || s.fadeOutMs > 0 || s.volumeCurve.length > 0,
+  cleanup: s.denoise !== 'OFF' || s.enhanceVoice || s.deEss || s.preset !== 'NONE',
   music: !!s.music || s.tracks.length > 0,
   speed: s.speed !== 1 || s.pitchSemitones !== 0,
   channels: s.balance !== 0 || s.channels !== 'KEEP'
@@ -539,6 +631,9 @@ const summary = computed(() => {
   if (s.fadeInMs > 0 || s.fadeOutMs > 0) parts.push('fades')
   if (s.denoise !== 'OFF') parts.push(`noise reduction ${s.denoise.toLowerCase()}`)
   if (s.enhanceVoice) parts.push('enhanced voice')
+  if (s.deEss) parts.push('de-essed')
+  if (s.preset !== 'NONE') parts.push(SOUND_PRESETS.find((p) => p.value === s.preset)!.label.toLowerCase())
+  if (s.volumeCurve.length) parts.push('volume curve')
   if (s.music) parts.push('background music')
   if (s.tracks.length) parts.push(`${s.tracks.length} sound track${s.tracks.length === 1 ? '' : 's'}`)
   if (s.speed !== 1) parts.push(`speed ${+s.speed.toFixed(2)}×`)
@@ -551,6 +646,49 @@ const summary = computed(() => {
 // ── Uploads ──────────────────────────────────────────────────────────────────
 const uploading = ref<'replacement' | 'music' | 'track' | null>(null)
 const uploadProgress = ref(0)
+
+// ── Speak a line (text-to-speech), added as a sound track at the playhead ──
+const { narrate } = useVideoEdits()
+const { overview: dubOverview } = useDubs()
+const narration = reactive({ text: '', voice: '', rate: 1, voices: [] as { label: string; value: string }[], ready: null as boolean | null, busy: false })
+watch(
+  () => open.music,
+  async (isOpen) => {
+    if (!isOpen || narration.ready !== null) return
+    try {
+      const o = await dubOverview(props.videoId)
+      narration.ready = o.textToSpeechReady
+      const list = Object.values(o.voices)[0] ?? []
+      narration.voices = list.map((v) => ({ label: `${v.name} (${v.gender.toLowerCase()})`, value: v.id }))
+      narration.voice ||= narration.voices[0]?.value ?? ''
+    } catch {
+      narration.ready = false
+    }
+  },
+  { immediate: true }
+)
+async function onNarrate() {
+  narration.busy = true
+  try {
+    const text = narration.text.trim()
+    const spoken = await narrate(props.videoId, { text, voice: narration.voice, rate: narration.rate })
+    s.tracks.push({
+      key: spoken.key,
+      name: `Spoken: “${text.length > 40 ? `${text.slice(0, 40)}…` : text}”`,
+      durationMs: spoken.durationMs,
+      volume: 1,
+      loop: false,
+      duck: false,
+      startMs: Math.max(0, Math.round(props.currentMs))
+    })
+    narration.text = ''
+    toast.add({ title: 'Line added as a sound track', description: 'Move it on the strip; it is heard in the result.', color: 'success' })
+  } catch (err) {
+    toast.add({ title: 'Could not speak the line', description: apiErrorMessage(err), color: 'error' })
+  } finally {
+    narration.busy = false
+  }
+}
 
 async function onUpload(file: File, what: 'replacement' | 'music' | 'track') {
   uploading.value = what

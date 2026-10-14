@@ -41,3 +41,26 @@ export function pausesToCuts(pauses: CutRange[], existing: CutRange[], o: PauseO
   accepted.sort((a, b) => a.startMs - b.startMs)
   return { cuts: accepted, skipped, savedMs: accepted.reduce((n, c) => n + (c.endMs - c.startMs), 0) }
 }
+
+/** Why the pauses of a video can't be cut from the Videos list (bulk), or null. */
+export function pauseCutSkip(v: { deleted: boolean; storageKey: string | null }): string | null {
+  if (v.deleted) return 'in the trash'
+  if (!v.storageKey) return 'a link video — only stored files can be edited'
+  return null
+}
+
+/** The cuts for one video of the bulk action, and the line saying what was queued (or why nothing was). */
+export function bulkPausePlan(
+  found: { durationMs: number; pauses: CutRange[] },
+  o: Omit<PauseOptions, 'durationMs'>
+): { cuts: CutRange[]; line: string; skip: string | null } {
+  const plan = pausesToCuts(found.pauses, [], { ...o, durationMs: found.durationMs })
+  if (!plan.cuts.length) return { cuts: [], line: '', skip: found.pauses.length ? 'no pause is that long' : 'no pauses found' }
+  const n = plan.cuts.length
+  const saved = Math.round(plan.savedMs / 100) / 10
+  return {
+    cuts: plan.cuts,
+    line: `${n} pause${n === 1 ? '' : 's'} cut, ${saved} s shorter${plan.skipped ? ` (${plan.skipped} left in)` : ''}`,
+    skip: null
+  }
+}

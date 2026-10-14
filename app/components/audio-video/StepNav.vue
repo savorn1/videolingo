@@ -52,7 +52,15 @@ const {
   burnSubtitles,
   blockerStep,
   uploadingAny,
-  scrollToStep
+  scrollToStep,
+  music,
+  progressBar,
+  blurBackdrop,
+  intro,
+  outro,
+  highlight,
+  schedule,
+  cardsError
 } = useAudioToVideoFormContext()
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`
@@ -64,19 +72,25 @@ const steps = computed(() => {
     waveform.value === 'NONE' ? 'no waveform' : WAVEFORM_STYLES.find((w) => w.value === waveform.value)?.label.toLowerCase(),
     slides.value.length ? plural(slides.value.length, 'picture') : '',
     stripText.value.trim() ? 'strip' : '',
-    logoKey.value ? 'logo' : ''
+    logoKey.value ? 'logo' : '',
+    blurBackdrop.value && slides.value.length ? 'blurred backdrop' : '',
+    progressBar.value ? 'progress bar' : '',
+    intro.text.trim() || outro.text.trim() ? 'cards' : ''
   ]
   const sound = [
     normalize.value && 'even loudness',
     denoise.value && 'less noise',
     trimSilence.value && 'trim silence',
+    music.value && 'music',
     chapters.value && `parts of ${partMinutes.value} min`
   ].filter(Boolean)
   const details = [
     language.value ? languageItems.value.find((l) => l.value === language.value)?.label : 'no language',
     categoryIds.value.length ? `${categoryIds.value.length} categor${categoryIds.value.length === 1 ? 'y' : 'ies'}` : '',
     collectionId.value ? collectionItems.value.find((c) => c.value === collectionId.value)?.label : '',
-    transcribe.value ? (burnSubtitles.value ? 'burned subtitles' : 'transcript') : ''
+    transcribe.value ? (burnSubtitles.value ? 'burned subtitles' : 'transcript') : '',
+    highlight.value ? 'highlight clip' : '',
+    schedule.value ? 'scheduled' : ''
   ]
   const problemAt = uploadingAny.value ? null : blockerStep.value
   return [
@@ -88,10 +102,17 @@ const steps = computed(() => {
       problem: problemAt === 1 && items.value.length > 0,
       badge: TAB_ACCENTS.audio.button
     },
-    { step: 2, title: 'The look', summary: look.filter(Boolean).join(' · '), done: false, problem: problemAt === 2, badge: TAB_ACCENTS.split.button },
+    {
+      step: 2,
+      title: 'The look',
+      summary: look.filter(Boolean).join(' · '),
+      done: false,
+      problem: problemAt === 2 || (!uploadingAny.value && !!cardsError.value),
+      badge: TAB_ACCENTS.split.button
+    },
     {
       step: 3,
-      title: 'Sound clean-up',
+      title: 'Sound',
       summary: sound.length ? sound.join(' · ') : 'As recorded',
       done: false,
       problem: false,

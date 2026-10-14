@@ -19,6 +19,13 @@
       :style="{ backgroundColor: background, aspectRatio: shape === 'TALL' ? '9 / 16' : shape === 'SQUARE' ? '1 / 1' : '16 / 9' }"
     >
       <img
+        v-if="blurBackdrop && (previewOwnCover || shownSlide)"
+        :src="previewOwnCover ?? shownSlide!.previewUrl"
+        alt=""
+        class="absolute inset-0 h-full w-full scale-110 object-cover blur-md brightness-[0.85]"
+        data-testid="preview-backdrop"
+      />
+      <img
         v-if="previewOwnCover || shownSlide"
         :src="previewOwnCover ?? shownSlide!.previewUrl"
         alt="Picture shown at this time"
@@ -58,17 +65,31 @@
       >
       <img v-if="logoUrl" :src="logoUrl" alt="" class="absolute right-[4%] top-[4%] w-[18%] object-contain" />
       <span
+        v-if="chapterNow"
+        class="absolute left-[4%] max-w-[70%] truncate rounded-sm bg-black/60 px-1.5 py-0.5 text-[11px] font-bold text-white"
+        :class="stripText.trim() && stripOnTop ? 'top-[14%]' : 'top-[5%]'"
+        data-testid="preview-chapter"
+        >{{ chapterNow }}</span
+      >
+      <div v-if="progressBar" class="absolute inset-x-0 bottom-0 h-[1.2%] min-h-[3px]" data-testid="preview-progress">
+        <div class="absolute inset-0 opacity-25" :style="{ backgroundColor: waveDrawColor }" />
+        <div class="absolute inset-y-0 left-0" :style="{ width: `${progressShare * 100}%`, backgroundColor: waveDrawColor }" />
+      </div>
+      <span
         v-if="transcribe && burnSubtitles"
         class="absolute inset-x-[8%] text-center text-[11px] font-bold leading-tight"
         :class="[subtitlePosition === 'TOP' ? 'top-[6%]' : 'bottom-[6%]', subtitleStyle === 'YELLOW' ? 'text-yellow-300' : 'text-white']"
         :style="subtitleStyle === 'BOX' ? undefined : { textShadow: '0 0 3px #000, 0 0 3px #000' }"
-        ><span :class="subtitleStyle === 'BOX' ? 'rounded-sm bg-black/50 px-1' : ''">The spoken words appear here</span></span
+        ><span v-if="subtitleStyle === 'KARAOKE'"><span class="text-amber-300">The spoken words</span> appear here</span
+        ><span v-else :class="subtitleStyle === 'BOX' ? 'rounded-sm bg-black/50 px-1' : ''">The spoken words appear here</span
+        ><span v-if="secondLanguage" class="block text-[9px] font-semibold text-yellow-100">…and their translation here</span></span
       >
     </div>
-    <div v-if="slides.length > 1 && previewMax > 0" class="space-y-1">
+    <div v-if="(slides.length > 1 || progressBar || previewChapters.length) && previewMax > 0" class="space-y-1">
       <USlider v-model="previewSeconds" :min="0" :max="previewMax" :step="1" aria-label="Preview time" />
       <p class="text-xs tabular-nums text-gray-500 dark:text-gray-400">
-        Showing what appears at {{ formatDuration(previewSeconds) }} (picture {{ shownIndex + 1 }} of {{ slides.length }})
+        Showing what appears at {{ formatDuration(previewSeconds)
+        }}<template v-if="slides.length > 1"> (picture {{ shownIndex + 1 }} of {{ slides.length }})</template>
       </p>
     </div>
     <dl class="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-gray-500 dark:text-gray-400">
@@ -86,7 +107,8 @@
 </template>
 
 <script setup lang="ts">
-// How the frame will look: the picture, waveform, strip, logo and a sample subtitle, placed as the server places them.
+// How the frame will look: the picture (on its blurred backdrop), waveform, strip, logo, chapter title, progress bar and a
+// sample subtitle, placed as the server places them.
 import { waveformPlacement } from '#shared/utils/audioVideo'
 const {
   slides,
@@ -119,8 +141,21 @@ const {
   waveDrawColor,
   previewTitle,
   previewItem,
-  previewItemId
+  previewItemId,
+  blurBackdrop,
+  progressBar,
+  useChapters,
+  secondLanguage
 } = useAudioToVideoFormContext()
+
+// The chapter title showing at the previewed time (as the video shows it: for 4 s from the chapter's start).
+const previewChapters = computed(() => (useChapters.value ? (previewItem.value?.chapters ?? []) : []))
+const chapterNow = computed(() => {
+  const ms = previewSeconds.value * 1000
+  return previewChapters.value.find((c) => ms >= c.startMs && ms < c.startMs + 4000)?.title ?? null
+})
+// How far the bar has filled at the previewed time (a third of the way when there's no length to go by).
+const progressShare = computed(() => (previewMax.value > 0 ? Math.min(1, previewSeconds.value / previewMax.value) : 1 / 3))
 
 const previewChoices = computed(() => readyItems.value.map((i, n) => ({ label: `${n + 1}. ${i.title.trim() || i.name}`, value: i.id })))
 </script>

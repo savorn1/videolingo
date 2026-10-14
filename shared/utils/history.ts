@@ -40,3 +40,8 @@ export function redo(h: History): History {
 export function current(h: History): string {
   return h.entries[h.index]!
 }
+
+/** Goes straight to snapshot `index` (from the History list); out of range leaves it as it is. */
+export function jumpTo(h: History, index: number): History {
+  return index >= 0 && index < h.entries.length ? { ...h, index } : h
+}

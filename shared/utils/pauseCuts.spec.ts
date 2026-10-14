@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { pausesToCuts } from './pauseCuts'
+import { bulkPausePlan, pauseCutSkip, pausesToCuts } from './pauseCuts'
 
 const o = { minPauseMs: 1000, keepMs: 200, durationMs: 30_000 }
 
@@ -55,5 +55,28 @@ describe('pausesToCuts', () => {
     )
     expect(r.cuts).toEqual([{ startMs: 25_200, endMs: 27_800 }])
     expect(r.skipped).toBe(1)
+  })
+})
+
+describe('remove the pauses on many videos', () => {
+  it('skips videos that cannot be edited', () => {
+    expect(pauseCutSkip({ deleted: true, storageKey: 'videos/a.mp4' })).toBe('in the trash')
+    expect(pauseCutSkip({ deleted: false, storageKey: null })).toMatch(/link video/)
+    expect(pauseCutSkip({ deleted: false, storageKey: 'videos/a.mp4' })).toBeNull()
+  })
+
+  it('plans the cuts and says what they save', () => {
+    const found = {
+      durationMs: 20_000,
+      pauses: [
+        { startMs: 3000, endMs: 5000 },
+        { startMs: 9000, endMs: 9400 }
+      ]
+    }
+    const plan = bulkPausePlan(found, { minPauseMs: 1000, keepMs: 200 })
+    expect(plan.cuts).toEqual([{ startMs: 3200, endMs: 4800 }])
+    expect(plan.line).toBe('1 pause cut, 1.6 s shorter')
+    expect(bulkPausePlan(found, { minPauseMs: 3000, keepMs: 200 }).skip).toBe('no pause is that long')
+    expect(bulkPausePlan({ durationMs: 20_000, pauses: [] }, { minPauseMs: 1000, keepMs: 200 }).skip).toBe('no pauses found')
   })
 })

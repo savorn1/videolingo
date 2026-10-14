@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { DEFAULT_LOOK } from './audioVideo'
 import { describeSeriesLook, sanitizeSeriesLook, sanitizeSeriesLooks, type SeriesLook } from './seriesLook'
 
-const look: SeriesLook = { ...DEFAULT_LOOK, stripText: 'Episode 4', titleCard: false, spreadPerRecording: true }
+const look: SeriesLook = { ...DEFAULT_LOOK, stripText: 'Episode 4', titleCard: false, spreadPerRecording: true, introText: 'Welcome', outroText: '' }
 
 describe('sanitizeSeriesLook', () => {
   it('keeps a valid look as it is', () => {
@@ -13,9 +13,11 @@ describe('sanitizeSeriesLook', () => {
       ...DEFAULT_LOOK,
       stripText: '',
       titleCard: false,
-      spreadPerRecording: false
+      spreadPerRecording: false,
+      introText: '',
+      outroText: ''
     })
-    expect(sanitizeSeriesLook(null)).toEqual({ ...DEFAULT_LOOK, stripText: '', titleCard: false, spreadPerRecording: false })
+    expect(sanitizeSeriesLook(null)).toEqual({ ...DEFAULT_LOOK, stripText: '', titleCard: false, spreadPerRecording: false, introText: '', outroText: '' })
   })
   it('cuts the strip to its limit', () => {
     expect(sanitizeSeriesLook({ stripText: 'x'.repeat(500) }).stripText).toHaveLength(120)

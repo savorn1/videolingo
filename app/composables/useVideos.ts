@@ -301,6 +301,16 @@ export function useVideos() {
     ).data
   }
 
+  /** The liveliest stretch of a recording, about `seconds` long, for a highlight clip (measured on the server, on the spot). */
+  async function highlightFromAudio(audioKey: string, seconds: number) {
+    return (
+      await api<ApiEnvelope<{ totalMs: number; startMs: number; endMs: number }>>('/api/admin/videos/from-audio/highlight', {
+        method: 'POST',
+        body: { audioKey, seconds }
+      })
+    ).data
+  }
+
   async function createFromAudio(payload: AudioToVideoPayload) {
     return (await api<ApiEnvelope<{ video: Video; job: ProcessingJob }>>('/api/admin/videos/from-audio', { method: 'POST', body: payload })).data
   }
@@ -343,6 +353,7 @@ export function useVideos() {
     create,
     createFromAudio,
     chaptersFromAudio,
+    highlightFromAudio,
     previewFromAudio,
     mergeVideos
   }
@@ -469,8 +480,18 @@ export interface AudioToVideoPayload {
   audioEndMs?: number
   /** The waveform's height, % of the picture (10–80); left out, the style's usual height. */
   waveHeightPct?: number
-  /** Burn the transcript into the picture once it is made (needs transcribe). */
-  burnSubtitles?: { style: string; position: string }
+  /** Burn the transcript into the picture once it is made (needs transcribe); with a translation as a second line. */
+  burnSubtitles?: { style: string; position: string; secondLanguage?: string }
+  /** The pictures on a blurred copy of themselves; a bar along the bottom that fills as it plays. */
+  blurBackdrop?: boolean
+  progressBar?: boolean
+  /** Chapters: each title shown for a few seconds at its start, and kept as a chapter marker. */
+  chapters?: { startMs: number; title: string }[]
+  /** Title cards before and after (1–6 s), on the background colour with the logo. */
+  intro?: { text: string; durationMs: number }
+  outro?: { text: string; durationMs: number }
+  /** Music under the recording (an AUDIO upload), 0–1, quieter under speech when duck. */
+  music?: { key: string; volume: number; loop: boolean; duck: boolean }
   title: string
   description?: string
   language?: string

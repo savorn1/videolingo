@@ -40,6 +40,8 @@ import {
 import { uploadToStorage, UploadInterruptedError, type ResumableUpload } from '~/composables/useVideos'
 import { formatTimecode, parseTimecode } from '#shared/utils/transport'
 import { MAX_SLIDES, nextSlideStart, slideIndexAt, slideProblem, slidesBeyond, spreadEvenly, swapContents } from '#shared/utils/slides'
+import { cardRequest, cardsProblem, chaptersForPart, highlightTitle, paletteFromPixels, tidyChapters, type ChapterMark } from '#shared/utils/audioVideoExtras'
+import { fromDateTimeLocal, SCHEDULE_STEPS, schedulePresets, scheduleSeries, toDateTimeLocal } from '#shared/utils/publishSchedule'
 
 interface Item {
   id: number
@@ -60,6 +62,8 @@ interface Item {
   coverUploading: boolean
   /** Where a large upload stopped, so "Try again" carries on from there. */
   resume: ResumableUpload | null
+  /** Chapters written in the file (ID3 CHAP), shown on the picture and kept as chapter markers. */
+  chapters: ChapterMark[]
 }
 interface Slide {
   id: number
@@ -119,6 +123,28 @@ export function useAudioToVideoForm() {
   const burnSubtitles = ref(false)
   const subtitleStyle = ref<BurnStyle>('BOX')
   const subtitlePosition = ref<BurnPosition>('BOTTOM')
+  /** A translation into this language as a smaller second line of the burned-in subtitles. */
+  const secondLanguage = ref<string | undefined>(undefined)
+  const blurBackdrop = ref(false)
+  const progressBar = ref(false)
+  /** Use the chapters found in the files: titles on the picture and chapter markers. */
+  const useChapters = ref(true)
+  const intro = reactive({ text: '', seconds: 3 })
+  const outro = reactive({ text: '', seconds: 3 })
+  const cardsError = computed(() => cardsProblem(intro, outro))
+  /** Music under the recordings (an AUDIO upload), quieter under speech when ducked. */
+  const music = ref<{ key: string; name: string } | null>(null)
+  const musicUploading = ref(false)
+  const musicProgress = ref(0)
+  const musicVolume = ref(0.15)
+  const musicDuck = ref(true)
+  /** Also make a short tall video of each recording's liveliest stretch. */
+  const highlight = ref(false)
+  const highlightSeconds = ref(45)
+  /** Schedule the videos to enable themselves one after another. */
+  const schedule = ref(false)
+  const scheduleStart = ref(toDateTimeLocal(schedulePresets(new Date())[1]!.at))
+  const scheduleStep = ref<number>(SCHEDULE_STEPS[1].value)
 
   const errors = ref<Record<string, string>>({})
   const saveError = ref('')
@@ -149,6 +175,10 @@ export function useAudioToVideoForm() {
   watch(transcribe, (on) => {
     if (!on) burnSubtitles.value = false
   })
+  watch([language, burnSubtitles], () => {
+    if (!burnSubtitles.value || secondLanguage.value === language.value) secondLanguage.value = undefined
+  })
+  const chapterCount = computed(() => readyItems.value.reduce((n, i) => n + i.chapters.length, 0))
   // The strip moves to the top when a waveform runs along the bottom (as on the server).
   const stripOnTop = computed(() => waveform.value !== 'NONE' && waveformPlacement(waveform.value) === 'BOTTOM')
   const subtitleClash = computed(() => {
@@ -197,27 +227,29 @@ export function useAudioToVideoForm() {
   })
   const shownIndex = computed(() => slideIndexAt(slideStarts.value, previewSeconds.value * 1000))
   const shownSlide = computed(() => slides.value[shownIndex.value] ?? null)
-  const uploadingAny = computed(() => picUploading.value || items.value.some((i) => i.status === 'queued' || i.status === 'uploading'))
-  const blocker = computed(() =>
-    submitBlocker({
-      files: items.value.filter((i) => i.status !== 'error').length,
-      uploading: items.value.filter((i) => i.status === 'queued' || i.status === 'uploading').length + (picUploading.value ? 1 : 0),
-      untitled: readyItems.value.filter((i) => !i.title.trim()).length,
-      slideError: slideError.value,
-      missingCategory: requireCategory.value && !categoryIds.value.length
-    })
+  const uploadingAny = computed(() => picUploading.value || musicUploading.value || items.value.some((i) => i.status === 'queued' || i.status === 'uploading'))
+  const blocker = computed(
+    () =>
+      submitBlocker({
+        files: items.value.filter((i) => i.status !== 'error').length,
+        uploading:
+          items.value.filter((i) => i.status === 'queued' || i.status === 'uploading').length + (picUploading.value ? 1 : 0) + (musicUploading.value ? 1 : 0),
+        untitled: readyItems.value.filter((i) => !i.title.trim()).length,
+        slideError: slideError.value,
+        missingCategory: requireCategory.value && !categoryIds.value.length
+      }) ?? cardsError.value
   )
   /** The step to look at for what blocks making the videos. */
   const blockerStep = computed(() =>
     blocker.value
-      ? submitBlockerStep({
+      ? (submitBlockerStep({
           files: items.value.filter((i) => i.status !== 'error').length,
           audioUploading: items.value.filter((i) => i.status === 'queued' || i.status === 'uploading').length,
           picturesUploading: picUploading.value,
           untitled: readyItems.value.filter((i) => !i.title.trim()).length,
           slideError: slideError.value,
           missingCategory: requireCategory.value && !categoryIds.value.length
-        })
+        }) ?? (cardsError.value ? 2 : null))
       : null
   )
   /** Brings a step's card into view (instantly when the user prefers less motion); returns it. */
@@ -265,6 +297,8 @@ export function useAudioToVideoForm() {
     crossfade.value = look.crossfade
     trimSilence.value = look.trimSilence
     waveHeight.value = look.waveHeightPct
+    blurBackdrop.value = look.blurBackdrop
+    progressBar.value = look.progressBar
   }
   function currentLook(): SavedLook {
     return {
@@ -279,12 +313,21 @@ export function useAudioToVideoForm() {
       motion: motion.value,
       crossfade: crossfade.value,
       trimSilence: trimSilence.value,
-      waveHeightPct: waveHeight.value
+      waveHeightPct: waveHeight.value,
+      blurBackdrop: blurBackdrop.value,
+      progressBar: progressBar.value
     }
   }
   // ── Saved looks for a series: the look plus the strip, the title card and the picture spread ──
   function currentSeriesLook(): SeriesLook {
-    return { ...currentLook(), stripText: stripText.value, titleCard: titleCard.value, spreadPerRecording: spreadPerRecording.value }
+    return {
+      ...currentLook(),
+      stripText: stripText.value,
+      titleCard: titleCard.value,
+      spreadPerRecording: spreadPerRecording.value,
+      introText: intro.text,
+      outroText: outro.text
+    }
   }
   function applySeriesLook(look: SeriesLook) {
     applyLook(look)
@@ -292,11 +335,16 @@ export function useAudioToVideoForm() {
     // The title card is only used without pictures (see the watch on slides).
     titleCard.value = look.titleCard && !slides.value.length
     spreadPerRecording.value = look.spreadPerRecording
+    intro.text = look.introText
+    outro.text = look.outroText
   }
-  watch([background, resolution, waveform, waveAuto, waveColor, normalize, denoise, shape, motion, crossfade, trimSilence, waveHeight], () => {
-    if (!lookRestored) return // still the defaults; don't overwrite what was saved
-    setApp(LOOK_KEY, currentLook())
-  })
+  watch(
+    [background, resolution, waveform, waveAuto, waveColor, normalize, denoise, shape, motion, crossfade, trimSilence, waveHeight, blurBackdrop, progressBar],
+    () => {
+      if (!lookRestored) return // still the defaults; don't overwrite what was saved
+      setApp(LOOK_KEY, currentLook())
+    }
+  )
   const totalLength = computed(() => {
     const total = readyItems.value.reduce((sum, i) => sum + (i.durationSeconds ?? 0), 0)
     return total ? formatDuration(total) : '—'
@@ -461,7 +509,8 @@ export function useAudioToVideoForm() {
         coverUrl: null,
         coverFromFile: false,
         coverUploading: false,
-        resume: null
+        resume: null,
+        chapters: []
       })
     }
     if (rejected.length) errors.value.audio = rejected.join(' · ')
@@ -516,6 +565,7 @@ export function useAudioToVideoForm() {
       item.durationSeconds = seconds
       // The title written in the file, unless one was already typed.
       if (tags.title && item.title === titleFromFileName(item.name)) item.title = tags.title.slice(0, 200)
+      if (tags.chapters?.length) item.chapters = tidyChapters(tags.chapters)
       const { key } = await videos.uploadFile('AUDIO', file, { onProgress: (f) => (item.progress = f), resume: item.resume })
       item.key = key
       item.resume = null
@@ -722,6 +772,51 @@ export function useAudioToVideoForm() {
     logoUrl.value = null
   }
 
+  // ── Music under the recordings ───────────────────────────────────────────────
+  async function onPickMusic(file: File) {
+    const problem = audioFileProblem(file, maxUploadMb.value)
+    if (problem) {
+      toast.add({ title: 'Can’t use that music', description: problem, color: 'warning' })
+      return
+    }
+    musicUploading.value = true
+    musicProgress.value = 0
+    try {
+      const { key } = await videos.uploadFile('AUDIO', file, { onProgress: (f) => (musicProgress.value = f) })
+      music.value = { key, name: file.name }
+    } catch (err) {
+      toast.add({ title: 'Could not upload the music', description: apiErrorMessage(err), color: 'error' })
+    } finally {
+      musicUploading.value = false
+    }
+  }
+
+  // ── Colours from the cover ───────────────────────────────────────────────────
+  /** The picture to take colours from: the previewed recording's own, else the one showing. */
+  const paletteSource = computed(() => previewOwnCover.value ?? shownSlide.value?.previewUrl ?? null)
+  async function useCoverColours() {
+    const url = paletteSource.value
+    if (!url) return
+    try {
+      const img = new Image()
+      img.src = url
+      await img.decode()
+      // A small copy is plenty to find the main colours.
+      const canvas = document.createElement('canvas')
+      canvas.width = 64
+      canvas.height = Math.max(1, Math.round((64 * img.naturalHeight) / Math.max(1, img.naturalWidth)))
+      const ctx = canvas.getContext('2d')!
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+      const { background: bg, accent } = paletteFromPixels(ctx.getImageData(0, 0, canvas.width, canvas.height).data)
+      setBackground(bg)
+      waveAuto.value = false
+      waveColor.value = accent
+      toast.add({ title: 'Colours taken from the picture', description: 'Undo by picking other colours.', color: 'success' })
+    } catch {
+      toast.add({ title: 'Could not read the picture’s colours', color: 'warning' })
+    }
+  }
+
   // ── Submit ───────────────────────────────────────────────────────────────────
   async function onSubmit() {
     errors.value = {}
@@ -739,10 +834,21 @@ export function useAudioToVideoForm() {
     const chosen = readyItems.value
     const titles = uniqueTitles(chosen.map((i) => i.title.trim()))
     const made: { id: number; jobId: number; title: string }[] = []
+    /** Highlight clips: made too, but kept out of the collection and the schedule (they're for elsewhere). */
+    const highlights: { id: number; jobId: number; title: string }[] = []
     const failed: string[] = []
     try {
       // One at a time and in order, so a collection ends up in the order the files were added.
       const shared = slides.value.map((sl) => ({ key: sl.key, startMs: sl.startMs }))
+      const extras = {
+        blurBackdrop: blurBackdrop.value || undefined,
+        progressBar: progressBar.value || undefined,
+        music: music.value ? { key: music.value.key, volume: musicVolume.value, loop: true, duck: musicDuck.value } : undefined
+      }
+      const burn = () =>
+        transcribe.value && burnSubtitles.value
+          ? { style: subtitleStyle.value, position: subtitlePosition.value, secondLanguage: secondLanguage.value }
+          : undefined
       for (let i = 0; i < chosen.length; i++) {
         const item = chosen[i]!
         // A long recording becomes several videos, cut at its pauses (found on the server).
@@ -759,6 +865,7 @@ export function useAudioToVideoForm() {
           const title = parts ? partTitle(titles[i]!, k, parts.length) : titles[i]!
           const seconds = part ? Math.round((part.endMs - part.startMs) / 1000) : item.durationSeconds
           const pictures = recordingSlides(shared, item.coverKey, seconds, spreadPerRecording.value)
+          const partChapters = useChapters.value ? chaptersForPart(item.chapters, part) : []
           try {
             const result = await videos.createFromAudio({
               audioKey: item.key,
@@ -781,7 +888,11 @@ export function useAudioToVideoForm() {
               trimSilence: trimSilence.value || undefined,
               audioStartMs: part?.startMs,
               audioEndMs: part?.endMs,
-              burnSubtitles: transcribe.value && burnSubtitles.value ? { style: subtitleStyle.value, position: subtitlePosition.value } : undefined,
+              burnSubtitles: burn(),
+              ...extras,
+              chapters: partChapters.length ? partChapters : undefined,
+              intro: cardRequest(intro),
+              outro: cardRequest(outro),
               title,
               description: description.value.trim() || undefined,
               language: language.value,
@@ -790,7 +901,45 @@ export function useAudioToVideoForm() {
             made.push({ id: result.video.id, jobId: result.job.id, title })
           } catch (err) {
             failed.push(`${title}: ${apiErrorMessage(err)}`)
-            if (chosen.length === 1 && !parts) throw err
+            if (chosen.length === 1 && !parts && !highlight.value) throw err
+          }
+        }
+        // A short tall video of the liveliest stretch, for Shorts / Reels / TikTok: same look, no cards or chapters.
+        if (highlight.value) {
+          const title = highlightTitle(titles[i]!)
+          try {
+            const range = await videos.highlightFromAudio(item.key, highlightSeconds.value)
+            const pictures = recordingSlides(shared, item.coverKey, Math.round((range.endMs - range.startMs) / 1000), true)
+            const result = await videos.createFromAudio({
+              audioKey: item.key,
+              coverKey: pictures.length === 1 ? pictures[0]!.key : undefined,
+              slides: pictures.length > 1 ? pictures : undefined,
+              background: background.value,
+              resolution: resolution.value,
+              waveform: waveform.value,
+              waveColor: waveform.value !== 'NONE' && !waveAuto.value ? waveColor.value : undefined,
+              waveHeightPct: waveform.value !== 'NONE' && waveHeight.value != null ? waveHeight.value : undefined,
+              titleCard: titleCard.value && !pictures.length ? true : undefined,
+              normalize: normalize.value || undefined,
+              denoise: denoise.value || undefined,
+              transcribe: transcribe.value || undefined,
+              shape: 'TALL',
+              motion: motion.value && pictures.length ? true : undefined,
+              crossfade: crossfade.value && pictures.length > 1 ? true : undefined,
+              stripText: stripText.value.trim() || undefined,
+              logoKey: logoKey.value ?? undefined,
+              audioStartMs: range.startMs,
+              audioEndMs: range.endMs,
+              burnSubtitles: burn(),
+              ...extras,
+              title,
+              description: description.value.trim() || undefined,
+              language: language.value,
+              categoryIds: categoryIds.value
+            })
+            highlights.push({ id: result.video.id, jobId: result.job.id, title })
+          } catch (err) {
+            failed.push(`${title}: ${apiErrorMessage(err)}`)
           }
         }
       }
@@ -805,6 +954,26 @@ export function useAudioToVideoForm() {
           toast.add({ title: 'Made the videos, but could not add them to the collection', description: apiErrorMessage(err), color: 'warning' })
         }
       }
+      // Each enables itself in turn once made (the server waits for a video's job to finish first).
+      const start = schedule.value ? fromDateTimeLocal(scheduleStart.value) : null
+      if (start && made.length) {
+        const plan = scheduleSeries(
+          made.map((m) => ({ ...m, enabled: false })),
+          start,
+          scheduleStep.value,
+          new Date()
+        )
+        const skipped = plan.filter((p) => !p.at).length
+        for (const p of plan) {
+          if (!p.at) continue
+          try {
+            await videos.schedulePublish(p.video.id, p.at)
+          } catch (err) {
+            failed.push(`${p.video.title}: not scheduled (${apiErrorMessage(err)})`)
+          }
+        }
+        if (skipped) failed.push(`${skipped} video(s) not scheduled — ${plan.find((p) => !p.at)?.skipped}`)
+      }
     } catch (err) {
       saveError.value = apiErrorMessage(err)
       saving.value = false
@@ -812,6 +981,7 @@ export function useAudioToVideoForm() {
     }
     saving.value = false
 
+    made.push(...highlights)
     if (!made.length) {
       saveError.value = failed.join(' · ')
       return
@@ -877,6 +1047,27 @@ export function useAudioToVideoForm() {
     burnSubtitles,
     subtitleStyle,
     subtitlePosition,
+    secondLanguage,
+    blurBackdrop,
+    progressBar,
+    useChapters,
+    chapterCount,
+    intro,
+    outro,
+    cardsError,
+    music,
+    musicUploading,
+    musicProgress,
+    musicVolume,
+    musicDuck,
+    onPickMusic,
+    highlight,
+    highlightSeconds,
+    schedule,
+    scheduleStart,
+    scheduleStep,
+    paletteSource,
+    useCoverColours,
     errors,
     saveError,
     saving,

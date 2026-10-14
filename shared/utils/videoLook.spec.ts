@@ -65,3 +65,20 @@ describe('describeVideoLook', () => {
     expect(describeVideoLook({ ...PLAIN_LOOK, brightness: -0.3, blur: 3, vignette: true })).toBe('darker, blurred, vignette')
   })
 })
+
+describe('warmth and sharpen', () => {
+  it('count as a change, are checked and described, and are always sent', () => {
+    expect(isPlainLook({ ...PLAIN_LOOK, warmth: 0.3 })).toBe(false)
+    expect(isPlainLook({ ...PLAIN_LOOK, sharpen: true })).toBe(false)
+    expect(validateLook({ ...PLAIN_LOOK, warmth: 2 })).toMatch(/Warmth/)
+    expect(describeVideoLook({ ...PLAIN_LOOK, warmth: -0.5, sharpen: true, contrast: 1.3 })).toBe('more contrast, cooler, sharpened')
+    // A look saved before warmth existed still sends both fields (the server needs them).
+    const old = { brightness: 0.1, contrast: 1, saturation: 1, blur: 0, grayscale: false, sepia: false, vignette: false } as typeof PLAIN_LOOK
+    expect(lookRequest(old)).toMatchObject({ brightness: 0.1, warmth: 0, sharpen: false })
+  })
+  it('warmth tints the preview, toward orange or blue; sharpening only shows in the result', () => {
+    expect(cssFilter({ ...PLAIN_LOOK, warmth: 1 })).toBe('sepia(0.35)')
+    expect(cssFilter({ ...PLAIN_LOOK, warmth: -1 })).toBe('hue-rotate(15deg)')
+    expect(cssFilter({ ...PLAIN_LOOK, sharpen: true })).toBe('')
+  })
+})

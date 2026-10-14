@@ -3,7 +3,17 @@
 // POSTed to /edits/audio; the backend validates it again (AudioEditRules).
 
 import type { AudioEditRequest } from '~/composables/useVideoEdits'
-import { initialClips, isIdentityClips, soundTracksProblem, validateClips, type AudioClip, type TimeRange } from '#shared/utils/audioEdit'
+import {
+  curveProblem,
+  initialClips,
+  isIdentityClips,
+  soundTracksProblem,
+  validateClips,
+  type AudioClip,
+  type CurvePoint,
+  type SoundPreset,
+  type TimeRange
+} from '#shared/utils/audioEdit'
 
 export interface UploadedAudio {
   key: string
@@ -45,7 +55,11 @@ export function useAudioEdit(durationMs: Ref<number>) {
     /** More sound beds besides the music (effects, a second bed). */
     tracks: [] as MusicSettings[],
     /** With a speed change, only the picture is re-timed; the sound keeps its own speed. */
-    keepSoundSpeed: false
+    keepSoundSpeed: false,
+    /** Levels at points of the video's timeline, drawn on the audio strip. */
+    volumeCurve: [] as CurvePoint[],
+    preset: 'NONE' as SoundPreset,
+    deEss: false
   })
 
   /** How long the sound clips are cut from is (the video, or the replacement file). */
@@ -74,7 +88,10 @@ export function useAudioEdit(durationMs: Ref<number>) {
       channels: 'KEEP',
       music: null,
       tracks: [],
-      keepSoundSpeed: false
+      keepSoundSpeed: false,
+      volumeCurve: [],
+      preset: 'NONE',
+      deEss: false
     })
     resetClips()
   }
@@ -104,7 +121,10 @@ export function useAudioEdit(durationMs: Ref<number>) {
     channels: state.channels,
     music: state.music ? bedRequest(state.music) : null,
     tracks: state.tracks.map(bedRequest),
-    keepSoundSpeed: state.speed !== 1 && state.keepSoundSpeed
+    keepSoundSpeed: state.speed !== 1 && state.keepSoundSpeed,
+    volumeCurve: state.volumeCurve.map(({ atMs, gain }) => ({ atMs, gain })),
+    preset: state.preset,
+    deEss: state.deEss
   }))
   function bedRequest(m: MusicSettings) {
     return { key: m.key, volume: m.volume, loop: m.loop, duck: m.duck, startMs: m.startMs }
@@ -126,7 +146,10 @@ export function useAudioEdit(durationMs: Ref<number>) {
       state.balance !== 0 ||
       state.channels !== 'KEEP' ||
       !!state.music ||
-      state.tracks.length > 0
+      state.tracks.length > 0 ||
+      state.volumeCurve.length > 0 ||
+      state.preset !== 'NONE' ||
+      state.deEss
   )
 
   /** Why it can't be rendered yet, or null. */
@@ -139,6 +162,8 @@ export function useAudioEdit(durationMs: Ref<number>) {
     if (clipError) return clipError
     const trackError = soundTracksProblem(state.tracks, durationMs.value)
     if (trackError) return trackError
+    const curveError = curveProblem(state.volumeCurve)
+    if (curveError) return curveError
     const outMs = durationMs.value / state.speed
     if (durationMs.value && state.fadeInMs + state.fadeOutMs > outMs) return 'The fades are longer than the video'
     return null

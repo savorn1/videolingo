@@ -9,6 +9,8 @@ export interface AudioTags {
   artist?: string
   album?: string
   cover?: { mime: string; data: Uint8Array }
+  /** Chapters written in the file (ID3 CHAP frames, as podcast tools write them), in time order. */
+  chapters?: { startMs: number; title: string }[]
 }
 
 const latin1 = new TextDecoder('latin1')
@@ -96,6 +98,11 @@ export function parseId3(buf: Uint8Array): AudioTags {
     pos += headLen + size
     if (!data.length) continue
     const enc = data[0]!
+    if (id === 'CHAP' && version >= 3) {
+      const chapter = parseChap(data, version)
+      if (chapter) (tags.chapters ??= []).push(chapter)
+      continue
+    }
     if (id === 'TIT2' || id === 'TT2') tags.title ||= decodeText(enc, data.subarray(1)) || undefined
     else if (id === 'TPE1' || id === 'TP1') tags.artist ||= decodeText(enc, data.subarray(1)) || undefined
     else if (id === 'TALB' || id === 'TAL') tags.album ||= decodeText(enc, data.subarray(1)) || undefined
@@ -122,7 +129,31 @@ export function parseId3(buf: Uint8Array): AudioTags {
       }
     }
   }
+  tags.chapters?.sort((a, b) => a.startMs - b.startMs)
   return tags
+}
+
+/**
+ * One ID3 CHAP frame: its element id (null-terminated), start and end times (ms), byte offsets, then sub-frames —
+ * the title is the TIT2 among them. Null when it has no title.
+ */
+function parseChap(data: Uint8Array, version: number): { startMs: number; title: string } | null {
+  let at = nullEnd(data, 0, false) + 1
+  if (at + 16 > data.length) return null
+  const startMs = uint32(data, at)
+  at += 16
+  while (at + 10 <= data.length) {
+    const id = ascii(data, at, 4)
+    if (!/^[A-Z0-9]+$/.test(id)) break
+    const size = version === 4 ? syncsafe(data, at + 4) : uint32(data, at + 4)
+    const sub = data.subarray(at + 10, at + 10 + size)
+    at += 10 + size
+    if (id === 'TIT2' && sub.length) {
+      const title = decodeText(sub[0]!, sub.subarray(1))
+      return title ? { startMs, title } : null
+    }
+  }
+  return null
 }
 
 /** The first child box of `type` within buf[start..end), as [contentStart, end]; null when there is none. */

@@ -7,6 +7,7 @@
 //
 // Its state and actions live here, shared by VideoClipEditor.vue and its tab components
 // (app/components/clip-editor/*), which inject them with useClipEditorContext().
+import type { BurnedCaptions } from '~/composables/useOverlayEdit'
 import type { InjectionKey } from 'vue'
 import type { EditOverview, VideoClip } from '~/composables/useVideoEdits'
 import type { ProcessingJob } from '~/composables/useProcessingJobs'
@@ -1400,7 +1401,7 @@ export function useClipEditor(props: ClipEditorProps, emit: ClipEditorEmit) {
       split: segments.value,
       audio,
       overlay: overlayEdit.state.layers,
-      captions: overlayEdit.state.captions ? { ...overlayEdit.state.captions } : null,
+      captions: overlayEdit.state.captions ? (JSON.parse(JSON.stringify(overlayEdit.state.captions)) as BurnedCaptions) : null,
       join: { clips: joinEdit.state.clips }
     }
   }
@@ -1427,11 +1428,11 @@ export function useClipEditor(props: ClipEditorProps, emit: ClipEditorEmit) {
     segments.value = st.split
     const { clips, ...audio } = st.audio
     // Drafts saved before extra sound tracks existed have neither of these.
-    Object.assign(audioEdit.state, { tracks: [], keepSoundSpeed: false }, audio)
+    Object.assign(audioEdit.state, { tracks: [], keepSoundSpeed: false, volumeCurve: [], preset: 'NONE', deEss: false }, audio)
     audioEdit.state.clips = clips
     overlayEdit.state.layers = st.overlay
     // Drafts saved before burned-in subtitles have none.
-    overlayEdit.state.captions = st.captions ? { ...st.captions } : null
+    overlayEdit.state.captions = st.captions ? (JSON.parse(JSON.stringify(st.captions)) as BurnedCaptions) : null
     // Drafts saved before the Join tab existed have no `join`.
     if (st.join) Object.assign(joinEdit.state, st.join)
     if (!st.overlay.some((l) => l.id === overlayEdit.state.selectedId)) overlayEdit.state.selectedId = null
@@ -1641,7 +1642,9 @@ export function useClipEditor(props: ClipEditorProps, emit: ClipEditorEmit) {
         pitchSemitones: a.pitchSemitones,
         balance: a.balance,
         channels: a.channels,
-        keepSoundSpeed: a.keepSoundSpeed
+        keepSoundSpeed: a.keepSoundSpeed,
+        preset: a.preset,
+        deEss: a.deEss
       }),
       layers: JSON.parse(JSON.stringify(overlayEdit.state.layers)) as RecipeLayer[]
     }

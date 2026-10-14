@@ -402,7 +402,7 @@
 
     <LookPanel v-model="look" v-model:compare="lookCompare" />
 
-    <ClipEditorMotionPanel />
+    <ClipEditorMotionPanel :video-id="video.id" :video-language="video.language" />
 
     <ClipEditorExtrasPanel />
 

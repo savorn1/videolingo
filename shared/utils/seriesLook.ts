@@ -5,11 +5,15 @@
 
 import { MAX_STRIP, sanitizeLook, type SavedLook } from './audioVideo'
 import type { NamedEntry } from './namedList'
+import { MAX_CARD_TEXT } from './trimExtras'
 
 export interface SeriesLook extends SavedLook {
   stripText: string
   titleCard: boolean
   spreadPerRecording: boolean
+  /** The intro and outro cards' text (empty = none). */
+  introText: string
+  outroText: string
 }
 
 /** A saved look read back from storage, made safe: anything missing or not valid falls back to the default. */
@@ -19,7 +23,9 @@ export function sanitizeSeriesLook(raw: unknown): SeriesLook {
     ...sanitizeLook(r),
     stripText: typeof r.stripText === 'string' ? r.stripText.slice(0, MAX_STRIP) : '',
     titleCard: r.titleCard === true,
-    spreadPerRecording: r.spreadPerRecording === true
+    spreadPerRecording: r.spreadPerRecording === true,
+    introText: typeof r.introText === 'string' ? r.introText.slice(0, MAX_CARD_TEXT) : '',
+    outroText: typeof r.outroText === 'string' ? r.outroText.slice(0, MAX_CARD_TEXT) : ''
   }
 }
 

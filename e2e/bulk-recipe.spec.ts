@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 import { configureMock, mockRequests, openReady, resetMock, signInAsAdmin } from './helpers'
 
-// Applying a saved edit recipe to selected videos from the Videos list: one edit per part of the recipe.
+// Edits queued on selected videos from the Videos list: a saved recipe (one edit per part), and removing the pauses.
 
 test.beforeEach(async ({ context }) => {
   await resetMock()
@@ -33,4 +33,16 @@ test('a recipe queues a picture, a sound and a layers edit on each selected vide
   expect(trim).toMatchObject({ startMs: 0, endMs: null, scale: { w: 1080, h: 1920 } })
   expect(sent.find((r) => r.path === '/api/admin/videos/7/edits/audio')?.body).toMatchObject({ volume: 1.5, clips: [], music: null })
   expect(sent.find((r) => r.path === '/api/admin/videos/7/edits/overlay')?.body).toMatchObject({ layers: [{ kind: 'TEXT', text: 'Lesson' }] })
+})
+
+test('Remove the pauses queues a cut of the long pauses on each selected video', async ({ page }) => {
+  await configureMock({ videoList: true })
+  await openReady(page, '/videos')
+  await page.getByRole('checkbox', { name: 'Select row' }).first().click({ force: true })
+  await page.getByRole('button', { name: 'Remove the pauses' }).click()
+  await page.getByRole('dialog').getByRole('button', { name: 'Remove the pauses' }).click()
+  await expect(page.getByText('Remove the pauses: 1 done').first()).toBeVisible()
+
+  const sent = await mockRequests()
+  expect(sent.find((r) => r.path === '/api/admin/videos/7/edits/cut')?.body).toMatchObject({ cuts: [{ startMs: 2200, endMs: 3800 }] })
 })

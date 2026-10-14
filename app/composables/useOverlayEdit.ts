@@ -4,6 +4,7 @@
 // again (OverlayRules) and draws text with the server's fonts.
 
 import type { BurnPosition, BurnStyle } from '#shared/utils/audioVideo'
+import { captionLookProblem, type CaptionLook } from '#shared/utils/captionLook'
 import type { OverlayLayer } from '~/composables/useVideoEdits'
 import { moveItem } from '#shared/utils/reorder'
 
@@ -15,6 +16,8 @@ export interface BurnedCaptions {
   position: BurnPosition
   /** Text size, % of the video's height (3–10). */
   sizePct: number
+  /** Colours, box and bold of one's own over the style; null/absent = the style's. */
+  look?: CaptionLook | null
 }
 
 export interface EditorLayer extends OverlayLayer {
@@ -314,6 +317,8 @@ export function useOverlayEdit(durationMs: Ref<number>) {
     if (!state.layers.length && !state.captions) return 'Add a text or image layer, or subtitles, first'
     if (state.captions && !state.captions.transcriptId) return 'Subtitles: choose the transcript'
     if (state.captions && state.captions.secondTranscriptId === state.captions.transcriptId) return 'Subtitles: the second line must be another transcript'
+    const lookError = captionLookProblem(state.captions?.look)
+    if (lookError) return lookError
     for (const [i, l] of state.layers.entries()) {
       const at = `Layer ${i + 1}: `
       if (l.kind === 'TEXT' && !l.text?.trim()) return `${at}the text is empty`

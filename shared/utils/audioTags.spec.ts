@@ -37,6 +37,24 @@ describe('ID3v2', () => {
     const t = tag(4, [frame('TIT2', bytes([1], utf16('សួស្តី')), 4)])
     expect(parseId3(t).title).toBe('សួស្តី')
   })
+  it('reads the chapters a podcast tool wrote (CHAP frames with a title), in time order', () => {
+    const chap = (id: string, start: number, title: string | null, version: 3 | 4) =>
+      frame(
+        'CHAP',
+        bytes(id, [0], be32(start), be32(start + 1000), be32(0xffffffff), be32(0xffffffff), title ? frame('TIT2', bytes([3], title), version) : []),
+        version
+      )
+    for (const v of [3, 4] as const) {
+      const tags = parseId3(
+        tag(v, [chap('c2', 90_000, 'Verbs', v), chap('c1', 0, 'Welcome', v), chap('c3', 120_000, null, v), frame('TIT2', bytes([3], 'Ep 1'), v)])
+      )
+      expect(tags.chapters).toEqual([
+        { startMs: 0, title: 'Welcome' },
+        { startMs: 90_000, title: 'Verbs' }
+      ])
+      expect(tags.title).toBe('Ep 1')
+    }
+  })
   it('stops quietly at padding and gives nothing for a file without a tag', () => {
     const t = tag(3, [frame('TIT2', bytes([0], 'A'), 3), Uint8Array.from([0, 0, 0, 0, 0, 0, 0, 0, 0, 0])])
     expect(parseId3(t)).toEqual({ title: 'A' })

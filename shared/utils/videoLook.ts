@@ -1,7 +1,7 @@
-// A picture look for a trim: brightness, contrast, colour, tint, blur, vignette.
+// A picture look for a trim: brightness, contrast, colour, warmth, tint, blur, sharpen, vignette.
 // The backend renders it (VideoEditRules.Look + ffmpeg) and re-checks the ranges;
 // the preview uses a CSS filter, which matches closely but isn't exact, and can't
-// show the vignette.
+// show the vignette or the sharpening.
 
 export interface VideoLook {
   /** −1…1, 0 = unchanged. */
@@ -15,11 +15,24 @@ export interface VideoLook {
   grayscale: boolean
   sepia: boolean
   vignette: boolean
+  /** −1 (cool, toward blue) … 1 (warm, toward orange); 0 = unchanged. */
+  warmth: number
+  sharpen: boolean
 }
 
 export const MAX_LOOK_BLUR = 20
 
-export const PLAIN_LOOK: VideoLook = { brightness: 0, contrast: 1, saturation: 1, blur: 0, grayscale: false, sepia: false, vignette: false }
+export const PLAIN_LOOK: VideoLook = {
+  brightness: 0,
+  contrast: 1,
+  saturation: 1,
+  blur: 0,
+  grayscale: false,
+  sepia: false,
+  vignette: false,
+  warmth: 0,
+  sharpen: false
+}
 
 export interface LookPreset {
   key: string
@@ -33,12 +46,24 @@ export const LOOK_PRESETS: LookPreset[] = [
   { key: 'moody', label: 'Moody', look: { ...PLAIN_LOOK, brightness: -0.08, contrast: 1.2, saturation: 0.85, vignette: true } },
   { key: 'mono', label: 'Black & white', look: { ...PLAIN_LOOK, contrast: 1.1, grayscale: true } },
   { key: 'sepia', label: 'Sepia', look: { ...PLAIN_LOOK, sepia: true } },
-  { key: 'soft', label: 'Soft', look: { ...PLAIN_LOOK, brightness: 0.05, contrast: 0.9, blur: 1.5 } }
+  { key: 'soft', label: 'Soft', look: { ...PLAIN_LOOK, brightness: 0.05, contrast: 0.9, blur: 1.5 } },
+  { key: 'warm', label: 'Warm', look: { ...PLAIN_LOOK, warmth: 0.4, saturation: 1.1 } },
+  { key: 'crisp', label: 'Crisp', look: { ...PLAIN_LOOK, contrast: 1.1, sharpen: true } }
 ]
 
 export function isPlainLook(look: VideoLook | null): boolean {
   if (!look) return true
-  return look.brightness === 0 && look.contrast === 1 && look.saturation === 1 && look.blur === 0 && !look.grayscale && !look.sepia && !look.vignette
+  return (
+    look.brightness === 0 &&
+    look.contrast === 1 &&
+    look.saturation === 1 &&
+    look.blur === 0 &&
+    !look.grayscale &&
+    !look.sepia &&
+    !look.vignette &&
+    !look.warmth &&
+    !look.sharpen
+  )
 }
 
 /** The preset the look matches exactly, or null. */
@@ -54,12 +79,13 @@ export function validateLook(look: VideoLook | null): string | null {
   if (!(look.contrast >= 0 && look.contrast <= 2)) return 'Contrast is between 0 % and 200 %'
   if (!(look.saturation >= 0 && look.saturation <= 3)) return 'Colour is between 0 % and 300 %'
   if (!(look.blur >= 0 && look.blur <= MAX_LOOK_BLUR)) return `Blur is between 0 and ${MAX_LOOK_BLUR}`
+  if (!((look.warmth ?? 0) >= -1 && (look.warmth ?? 0) <= 1)) return 'Warmth is between −100 % and +100 %'
   return null
 }
 
 /** The `look` part of a trim request: null when nothing is changed, so a plain trim is sent as before. */
 export function lookRequest(look: VideoLook | null): VideoLook | null {
-  return look && !isPlainLook(look) ? { ...look } : null
+  return look && !isPlainLook(look) ? { ...PLAIN_LOOK, ...look } : null
 }
 
 /** A CSS `filter` for the preview <video>; '' when nothing is changed. */
@@ -72,6 +98,9 @@ export function cssFilter(look: VideoLook | null): string {
   if (look.grayscale) parts.push('grayscale(1)')
   else if (look.saturation !== 1) parts.push(`saturate(${+look.saturation.toFixed(3)})`)
   if (look.sepia && !look.grayscale) parts.push('sepia(1)')
+  // Warmth: a touch of sepia toward orange, or a turn of the hue toward blue (the render uses colour balance).
+  if (look.warmth > 0 && !look.grayscale && !look.sepia) parts.push(`sepia(${+(0.35 * look.warmth).toFixed(3)})`)
+  if (look.warmth < 0 && !look.grayscale) parts.push(`hue-rotate(${+(-15 * look.warmth).toFixed(1)}deg)`)
   if (look.blur > 0) parts.push(`blur(${+(look.blur / 2).toFixed(2)}px)`)
   return parts.join(' ')
 }
@@ -87,7 +116,9 @@ export function describeVideoLook(look: VideoLook | null): string | null {
   if (look.saturation !== 1 && !look.grayscale && !look.sepia) parts.push(look.saturation > 1 ? 'more colour' : 'less colour')
   if (look.grayscale) parts.push('black & white')
   else if (look.sepia) parts.push('sepia')
+  if (look.warmth && !look.grayscale) parts.push(look.warmth > 0 ? 'warmer' : 'cooler')
   if (look.blur > 0) parts.push('blurred')
+  if (look.sharpen) parts.push('sharpened')
   if (look.vignette) parts.push('vignette')
   return parts.join(', ')
 }

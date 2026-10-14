@@ -1108,6 +1108,22 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/admin/videos/{videoId}/edits/narration': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    post: operations['narration']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/api/admin/videos/{videoId}/edits/gif': {
     parameters: {
       query?: never
@@ -3625,6 +3641,8 @@ export interface components {
       /** Format: int64 */
       videoId?: number
       body?: string
+      /** Format: int64 */
+      atMs?: number
       author?: string
       resolved?: boolean
       resolvedBy?: string
@@ -3660,6 +3678,14 @@ export interface components {
       endMs: number
       text: string
       speaker?: string
+      words?: components['schemas']['TranscriptWord'][]
+    }
+    TranscriptWord: {
+      /** Format: int64 */
+      startMs?: number
+      /** Format: int64 */
+      endMs?: number
+      text?: string
     }
     UpdateTranscriptRequest: {
       /** Format: int64 */
@@ -4466,6 +4492,10 @@ export interface components {
       /** Format: double */
       sizePct?: number
     }
+    Reframe: {
+      /** Format: double */
+      aspect?: number
+    }
     ScaleSize: {
       /** Format: int32 */
       w?: number
@@ -4509,6 +4539,7 @@ export interface components {
       stabilize?: boolean
       zoomTo?: components['schemas']['ZoomTo']
       greenScreen?: components['schemas']['GreenScreen']
+      reframe?: components['schemas']['Reframe']
     }
     ZoomTo: {
       /** Format: double */
@@ -4584,6 +4615,7 @@ export interface components {
       position?: string
       /** Format: double */
       sizePct?: number
+      look?: components['schemas']['Look']
     }
     Layer: {
       kind?: string
@@ -4622,6 +4654,24 @@ export interface components {
     Spec: {
       layers?: components['schemas']['Layer'][]
       captions?: components['schemas']['Captions']
+    }
+    Request: {
+      text?: string
+      voice?: string
+      /** Format: double */
+      rate?: number
+    }
+    ApiResponseNarration: {
+      traceId?: string
+      /** Format: int32 */
+      statusCode?: number
+      message?: string
+      data?: components['schemas']['Narration']
+    }
+    Narration: {
+      key?: string
+      /** Format: int64 */
+      durationMs?: number
     }
     GifRequest: {
       /** Format: int64 */
@@ -4703,6 +4753,8 @@ export interface components {
     }
     NoteRequest: {
       body: string
+      /** Format: int64 */
+      atMs?: number
     }
     UploadRequest: {
       kind: string
@@ -4874,10 +4926,34 @@ export interface components {
       burnSubtitles?: components['schemas']['BurnSubtitlesDto']
       /** Format: int32 */
       waveHeightPct?: number
+      blurBackdrop?: boolean
+      progressBar?: boolean
+      chapters?: components['schemas']['ChapterDto'][]
+      intro?: components['schemas']['TitleCardDto']
+      outro?: components['schemas']['TitleCardDto']
+      music?: components['schemas']['MusicDto']
     }
     BurnSubtitlesDto: {
       style?: string
       position?: string
+      secondLanguage?: string
+    }
+    TitleCardDto: {
+      text?: string
+      /** Format: int64 */
+      durationMs?: number
+    }
+    ChapterDto: {
+      /** Format: int64 */
+      startMs?: number
+      title: string
+    }
+    MusicDto: {
+      key: string
+      /** Format: double */
+      volume?: number
+      loop?: boolean
+      duck?: boolean
     }
     SlideDto: {
       key: string
@@ -9193,6 +9269,32 @@ export interface operations {
         }
         content: {
           '*/*': components['schemas']['ApiResponseProcessingJobResponse']
+        }
+      }
+    }
+  }
+  narration: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        videoId: number
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['Request']
+      }
+    }
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseNarration']
         }
       }
     }

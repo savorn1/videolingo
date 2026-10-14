@@ -94,6 +94,33 @@ test('Audio: an extra sound track and slow motion with the sound at normal speed
     .toMatchObject({ speed: 0.5, keepSoundSpeed: true, tracks: [{ key: expect.stringMatching(/^uploads\//), volume: 1, loop: false, duck: false }] })
 })
 
+test('Audio: a volume curve drawn on the strip, a sound preset and the de-esser are sent with the render', async ({ page }) => {
+  await openEditor(page)
+  await page.getByRole('tab', { name: /Audio/ }).click()
+  // A point at the middle of the video, near the bottom of the lane (quiet).
+  const lane = page.getByTestId('volume-curve')
+  const box = (await lane.boundingBox())!
+  await lane.click({ position: { x: box.width / 2, y: box.height * 0.85 } })
+  await expect(page.getByTestId('curve-point')).toHaveCount(1)
+  // ↑ lifts it by 5 %.
+  const point = page.getByTestId('curve-point')
+  await point.focus()
+  const before = Number(await point.getAttribute('aria-valuenow'))
+  await point.press('ArrowUp')
+  await expect(point).toHaveAttribute('aria-valuenow', String(before + 5))
+
+  await page.getByRole('heading', { name: 'Clean-up' }).click()
+  await page.getByRole('radio', { name: 'Phone call' }).click()
+  await page.getByRole('switch', { name: /Soften the/ }).click()
+  await page.getByRole('button', { name: /Render video with this audio/ }).click()
+
+  await expect
+    .poll(async () => (await mockRequests()).find((r) => r.path === '/api/admin/videos/7/edits/audio')?.body)
+    .toMatchObject({ preset: 'PHONE', deEss: true, volumeCurve: [{ atMs: expect.any(Number), gain: (before + 5) / 100 }] })
+  const body = (await mockRequests()).find((r) => r.path === '/api/admin/videos/7/edits/audio')!.body
+  expect(Math.abs(body.volumeCurve[0].atMs - 5000)).toBeLessThan(400)
+})
+
 test('Trim: crossing out sentences of the transcript cuts them, with the pause between', async ({ page }) => {
   await openEditor(page)
   await page.getByRole('heading', { name: 'Edit by transcript' }).click()
@@ -121,6 +148,42 @@ test('Trim: long pauses are found and added to Cut out', async ({ page }) => {
   await expect(page.getByTestId('cut-row')).toHaveCount(1)
   await expect(page.getByTestId('cut-row').getByLabel('Cut 1 start')).toHaveValue(/0:02\.2/)
   await expect(page.getByTestId('cut-row').getByLabel('Cut 1 end')).toHaveValue(/0:03\.8/)
+})
+
+test('Trim: a pause after each sentence is placed from the transcript and sent', async ({ page }) => {
+  await openEditor(page)
+  await page.getByRole('heading', { name: 'Motion & effects' }).click()
+  const pauses = page.getByTestId('sentence-pauses')
+  await pauses.getByRole('button', { name: 'Add the pauses' }).click()
+  await expect(pauses.getByRole('status')).toContainText('3 pauses of 2 s')
+  await page.getByRole('button', { name: 'Start trim' }).click()
+
+  await expect
+    .poll(async () => (await mockRequests()).find((r) => r.path === '/api/admin/videos/7/edits/trim')?.body?.holds)
+    .toEqual([
+      { atMs: 2000, durationMs: 2000 },
+      { atMs: 4000, durationMs: 2000 },
+      { atMs: 6000, durationMs: 2000 }
+    ])
+})
+
+test('Trim: two parts at other speeds are sent in time order', async ({ page }) => {
+  await openEditor(page)
+  await page.getByRole('heading', { name: 'Motion & effects' }).click()
+  const speeds = page.getByTestId('speed-parts')
+  await speeds.getByRole('button', { name: 'Add a part' }).click()
+  await speeds.getByRole('button', { name: 'Add another part' }).click()
+  await expect(speeds.getByTestId('speed-part')).toHaveCount(2)
+  // The second starts where the first ends (they mustn't overlap).
+  await expect(speeds.getByLabel('Part 2 from')).toHaveValue('2.1')
+  await page.getByRole('button', { name: 'Start trim' }).click()
+
+  await expect
+    .poll(async () => (await mockRequests()).find((r) => r.path === '/api/admin/videos/7/edits/trim')?.body?.speeds)
+    .toEqual([
+      { startMs: 100, endMs: 2100, speed: 0.5 },
+      { startMs: 2100, endMs: 4100, speed: 0.5 }
+    ])
 })
 
 test('Trim: motion and effects are sent with the trim', async ({ page }) => {
@@ -252,6 +315,68 @@ test('Trim: single words and the filler words can be cut when the transcript has
   await expect(panel.getByRole('button', { name: 'Um,' })).toHaveAttribute('aria-pressed', 'true')
   await panel.getByRole('button', { name: 'notes.' }).click()
   await expect(page.getByTestId('cut-row')).toHaveCount(2)
+})
+
+test('Trim: a warm, sharpened look is sent whole (warmth and sharpen included)', async ({ page }) => {
+  await openEditor(page)
+  await page.getByRole('heading', { name: 'Look' }).click()
+  await page.getByRole('button', { name: 'Warm', exact: true }).click()
+  await page.getByRole('switch', { name: 'Sharpen' }).click()
+  await page.getByRole('button', { name: 'Start trim' }).click()
+
+  await expect
+    .poll(async () => (await mockRequests()).find((r) => r.path === '/api/admin/videos/7/edits/trim')?.body?.look)
+    .toEqual({ brightness: 0, contrast: 1, saturation: 1.1, blur: 0, grayscale: false, sepia: false, vignette: false, warmth: 0.4, sharpen: true })
+})
+
+test('Audio: a spoken line is added as a sound track and sent with the render', async ({ page }) => {
+  await openEditor(page)
+  await page.getByRole('tab', { name: /Audio/ }).click()
+  await page.getByRole('heading', { name: /Background music/ }).click()
+  const box = page.getByTestId('narration')
+  await box.getByLabel('Line to speak').fill('Listen, then repeat after me.')
+  await box.getByRole('button', { name: 'Speak and add' }).click()
+  await expect(page.getByTestId('sound-tracks')).toContainText('Spoken: “Listen, then repeat after me.”')
+  const spoken = (await mockRequests()).find((r) => r.path === '/api/admin/videos/7/edits/narration')
+  expect(spoken?.body).toEqual({ text: 'Listen, then repeat after me.', voice: 'nova', rate: 1 })
+
+  await page.getByRole('button', { name: /Render video with this audio/ }).click()
+  await expect
+    .poll(async () => (await mockRequests()).find((r) => r.path === '/api/admin/videos/7/edits/audio')?.body?.tracks)
+    .toEqual([{ key: 'audio-uploads/narration-1.wav', volume: 1, loop: false, duck: false, startMs: 0 }])
+})
+
+test('Text: burned-in subtitles can have a look of their own', async ({ page }) => {
+  await openEditor(page)
+  await page.getByRole('tab', { name: /Text/ }).click()
+  await page.getByRole('heading', { name: 'Burned-in subtitles' }).click()
+  await page.getByRole('switch', { name: 'Burn the subtitles into the picture' }).click()
+  const look = page.getByTestId('caption-look')
+  await look.getByRole('switch', { name: 'Customise the look' }).click()
+  // The BOX style's look to start from; take the box away and make it plain.
+  await look.getByRole('switch', { name: 'Box behind' }).click()
+  await look.getByRole('switch', { name: 'Bold' }).click()
+  await expect(page.getByTestId('caption-sample')).toContainText('The spoken words appear here')
+  await page.getByRole('button', { name: /Render layers/ }).click()
+
+  await expect
+    .poll(async () => (await mockRequests()).find((r) => r.path === '/api/admin/videos/7/edits/overlay')?.body?.captions?.look)
+    .toEqual({ color: '#ffffff', secondColor: '#ffff99', edgeColor: '#000000', box: false, boxOpacity: 0.5, bold: false })
+})
+
+test('History lists the steps by name, and a click goes back to one', async ({ page }) => {
+  await openEditor(page)
+  await page.getByRole('heading', { name: 'Look' }).click()
+  await page.getByRole('button', { name: 'Warm', exact: true }).click()
+  await page.waitForTimeout(600) // a step is recorded once changes settle
+  await page.getByRole('switch', { name: 'Sharpen' }).click()
+  await page.waitForTimeout(600)
+  await page.getByRole('button', { name: 'History' }).click()
+  const list = page.getByTestId('history-list')
+  await expect(list.getByRole('button')).toHaveText([/Look/, /Look/, /Start/])
+  await list.getByRole('button', { name: /Start/ }).click()
+  await expect(page.getByRole('switch', { name: 'Sharpen' })).not.toBeChecked()
+  await expect(page.getByRole('button', { name: 'Warm', exact: true })).toHaveAttribute('aria-pressed', 'false')
 })
 
 test('Split: three even parts queue a split into three segments', async ({ page }) => {

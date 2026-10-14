@@ -55,7 +55,18 @@
       :default-value="0"
       @update:model-value="(v) => (look = { ...look, blur: v })"
     />
+    <SliderRow
+      label="Warmth"
+      :model-value="Math.round((look.warmth ?? 0) * 100)"
+      :min="-100"
+      :max="100"
+      :step="5"
+      :default-value="0"
+      unit="%"
+      @update:model-value="(v) => (look = { ...look, warmth: v / 100 })"
+    />
     <div class="flex flex-wrap gap-x-4 gap-y-2">
+      <USwitch :model-value="!!look.sharpen" label="Sharpen" @update:model-value="(v: boolean) => (look = { ...look, sharpen: v })" />
       <USwitch
         :model-value="look.grayscale"
         label="Black & white"
@@ -71,7 +82,9 @@
       description="A divider on the preview: as it is on the left, with the look on the right."
       data-testid="look-compare-switch"
     />
-    <p class="text-xs text-gray-500 dark:text-gray-400">The preview is a close match; dark corners show only in the rendered result.</p>
+    <p class="text-xs text-gray-500 dark:text-gray-400">
+      The preview is a close match; dark corners and sharpening show only in the rendered result. Warmth below 0 cools toward blue.
+    </p>
   </EditorSection>
 </template>
 

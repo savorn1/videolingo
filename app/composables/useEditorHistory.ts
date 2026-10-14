@@ -3,7 +3,8 @@
 // as plain data) and `apply` (put such data back); changes are recorded
 // after they settle, so dragging a slider is one step, not hundreds.
 
-import { canRedo, canUndo, createHistory, current, record, redo, undo, type History } from '#shared/utils/history'
+import { canRedo, canUndo, createHistory, current, jumpTo, record, redo, undo, type History } from '#shared/utils/history'
+import { historySteps } from '#shared/utils/historySteps'
 
 export interface EditorDraft {
   /** The video file the draft was made against — a replaced file makes it stale. */
@@ -87,6 +88,15 @@ export function useEditorHistory(options: {
     await show(current(history.value))
   }
 
+  /** The History list: each step's name, oldest first, and which one is shown (worked out only when looked at). */
+  const steps = computed(() => historySteps(history.value.entries))
+  const position = computed(() => history.value.index)
+  async function goTo(index: number) {
+    if (index === history.value.index) return
+    history.value = jumpTo(history.value, index)
+    await show(current(history.value))
+  }
+
   /** Starts over from the editor's current state (after loading or reset): no history, no draft. */
   function start() {
     clearTimeout(timer)
@@ -131,5 +141,5 @@ export function useEditorHistory(options: {
   onMounted(() => window.addEventListener('keydown', onKey))
   onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 
-  return { undo: doUndo, redo: doRedo, undoable, redoable, draftSavedAt, start, pendingDraft, restoreDraft, discardDraft }
+  return { undo: doUndo, redo: doRedo, undoable, redoable, draftSavedAt, start, pendingDraft, restoreDraft, discardDraft, steps, position, goTo }
 }

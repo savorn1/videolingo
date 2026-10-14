@@ -262,11 +262,11 @@ export function fadeSpans(
 
 /**
  * The level the live preview plays at a point of the video (0–1): the volume (the player can't go above 100 %),
- * the muted ranges, and the fades. The fades are linear, as ffmpeg's afade, and sit on the finished video's
+ * the volume curve, the muted ranges, and the fades. The fades are linear, as ffmpeg's afade, and sit on the finished video's
  * timeline, which a speed change stretches or shortens.
  */
 export function previewGainAt(
-  s: { volume: number; mutes: TimeRange[]; fadeInMs: number; fadeOutMs: number; speed: number },
+  s: { volume: number; mutes: TimeRange[]; fadeInMs: number; fadeOutMs: number; speed: number; volumeCurve?: CurvePoint[] },
   durationMs: number,
   ms: number
 ): number {
@@ -277,7 +277,7 @@ export function previewGainAt(
   let fade = 1
   if (s.fadeInMs > 0) fade = Math.min(fade, outMs / s.fadeInMs)
   if (s.fadeOutMs > 0 && outLength > 0) fade = Math.min(fade, (outLength - outMs) / s.fadeOutMs)
-  return Math.max(0, Math.min(1, s.volume * Math.max(0, fade)))
+  return Math.max(0, Math.min(1, s.volume * curveGainAt(s.volumeCurve ?? [], ms) * Math.max(0, fade)))
 }
 
 /** Extra sound tracks besides the background music (backend AudioEditRules.MAX_TRACKS). */
@@ -293,3 +293,85 @@ export function soundTracksProblem(tracks: { startMs: number; volume: number }[]
   }
   return null
 }
+
+// ── Volume curve: levels at points of the video's timeline, a straight line between (backend AudioEditRules) ──
+
+export interface CurvePoint {
+  atMs: number
+  /** 0–MAX_CURVE_GAIN (1 = as it is). */
+  gain: number
+}
+
+export const MAX_CURVE_POINTS = 30
+export const MAX_CURVE_GAIN = 2
+/** A point added this close to another replaces it. */
+const SAME_POINT_MS = 100
+
+/** The curve's level at `ms`: the first point's before it, the last one's after it, a straight line between. 1 with no points. */
+export function curveGainAt(points: CurvePoint[], ms: number): number {
+  if (!points.length) return 1
+  if (ms <= points[0]!.atMs) return points[0]!.gain
+  for (let i = 1; i < points.length; i++) {
+    const a = points[i - 1]!
+    const b = points[i]!
+    if (ms < b.atMs) return a.gain + ((b.gain - a.gain) * (ms - a.atMs)) / (b.atMs - a.atMs)
+  }
+  return points[points.length - 1]!.gain
+}
+
+const clampGain = (g: number) => Math.round(Math.min(MAX_CURVE_GAIN, Math.max(0, g)) * 100) / 100
+
+/** Adds a point (replacing one within 0.1 s), in time order; unchanged when the curve is full. */
+export function addCurvePoint(points: CurvePoint[], atMs: number, gain: number, durationMs: number): CurvePoint[] {
+  const at = Math.round(Math.min(Math.max(0, atMs), durationMs || atMs))
+  const rest = points.filter((p) => Math.abs(p.atMs - at) > SAME_POINT_MS)
+  if (rest.length >= MAX_CURVE_POINTS) return points
+  return [...rest, { atMs: at, gain: clampGain(gain) }].sort((a, b) => a.atMs - b.atMs)
+}
+
+/** Moves point `index`, kept between its neighbours (so the order never changes). */
+export function moveCurvePoint(points: CurvePoint[], index: number, atMs: number, gain: number, durationMs: number): CurvePoint[] {
+  const p = points[index]
+  if (!p) return points
+  const min = index > 0 ? points[index - 1]!.atMs + 1 : 0
+  const max = index < points.length - 1 ? points[index + 1]!.atMs - 1 : durationMs || atMs
+  const at = Math.round(Math.min(Math.max(min, atMs), Math.max(min, max)))
+  return points.map((q, i) => (i === index ? { atMs: at, gain: clampGain(gain) } : q))
+}
+
+/** Why the curve can't be rendered (as the backend says), or null. */
+export function curveProblem(points: CurvePoint[]): string | null {
+  if (points.length > MAX_CURVE_POINTS) return `At most ${MAX_CURVE_POINTS} points on the volume curve`
+  for (let i = 0; i < points.length; i++) {
+    const p = points[i]!
+    if (p.atMs < 0 || (i && p.atMs <= points[i - 1]!.atMs)) return 'Volume curve: the points must be in time order'
+    if (p.gain < 0 || p.gain > MAX_CURVE_GAIN) return `Volume curve: each point is between 0% and ${MAX_CURVE_GAIN * 100}%`
+  }
+  return null
+}
+
+/** A dip under a stretch (e.g. while someone else talks): full level, down to `gain` over 0.3 s, and back after. */
+export function dipPoints(points: CurvePoint[], range: TimeRange, gain: number, durationMs: number): CurvePoint[] {
+  const ramp = 300
+  const keep = points.filter((p) => p.atMs < range.startMs - ramp - SAME_POINT_MS || p.atMs > range.endMs + ramp + SAME_POINT_MS)
+  const add = [
+    { atMs: Math.max(0, range.startMs - ramp), gain: curveGainAt(points, range.startMs - ramp) },
+    { atMs: range.startMs, gain },
+    { atMs: range.endMs, gain },
+    { atMs: Math.min(durationMs || range.endMs + ramp, range.endMs + ramp), gain: curveGainAt(points, range.endMs + ramp) }
+  ]
+  let out = keep
+  for (const p of add) out = addCurvePoint(out, p.atMs, p.gain, durationMs)
+  return out
+}
+
+// ── Sound presets (backend AudioEditRules.PRESETS) ──
+
+export const SOUND_PRESETS = [
+  { value: 'NONE', label: 'None', hint: '' },
+  { value: 'MORE_BASS', label: 'More bass', hint: 'Fuller low end' },
+  { value: 'CLEARER_VOICE', label: 'Clearer voice', hint: 'Less boom, more presence' },
+  { value: 'PHONE', label: 'Phone call', hint: 'Thin, squeezed, like on a call' },
+  { value: 'RADIO', label: 'Radio', hint: 'Narrow and punchy, like a broadcast' }
+] as const
+export type SoundPreset = (typeof SOUND_PRESETS)[number]['value']

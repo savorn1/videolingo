@@ -24,7 +24,7 @@
         <AudioVideoFilesStep />
         <!-- 2. The look -->
         <AudioVideoLookStep />
-        <!-- 3. Sound clean-up -->
+        <!-- 3. Sound -->
         <AudioVideoSoundStep />
         <!-- 4. The details -->
         <AudioVideoDetailsStep />

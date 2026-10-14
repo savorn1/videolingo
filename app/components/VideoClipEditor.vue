@@ -297,6 +297,37 @@
               >
                 Redo
               </UButton>
+              <!-- Every step so far: click one to go back (or forward) to it -->
+              <UPopover>
+                <UButton size="xs" color="neutral" variant="ghost" icon="i-lucide-history" :disabled="history.steps.value.length < 2" title="History"
+                  >History</UButton
+                >
+                <template #content>
+                  <ol class="max-h-80 w-64 overflow-y-auto p-1 text-sm" data-testid="history-list">
+                    <li v-for="i in historyOrder" :key="i">
+                      <button
+                        type="button"
+                        class="flex w-full items-center gap-2 rounded px-2 py-1 text-left hover:bg-gray-100 dark:hover:bg-gray-800"
+                        :class="
+                          i === history.position.value
+                            ? 'bg-primary-50 font-medium text-primary-800 dark:bg-primary-950/40 dark:text-primary-200'
+                            : i > history.position.value
+                              ? 'italic text-gray-500 dark:text-gray-400'
+                              : 'text-gray-700 dark:text-gray-300'
+                        "
+                        :aria-current="i === history.position.value ? 'step' : undefined"
+                        @click="history.goTo(i)"
+                      >
+                        <span class="w-5 shrink-0 text-right text-xs tabular-nums text-gray-500 dark:text-gray-400">{{ i }}</span>
+                        <span class="truncate">{{ history.steps.value[i] }}</span>
+                      </button>
+                    </li>
+                  </ol>
+                  <p class="border-t border-gray-100 px-3 py-1.5 text-xs text-gray-500 dark:border-gray-800 dark:text-gray-400">
+                    Greyed steps were undone — doing something new drops them.
+                  </p>
+                </template>
+              </UPopover>
               <ShortcutsHelp :items="EDITOR_SHORTCUTS" />
             </div>
           </div>
@@ -548,4 +579,7 @@ const {
   zoomBox,
   cropLayer
 } = provideClipEditor(props, emit)
+
+// History newest first.
+const historyOrder = computed(() => history.steps.value.map((_, i) => i).reverse())
 </script>

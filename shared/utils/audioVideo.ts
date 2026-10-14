@@ -34,7 +34,8 @@ export function frameSizeLabel(resolution: VideoResolution, shape: VideoShape): 
 export const BURN_STYLES = [
   { value: 'CLASSIC', label: 'White, outlined' },
   { value: 'BOX', label: 'On a dark box' },
-  { value: 'YELLOW', label: 'Yellow, outlined' }
+  { value: 'YELLOW', label: 'Yellow, outlined' },
+  { value: 'KARAOKE', label: 'Karaoke — each word lights up' }
 ] as const
 export type BurnStyle = (typeof BURN_STYLES)[number]['value']
 export type BurnPosition = 'BOTTOM' | 'TOP'
@@ -211,6 +212,10 @@ export interface SavedLook {
   trimSilence: boolean
   /** Null = the style's usual height. */
   waveHeightPct: number | null
+  /** The pictures on a blurred copy of themselves instead of the plain colour. */
+  blurBackdrop: boolean
+  /** A thin bar along the bottom that fills up as the recording plays. */
+  progressBar: boolean
 }
 
 export const DEFAULT_LOOK: SavedLook = {
@@ -225,7 +230,9 @@ export const DEFAULT_LOOK: SavedLook = {
   motion: false,
   crossfade: false,
   trimSilence: false,
-  waveHeightPct: null
+  waveHeightPct: null,
+  blurBackdrop: false,
+  progressBar: false
 }
 
 /** Settings read back from storage, made safe: anything missing or not valid falls back to the default. */
@@ -250,7 +257,9 @@ export function sanitizeLook(raw: unknown): SavedLook {
       r.waveHeightPct >= MIN_WAVE_HEIGHT_PCT &&
       r.waveHeightPct <= MAX_WAVE_HEIGHT_PCT
         ? r.waveHeightPct
-        : DEFAULT_LOOK.waveHeightPct
+        : DEFAULT_LOOK.waveHeightPct,
+    blurBackdrop: typeof r.blurBackdrop === 'boolean' ? r.blurBackdrop : DEFAULT_LOOK.blurBackdrop,
+    progressBar: typeof r.progressBar === 'boolean' ? r.progressBar : DEFAULT_LOOK.progressBar
   }
 }
 

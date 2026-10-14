@@ -175,7 +175,9 @@ describe('sanitizeLook', () => {
       motion: true,
       crossfade: false,
       trimSilence: true,
-      waveHeightPct: 60
+      waveHeightPct: 60,
+      blurBackdrop: true,
+      progressBar: true
     }
     expect(sanitizeLook(look)).toEqual(look)
   })

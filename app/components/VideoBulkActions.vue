@@ -23,6 +23,9 @@
       <UButton v-if="can('videos', 'WRITE')" size="xs" color="primary" variant="soft" icon="i-lucide-book-marked" @click="openAction('recipe')">
         Apply a recipe
       </UButton>
+      <UButton v-if="can('videos', 'WRITE')" size="xs" color="primary" variant="soft" icon="i-lucide-audio-waveform" @click="openAction('pauses')">
+        Remove the pauses
+      </UButton>
       <UButton v-if="can('videos', 'WRITE')" size="xs" color="neutral" variant="soft" icon="i-lucide-archive" @click="openAction('archive')">Archive</UButton>
       <UButton v-if="can('videos', 'WRITE')" size="xs" color="neutral" variant="soft" icon="i-lucide-archive-restore" @click="openAction('unarchive')">
         Unarchive
@@ -125,6 +128,21 @@
             </p>
           </template>
 
+          <template v-else-if="action === 'pauses'">
+            <p class="text-sm text-gray-600 dark:text-gray-300">
+              Finds the quiet stretches in each video's sound and cuts the long ones out, keeping a little quiet next to the speech. Queues a cut on each video;
+              the results appear under Results in each video's editor, to check before they replace the original or become new videos.
+            </p>
+            <USelect
+              v-model="pauseNoiseDb"
+              :items="PAUSE_LEVELS.map((l) => ({ label: l.label, value: l.value }))"
+              class="w-56"
+              aria-label="How quiet a pause is"
+            />
+            <SliderRow v-model="pauseMinMs" label="Cut pauses longer than" :min="300" :max="3000" :step="100" :default-value="1000" unit=" ms" />
+            <SliderRow v-model="pauseKeepMs" label="Keep next to the speech" :min="0" :max="500" :step="50" :default-value="200" unit=" ms" />
+          </template>
+
           <p v-else-if="action === 'duplicate'" class="text-sm text-gray-600 dark:text-gray-300">
             Makes a full copy of each — same file, metadata, categories and tags — disabled until reviewed.
           </p>
@@ -176,6 +194,7 @@ import type { AudioEditRequest, OverlayLayer } from '~/composables/useVideoEdits
 import { recipeJobsFor } from '#shared/utils/bulkRecipe'
 import { fromDateTimeLocal, SCHEDULE_STEPS, schedulePresets, scheduleSeries, toDateTimeLocal } from '#shared/utils/publishSchedule'
 import { describeRecipe } from '#shared/utils/editRecipe'
+import { bulkPausePlan, PAUSE_LEVELS, pauseCutSkip } from '#shared/utils/pauseCuts'
 
 const props = defineProps<{ videos: Video[]; trash?: boolean }>()
 const emit = defineEmits<{ done: [] }>()
@@ -186,7 +205,10 @@ const { list: listCollections, addVideos } = useCollections()
 const { list: listTranscripts, create: createTranscript, regenerate } = useTranscripts()
 const { duplicate, archive, unarchive, restore, purge, schedulePublish } = useVideos()
 const { settings: clientSettings } = useClientSettings()
-const { startTrim, startAudio, startOverlay } = useVideoEdits()
+const { startTrim, startAudio, startOverlay, startCut, pauses } = useVideoEdits()
+const pauseNoiseDb = ref<(typeof PAUSE_LEVELS)[number]['value']>(PAUSE_LEVELS[0].value)
+const pauseMinMs = ref(1000)
+const pauseKeepMs = ref(200)
 const recipes = useEditRecipes()
 const recipeId = ref<string | undefined>()
 const scheduleStart = ref(toDateTimeLocal(schedulePresets(new Date())[1]!.at))
@@ -200,7 +222,7 @@ const schedulePlan = computed(() => {
 const chosenRecipe = computed(() => recipes.saved.value.find((r) => r.id === recipeId.value) ?? null)
 const toast = useToast()
 
-type Action = 'tags' | 'collection' | 'translate' | 'duplicate' | 'archive' | 'unarchive' | 'restore' | 'purge' | 'recipe' | 'schedule'
+type Action = 'tags' | 'collection' | 'translate' | 'duplicate' | 'archive' | 'unarchive' | 'restore' | 'purge' | 'recipe' | 'schedule' | 'pauses'
 const action = ref<Action>('tags')
 const show = ref(false)
 const running = ref(false)
@@ -219,7 +241,8 @@ const title = computed(
       restore: 'Restore videos',
       purge: 'Delete permanently',
       recipe: 'Apply a recipe',
-      schedule: 'Schedule videos'
+      schedule: 'Schedule videos',
+      pauses: 'Remove the pauses'
     })[action.value]
 )
 const icon = computed(
@@ -234,7 +257,8 @@ const icon = computed(
       restore: 'i-lucide-rotate-ccw',
       purge: 'i-lucide-trash-2',
       recipe: 'i-lucide-book-marked',
-      schedule: 'i-lucide-calendar-clock'
+      schedule: 'i-lucide-calendar-clock',
+      pauses: 'i-lucide-audio-waveform'
     })[action.value]
 )
 
@@ -348,6 +372,21 @@ async function run() {
           else push(v.title, 'skipped', plan.note ?? 'nothing in the recipe applies')
         } catch (err) {
           push(v.title, 'failed', `${queued.length ? `queued ${queued.join(', ')}, then: ` : ''}${apiErrorMessage(err)}`)
+        }
+      }
+    } else if (action.value === 'pauses') {
+      for (const v of props.videos) {
+        const skip = pauseCutSkip(v)
+        if (skip) {
+          push(v.title, 'skipped', skip)
+          continue
+        }
+        try {
+          const plan = bulkPausePlan(await pauses(v.id, pauseNoiseDb.value), { minPauseMs: pauseMinMs.value, keepMs: pauseKeepMs.value })
+          if (plan.skip) push(v.title, 'skipped', plan.skip)
+          else push(v.title, 'ok', `queued cut #${(await startCut(v.id, plan.cuts)).id}: ${plan.line}`)
+        } catch (err) {
+          push(v.title, 'failed', apiErrorMessage(err))
         }
       }
     } else if (action.value === 'archive' || action.value === 'unarchive') {

@@ -76,45 +76,69 @@
       </div>
     </div>
 
-    <!-- Part at another speed -->
-    <div class="space-y-2">
-      <USwitch
-        :model-value="!!motion.speed"
-        label="Slow motion or speed up a part"
-        description="Only that part plays at another speed; the sound keeps its pitch."
-        @update:model-value="(on) => (motion.speed = on ? defaultSpeedRange() : null)"
-      />
-      <div v-if="motion.speed" class="flex flex-wrap items-end gap-2 pl-11">
+    <!-- Pause after each sentence -->
+    <div class="space-y-2" data-testid="sentence-pauses">
+      <div class="flex flex-wrap items-end gap-2">
+        <div class="min-w-48 flex-1">
+          <p class="text-sm font-medium text-gray-900 dark:text-white">Pause after each sentence</p>
+          <p class="text-xs text-gray-500 dark:text-gray-400">
+            The picture holds at the end of each spoken sentence, so learners have time to repeat it. Uses the transcript.
+          </p>
+        </div>
+        <USelect v-model="pauseMs" :items="PAUSE_LENGTHS" size="xs" class="w-24" aria-label="Pause length" />
+        <UButton size="xs" color="neutral" variant="soft" icon="i-lucide-pause" :loading="pausesLoading" @click="addSentencePauses">
+          {{ motion.holds.length ? 'Place again' : 'Add the pauses' }}
+        </UButton>
+        <UButton v-if="motion.holds.length" size="xs" color="neutral" variant="ghost" icon="i-lucide-x" @click="motion.holds = []">Remove</UButton>
+      </div>
+      <p v-if="pausesNote" class="text-xs text-gray-500 dark:text-gray-400" role="status">{{ pausesNote }}</p>
+    </div>
+
+    <!-- Parts at another speed -->
+    <div class="space-y-2" data-testid="speed-parts">
+      <div class="flex flex-wrap items-end gap-2">
+        <div class="min-w-48 flex-1">
+          <p class="text-sm font-medium text-gray-900 dark:text-white">Slow motion or speed up parts</p>
+          <p class="text-xs text-gray-500 dark:text-gray-400">Each part plays at its own speed; the sound keeps its pitch. Parts mustn't overlap.</p>
+        </div>
+        <UButton size="xs" color="neutral" variant="soft" icon="i-lucide-plus" :disabled="!canAddSpeedPart" @click="addSpeedPart">
+          {{ motion.speeds.length ? 'Add another part' : 'Add a part' }}
+        </UButton>
+      </div>
+      <div v-for="(part, i) in motion.speeds" :key="i" class="flex flex-wrap items-end gap-2 pl-4" data-testid="speed-part">
         <UFormField label="From (s)" class="w-24">
           <UInput
-            :model-value="sec(motion.speed.startMs)"
+            :model-value="sec(part.startMs)"
             type="number"
             step="0.1"
             min="0"
             size="sm"
-            @update:model-value="(v) => motion.speed && (motion.speed.startMs = ms(v))"
+            :aria-label="`Part ${i + 1} from`"
+            @update:model-value="(v) => (part.startMs = ms(v))"
           />
         </UFormField>
         <UFormField label="To (s)" class="w-24">
           <UInput
-            :model-value="sec(motion.speed.endMs)"
+            :model-value="sec(part.endMs)"
             type="number"
             step="0.1"
             min="0"
             size="sm"
-            @update:model-value="(v) => motion.speed && (motion.speed.endMs = ms(v))"
+            :aria-label="`Part ${i + 1} to`"
+            @update:model-value="(v) => (part.endMs = ms(v))"
           />
         </UFormField>
         <UFormField label="Speed">
           <USelect
-            v-model="motion.speed.speed"
+            v-model="part.speed"
             :items="RAMP_SPEEDS.map((s) => ({ label: `${s}×`, value: s as number }))"
             size="sm"
             class="w-24"
-            aria-label="Part speed"
+            :aria-label="`Part ${i + 1} speed`"
           />
         </UFormField>
-        <UButton size="xs" color="neutral" variant="ghost" icon="i-lucide-crosshair" @click="motion.speed.startMs = clipNow()">From the playhead</UButton>
+        <UButton size="xs" color="neutral" variant="ghost" icon="i-lucide-crosshair" @click="part.startMs = clipNow()">From the playhead</UButton>
+        <UButton size="xs" color="neutral" variant="ghost" icon="i-lucide-trash-2" :aria-label="`Remove part ${i + 1}`" @click="motion.speeds.splice(i, 1)" />
       </div>
     </div>
 
@@ -218,10 +242,40 @@
 <script setup lang="ts">
 // Motion & effects on a trim: effect, fades, a held frame, part at another speed, backwards, steadied, zoom into an
 // area, green screen. The settings live in useClipEditor (motion, in undo and drafts); rules in videoMotion.ts.
-import { describeMotion, isPlainMotion, MAX_REVERSE_MS, RAMP_SPEEDS, TRIM_EFFECTS } from '#shared/utils/videoMotion'
+import { describeMotion, isPlainMotion, MAX_REVERSE_MS, nextSpeedPart, RAMP_SPEEDS, sentencePauses, TRIM_EFFECTS } from '#shared/utils/videoMotion'
 
+const props = defineProps<{ videoId: number; videoLanguage: string | null }>()
 const { motion, currentMs, range } = useClipEditorContext()
 const open = ref(false)
+
+// ── Pause after each sentence: holds at each sentence end of the spoken-language transcript ──
+const PAUSE_LENGTHS = [1, 1.5, 2, 3, 5].map((s) => ({ label: `${s} s`, value: s * 1000 }))
+const pauseMs = ref(2000)
+const pausesLoading = ref(false)
+const pausesNote = ref('')
+const { list: listTranscripts, get: getTranscript } = useTranscripts()
+async function addSentencePauses() {
+  pausesLoading.value = true
+  pausesNote.value = ''
+  try {
+    const all = (await listTranscripts({ videoId: props.videoId, size: 50 })).data.filter((t) => t.segmentCount > 0)
+    const pick = all.find((t) => t.language === props.videoLanguage) ?? all[0]
+    if (!pick) {
+      pausesNote.value = "This video has no transcript yet — make one from the video's page (Transcribe)."
+      return
+    }
+    const segments = (await getTranscript(pick.id)).segments ?? []
+    motion.value.holds = sentencePauses(segments, Math.round(range.value[0]), Math.round(range.value[1]), pauseMs.value)
+    const n = motion.value.holds.length
+    pausesNote.value = n
+      ? `${n} pause${n === 1 ? '' : 's'} of ${pauseMs.value / 1000} s — the clip gets ${(n * pauseMs.value) / 1000} s longer.`
+      : 'No sentence ends inside the trimmed part.'
+  } catch (err) {
+    pausesNote.value = apiErrorMessage(err)
+  } finally {
+    pausesLoading.value = false
+  }
+}
 
 const ZOOM_SPOTS = [
   { label: 'top left', cx: 0.2, cy: 0.2 },
@@ -240,9 +294,10 @@ const clipMs = computed(() => Math.max(0, Math.round(range.value[1] - range.valu
 function clipNow() {
   return Math.min(Math.max(100, Math.round(currentMs.value - range.value[0])), Math.max(100, clipMs.value - 100))
 }
-function defaultSpeedRange() {
-  const start = clipNow()
-  return { startMs: start, endMs: Math.min(clipMs.value, start + 2000), speed: 0.5 }
+const canAddSpeedPart = computed(() => !!nextSpeedPart(motion.value.speeds, clipNow(), clipMs.value))
+function addSpeedPart() {
+  const part = nextSpeedPart(motion.value.speeds, clipNow(), clipMs.value)
+  if (part) motion.value.speeds = [...motion.value.speeds, part].sort((a, b) => a.startMs - b.startMs)
 }
 const sec = (v: number) => +(v / 1000).toFixed(2)
 const ms = (v: unknown) => Math.max(0, Math.round(Number(v) * 1000) || 0)

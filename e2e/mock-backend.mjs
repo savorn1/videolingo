@@ -160,7 +160,7 @@ function route(method, path, body) {
       textToSpeechReady: true,
       translationReady: true,
       spokenLanguage: 'en',
-      voices: {},
+      voices: { en: [{ id: 'nova', name: 'Nova', gender: 'Female' }] },
       jobs: [],
       dubs: [
         {
@@ -212,6 +212,8 @@ function route(method, path, body) {
     return ok({ partNumber: body.partNumber, url: `/api/__storage/part/${body.partNumber}`, length: 0, expiresAt: new Date(Date.now() + 3600e3).toISOString() })
   }
   if (method === 'POST' && /^\/api\/admin\/videos\/uploads\/multipart\/(complete|abort)$/.test(path)) return ok(null)
+  // The liveliest stretch of a recording, for the highlight clip.
+  if (method === 'POST' && path === '/api/admin/videos/from-audio/highlight') return ok({ totalMs: 120_000, startMs: 30_000, endMs: 74_500 })
   if (method === 'POST' && path === '/api/admin/videos/from-audio') {
     const entry = { videoId: 42 + made.length, jobId: 7 + made.length, title: body?.title, status: made.length === 0 ? 'SUCCEEDED' : 'FAILED' }
     made.push(entry)
@@ -272,6 +274,8 @@ function route(method, path, body) {
       { ...video(7), storageKey: 'videos/sample.mp4', width: 320, height: 180, deleted: false },
       { ...video(8), title: 'Teacher camera', storageKey: 'videos/teacher.mp4', width: 320, height: 180, deleted: false }
     ])
+  // A spoken line, for Speak a line.
+  if (method === 'POST' && path === '/api/admin/videos/7/edits/narration') return ok({ key: 'audio-uploads/narration-1.wav', durationMs: 1800 })
   // Pauses in the sample video's sound, for Remove the pauses.
   if (method === 'GET' && path === '/api/admin/videos/7/edits/pauses')
     return ok({

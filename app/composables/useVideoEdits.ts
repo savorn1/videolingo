@@ -82,6 +82,12 @@ export interface AudioEditRequest {
   tracks?: { key: string; volume: number; loop: boolean; duck: boolean; startMs: number }[]
   /** With a speed change: re-time only the picture, the sound plays at its own speed (padded or cut at the end). */
   keepSoundSpeed?: boolean
+  /** Levels at points of the video's timeline (0–2), a straight line between; up to 30 points. */
+  volumeCurve?: { atMs: number; gain: number }[]
+  /** A ready-made sound shape for the main sound. */
+  preset?: 'NONE' | 'MORE_BASS' | 'CLEARER_VOICE' | 'PHONE' | 'RADIO'
+  /** Tame harsh "s" sounds. */
+  deEss?: boolean
 }
 
 /** A text or image layer drawn over the video; x/y is its centre as fractions of the frame. */
@@ -154,14 +160,28 @@ export function useVideoEdits() {
       /** Let `endMs` run past the end of the video (up to MAX_EXTEND_MS): the last frame is held, the sound is silent. */
       extend?: boolean
       /** A picture look (brightness, contrast, colour, blur, tint, vignette); leave out for none. */
-      look?: { brightness: number; contrast: number; saturation: number; blur: number; grayscale: boolean; sepia: boolean; vignette: boolean } | null
+      look?: {
+        brightness: number
+        contrast: number
+        saturation: number
+        blur: number
+        grayscale: boolean
+        sepia: boolean
+        vignette: boolean
+        warmth: number
+        sharpen: boolean
+      } | null
       /** Sound added to the trimmed result: music mixed in, or a file used instead of the video's own sound. */
       audio?: { replaceKey?: string; music?: { key: string; volume: number; loop: boolean; duck: boolean; startMs: number } } | null
       /** Motion & effects (shared/utils/videoMotion.ts); times on the trimmed clip. */
       effect?: string
       fade?: { inMs: number; outMs: number; color: 'BLACK' | 'WHITE' }
       freeze?: { atMs: number; durationMs: number }
+      /** Pauses on the last frame, e.g. after each sentence (in time order, ≥ 0.5 s apart). */
+      holds?: { atMs: number; durationMs: number }[]
       speed?: { startMs: number; endMs: number; speed: number }
+      /** Several parts at another speed (in time order, not overlapping); newer servers take these instead of `speed`. */
+      speeds?: { startMs: number; endMs: number; speed: number }[]
       reverse?: boolean
       stabilize?: boolean
       zoomTo?: { cx: number; cy: number; size: number }
@@ -204,7 +224,14 @@ export function useVideoEdits() {
   async function startOverlay(
     videoId: number,
     layers: OverlayLayer[],
-    captions?: { transcriptId: number; secondTranscriptId: number | null; style: string; position: string; sizePct: number } | null
+    captions?: {
+      transcriptId: number
+      secondTranscriptId: number | null
+      style: string
+      position: string
+      sizePct: number
+      look?: { color: string; secondColor: string; edgeColor: string; box: boolean; boxOpacity: number; bold: boolean } | null
+    } | null
   ) {
     return (await api<ApiEnvelope<ProcessingJob>>(`${base(videoId)}/overlay`, { method: 'POST', body: { layers, captions: captions ?? null } })).data
   }
@@ -220,6 +247,11 @@ export function useVideoEdits() {
   }
 
   /** The video's sound (or an uploaded audio file's) as peaks, for drawing a waveform. */
+  /** Speaks a line with the text-to-speech service and keeps it as an audio upload (backend NarrationRules). */
+  async function narrate(videoId: number, body: { text: string; voice: string; rate: number }) {
+    return (await api<ApiEnvelope<{ key: string; durationMs: number }>>(`${base(videoId)}/narration`, { method: 'POST', body })).data
+  }
+
   /** The quiet stretches in the video's sound, quieter than `noiseDb` (backend PauseRules), for "Remove the pauses". */
   async function pauses(videoId: number, noiseDb: number) {
     return (await api<ApiEnvelope<{ durationMs: number; pauses: { startMs: number; endMs: number }[] }>>(`${base(videoId)}/pauses?noiseDb=${noiseDb}`)).data
@@ -246,5 +278,21 @@ export function useVideoEdits() {
     return (await api<ApiEnvelope<EditResultRow[]>>('/api/admin/videos/edit-results')).data
   }
 
-  return { overview, startTrim, startSplit, startCut, startAudio, startExtract, startOverlay, fonts, waveform, pauses, autoCrop, promote, remove, allResults }
+  return {
+    overview,
+    startTrim,
+    startSplit,
+    startCut,
+    startAudio,
+    startExtract,
+    startOverlay,
+    fonts,
+    waveform,
+    pauses,
+    narrate,
+    autoCrop,
+    promote,
+    remove,
+    allResults
+  }
 }
