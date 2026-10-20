@@ -9,7 +9,7 @@
 // (app/components/clip-editor/*), which inject them with useClipEditorContext().
 import type { BurnedCaptions } from '~/composables/useOverlayEdit'
 import type { InjectionKey } from 'vue'
-import type { EditOverview, VideoClip } from '~/composables/useVideoEdits'
+import type { EditOverview, PromoteResult, VideoClip } from '~/composables/useVideoEdits'
 import type { ProcessingJob } from '~/composables/useProcessingJobs'
 import type { Video } from '~/composables/useVideos'
 import type VideoPlayer from '~/components/VideoPlayer.vue'
@@ -19,6 +19,7 @@ import {
   findSplitTarget,
   MAX_QUEUED_EDITS,
   NO_ORIENTATION,
+  SAMPLE_SECONDS,
   swapsSides,
   describeOrientation,
   hasOrientation,
@@ -32,6 +33,7 @@ import {
   splitEveryRows,
   splitEvenlyRows,
   splitRowAt,
+  type SegmentRow,
   uncoveredMs as uncoveredTime,
   validateCrop,
   validateScale,
@@ -48,13 +50,36 @@ import { musicPositionAt, previewGainAt } from '#shared/utils/audioEdit'
 import { formatTimecode, parseTimecode } from '#shared/utils/transport'
 import { presetFromSettings, ratioLabel } from '#shared/utils/exportPreset'
 import { PLAIN_LOOK, cssFilter, describeVideoLook, isPlainLook, lookRequest, validateLook, type VideoLook } from '#shared/utils/videoLook'
-import { CLIP_OPERATION_ICONS, clipLabel } from '#shared/utils/editResults'
+import { CLIP_OPERATION_ICONS, clipLabel, downloadOnly } from '#shared/utils/editResults'
 import { describeExtras, extrasProblem, extrasRequest, isPlainExtras, sanitizeExtras, type TrimExtras } from '#shared/utils/trimExtras'
+import { lineAt, nextLineStart, previousLineStart, type TimedCue } from '#shared/utils/sentences'
+import {
+  MAX_SNAP_MS,
+  cutMarkers,
+  cutsAtPauses,
+  rowsFromCutPoints,
+  rowsNearLength,
+  rowsOverLimit,
+  segmentSpeech,
+  sentenceBreaks,
+  snapCutsToBreaks,
+  snapRangeToBreaks,
+  splitLongRows,
+  splitRequestSegments,
+  labelRowsAt,
+  tightenToSpeech
+} from '#shared/utils/splitPoints'
+import { pickAiChapters, type AiChapter } from '#shared/utils/aiChapterMarkers'
+import { PAUSE_LEVELS } from '#shared/utils/pauseCuts'
+import type { VideoMarker } from '~/composables/useVideoMarkers'
 import { PLAIN_MOTION, describeMotion, isPlainMotion, motionProblem, motionRequest, sanitizeMotion, type VideoMotion } from '#shared/utils/videoMotion'
 import { describeTrimAudio, trimAudioRequest, validateTrimAudio, type TrimAudioSettings } from '#shared/utils/trimAudio'
 import { cutSkipTarget, mergeCutRanges, validateCutOut, type CutRange } from '#shared/utils/cutOut'
 import { audioDifferences, fullAudio, isRecipeEmpty, type EditRecipe, type RecipeLayer } from '#shared/utils/editRecipe'
 import { MAX_NAMED_ENTRIES, uniqueName } from '#shared/utils/namedList'
+import { cuesToSrt, editedCues, pauseCrossed, resultLength, speedAt, type TrimTiming } from '#shared/utils/editTiming'
+import { platformChecks } from '#shared/utils/platformChecks'
+import { punchAt } from '#shared/utils/videoMotion'
 import { formatFileSize } from '#shared/utils/format'
 import type { EditorDraft } from '~/composables/useEditorHistory'
 
@@ -62,9 +87,13 @@ export interface ClipEditorProps {
   video: Video
   canWrite: boolean
 }
+// Separate overloads, as defineEmits makes them (a merged 'replaced' | 'updated' wouldn't accept the component's emit).
 export interface ClipEditorEmit {
   (e: 'replaced'): void
   (e: 'created', videoId: number): void
+  /** The video itself changed (e.g. a new thumbnail): load it again. */
+  // eslint-disable-next-line @typescript-eslint/unified-signatures
+  (e: 'updated'): void
 }
 
 export function useClipEditor(props: ClipEditorProps, emit: ClipEditorEmit) {
@@ -136,7 +165,7 @@ export function useClipEditor(props: ClipEditorProps, emit: ClipEditorEmit) {
 
   // The keys that matter on the tab that is open.
   const TAB_KEYS: Partial<Record<typeof mode.value, string>> = {
-    trim: 'I set start · O set end · ← → step a frame · Space play',
+    trim: 'I set start · O set end · [ ] by sentence · { } start / end at the sentence · ← → step a frame · Space play',
     split: 'S split here · [ ] previous / next segment · drag a cut on the strip',
     audio: 'Space play · ← → step a frame · Ctrl/⌘ Z undo',
     overlay: 'Arrow keys nudge the layer (Shift = further) · Delete removes it'
@@ -155,6 +184,8 @@ export function useClipEditor(props: ClipEditorProps, emit: ClipEditorEmit) {
     { keys: 'F', label: 'Full screen' },
     { keys: 'I', label: 'Set the trim start to the playhead (Trim tab)' },
     { keys: 'O', label: 'Set the trim end to the playhead (Trim tab)' },
+    { keys: '[  ]', label: 'Previous / next sentence of the transcript (Trim tab)' },
+    { keys: '{  }', label: 'Trim start / end at the sentence playing (Trim tab)' },
     { keys: 'S', label: 'Split at the playhead (Split tab)' },
     { keys: '[  ]', label: 'Previous / next segment (Split tab)' },
     { keys: 'ctrl/⌘ Z', label: 'Undo' },
@@ -337,6 +368,11 @@ export function useClipEditor(props: ClipEditorProps, emit: ClipEditorEmit) {
         setEdge(e.key.toLowerCase() === 'i' ? 'start' : 'end', Math.round(currentMs.value))
         return
       }
+      if (e.key === '[' || e.key === ']' || e.key === '{' || e.key === '}') {
+        e.preventDefault()
+        void bySentence(e.key)
+        return
+      }
     }
     if (
       mode.value === 'split' &&
@@ -371,6 +407,39 @@ export function useClipEditor(props: ClipEditorProps, emit: ClipEditorEmit) {
     e.preventDefault()
     spaceHeld.value = false
   }
+  // ── Moving by sentence (Trim tab): [ ] previous / next sentence, { } trim start / end at the sentence ──
+  // The spoken-language transcript, loaded the first time one of these keys is pressed.
+  const { list: listTranscripts, get: getTranscript } = useTranscripts()
+  let sentenceCache: (TimedCue & { text: string })[] | null = null
+  async function loadSentences(): Promise<(TimedCue & { text: string })[]> {
+    if (sentenceCache) return sentenceCache
+    const all = (await listTranscripts({ videoId: props.video.id, size: 50 })).data.filter((t) => t.segmentCount > 0)
+    const pick = all.find((t) => t.language === props.video.language) ?? all[0]
+    sentenceCache = pick ? ((await getTranscript(pick.id)).segments ?? []).slice().sort((a, b) => a.startMs - b.startMs) : []
+    return sentenceCache
+  }
+  async function bySentence(key: string) {
+    let sentences: TimedCue[]
+    try {
+      sentences = await loadSentences()
+    } catch (err) {
+      toast.add({ title: 'Could not load the transcript', description: apiErrorMessage(err), color: 'error' })
+      return
+    }
+    if (!sentences.length) {
+      toast.add({ title: 'No transcript yet', description: 'Transcribe the video from its page to move by sentence.', color: 'warning' })
+      return
+    }
+    const at = Math.round(currentMs.value)
+    if (key === '[' || key === ']') {
+      const to = key === ']' ? nextLineStart(sentences, at) : previousLineStart(sentences, at)
+      if (to !== null) preview.value?.seek(to, false)
+      return
+    }
+    const s = sentences[lineAt(sentences, at)]
+    if (s) setEdge(key === '{' ? 'start' : 'end', key === '{' ? s.startMs : s.endMs)
+  }
+
   // ── Full screen ──────────────────────────────────────────────────────────────
   // The player keeps its 16:9 box, so in full screen it's sized to fit the
   // height left over by the playback bar; the bar matches its width.
@@ -728,6 +797,18 @@ export function useClipEditor(props: ClipEditorProps, emit: ClipEditorEmit) {
   function setEdge(edge: 'start' | 'end', ms: number) {
     range.value = withTrimEdge(range.value, edge, ms, edge === 'end' ? trimLimit.value : durationMs.value)
   }
+  // "Start and end between sentences": each edge inside a sentence moves to the nearest pause.
+  async function snapTrimToSentences() {
+    const cues = await sentencesOrSay('to find the breaks between sentences')
+    if (!cues.length) return
+    const { range: snapped, moved } = snapRangeToBreaks(range.value, sentenceBreaks(cues), durationMs.value)
+    range.value = snapped
+    toast.add({
+      title: moved ? `Moved ${moved === 2 ? 'both ends' : 'one end'} to a break between sentences` : 'Nothing to move',
+      description: moved ? 'Ctrl/⌘+Z puts it back.' : `Both ends are already between sentences, or no break is within ${MAX_SNAP_MS / 1000}s.`,
+      color: moved ? 'success' : 'neutral'
+    })
+  }
   function nudgeEdge(edge: 'start' | 'end', deltaMs: number) {
     setEdge(edge, range.value[edge === 'start' ? 0 : 1] + deltaMs)
   }
@@ -815,23 +896,28 @@ export function useClipEditor(props: ClipEditorProps, emit: ClipEditorEmit) {
   })
 
   const starting = ref(false)
+  /** The trim request for the current settings. */
+  function trimBody() {
+    return {
+      startMs: Math.round(range.value[0]),
+      endMs: Math.round(range.value[1]),
+      crop: cropOn.value && !reframing.value ? { x: crop.x, y: crop.y, w: crop.w, h: crop.h } : null,
+      scale: scaleOn.value ? { w: scale.w, h: scale.h } : null,
+      ...orientationRequest(orient.value),
+      ...(reframing.value ? { reframe: { aspect: cropAspect.value! } } : {}),
+      audio: trimAudioRequest(trimAudio.value),
+      extend: extension.value > 0 || undefined,
+      look: lookRequest(look.value),
+      ...motionRequest(motion.value),
+      ...extrasRequest(extras.value),
+      ...(lut.value ? { lutKey: lut.value.key } : {})
+    }
+  }
   async function onStartTrim() {
     if (trimError.value) return
     starting.value = true
     try {
-      const job = await startTrim(props.video.id, {
-        startMs: Math.round(range.value[0]),
-        endMs: Math.round(range.value[1]),
-        crop: cropOn.value && !reframing.value ? { x: crop.x, y: crop.y, w: crop.w, h: crop.h } : null,
-        scale: scaleOn.value ? { w: scale.w, h: scale.h } : null,
-        ...orientationRequest(orient.value),
-        ...(reframing.value ? { reframe: { aspect: cropAspect.value! } } : {}),
-        audio: trimAudioRequest(trimAudio.value),
-        extend: extension.value > 0 || undefined,
-        look: lookRequest(look.value),
-        ...motionRequest(motion.value),
-        ...extrasRequest(extras.value)
-      })
+      const job = await startTrim(props.video.id, trimBody())
       toast.add({ title: `Trim queued — job #${job.id}`, color: 'success' })
       await load()
       scrollToResults()
@@ -842,10 +928,152 @@ export function useClipEditor(props: ClipEditorProps, emit: ClipEditorEmit) {
     }
   }
 
+  // "Test render": the first few seconds at a small size with every setting, for what the preview can't show.
+  const sampleStarting = ref(false)
+  async function onStartSample() {
+    if (trimError.value) return
+    sampleStarting.value = true
+    try {
+      const job = await startTrim(props.video.id, { ...trimBody(), sample: true })
+      toast.add({
+        title: `Test render queued — job #${job.id}`,
+        description: `The first ${SAMPLE_SECONDS} s at a small size, to check the settings. It can't become a video.`,
+        color: 'success'
+      })
+      await load()
+      scrollToResults()
+    } catch (err) {
+      toast.add({ title: 'Could not start the test render', description: apiErrorMessage(err), color: 'error' })
+    } finally {
+      sampleStarting.value = false
+    }
+  }
+
+  // The trim's timing: where its moments land in the result (subtitles, platform checks, the timing preview).
+  const trimTiming = computed<TrimTiming>(() => ({
+    startMs: Math.round(range.value[0]),
+    endMs: Math.round(range.value[1]),
+    speeds: motion.value.speeds,
+    holds: [...(motion.value.freeze ? [motion.value.freeze] : []), ...motion.value.holds],
+    introMs: extras.value.cards?.intro?.durationMs ?? 0,
+    outroMs: extras.value.cards?.outro?.durationMs ?? 0
+  }))
+
+  // "Subtitles for this trim": the transcript moved to the trimmed result's timing, as an .srt.
+  async function downloadTrimSubtitles() {
+    if (motion.value.reverse) {
+      toast.add({ title: 'Not for a clip played backwards', description: 'Its lines would run backwards too.', color: 'warning' })
+      return
+    }
+    const cues = await sentencesOrSay('to make subtitles for the trim')
+    if (!cues.length) return
+    const lines = editedCues(cues, trimTiming.value)
+    if (!lines.length) {
+      toast.add({ title: 'Nothing is said inside the trim', color: 'warning' })
+      return
+    }
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(new Blob([cuesToSrt(lines)], { type: 'application/x-subrip' }))
+    a.download = `${props.video.title || 'video'} (trimmed).srt`
+    a.click()
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000)
+    toast.add({
+      title: `${lines.length} subtitle line${lines.length === 1 ? '' : 's'} saved`,
+      description: 'Timed for the trimmed video, cards and pauses included.',
+      color: 'success'
+    })
+  }
+
+  // Before exporting for a platform: what fits it (for the built-in presets).
+  const platformCheckList = computed(() => {
+    const p = activePreset.value
+    if (!p || p.customId) return null
+    return platformChecks(p.key, {
+      lengthMs: resultLength(trimTiming.value),
+      w: scaleOn.value ? scale.w : null,
+      h: scaleOn.value ? scale.h : null,
+      introMs: trimTiming.value.introMs,
+      fadeInMs: motion.value.fadeInMs
+    })
+  })
+
+  // "Preview the timing" (Trim tab): in the preview, the speed parts play at their speed, the pauses stop it, the
+  // punch-ins zoom and the cards show — roughly, without rendering.
+  const timingPreview = ref(false)
+  const cardShowing = ref<{ text: string; background: string; color: string } | null>(null)
+  let timingFrame = 0
+  let timingWait: ReturnType<typeof setTimeout> | undefined
+  let lastClipMs: number | null = null
+  let introShown = false
+  let outroShown = false
+  function resetTimingLook() {
+    cancelAnimationFrame(timingFrame)
+    clearTimeout(timingWait)
+    timingWait = undefined
+    cardShowing.value = null
+    lastClipMs = null
+    const el = preview.value?.videoEl
+    if (el) {
+      el.playbackRate = 1
+      el.style.transform = ''
+    }
+  }
+  function holdFor(ms: number, card: { text: string } | null, el: HTMLVideoElement) {
+    el.pause()
+    const c = extras.value.cards
+    cardShowing.value = card && c ? { text: card.text, background: c.background, color: c.color } : null
+    timingWait = setTimeout(() => {
+      timingWait = undefined
+      cardShowing.value = null
+      el.play().catch(() => {})
+    }, ms)
+  }
+  function followTiming() {
+    timingFrame = requestAnimationFrame(followTiming)
+    const el = preview.value?.videoEl
+    if (!el || timingWait) return
+    const clipMs = el.currentTime * 1000 - range.value[0]
+    const clipLen = range.value[1] - range.value[0]
+    if (clipMs > 1000) introShown = false
+    if (clipMs < clipLen - 1000) outroShown = false
+    if (el.paused) {
+      lastClipMs = clipMs
+      return
+    }
+    const cards = extras.value.cards
+    if (clipMs < 150 && cards?.intro && !introShown) {
+      introShown = true
+      return holdFor(cards.intro.durationMs, cards.intro, el)
+    }
+    el.playbackRate = speedAt(motion.value.speeds, clipMs)
+    const zoom = punchAt(motion.value.punchIn, clipMs)
+    el.style.transform = zoom === 1 ? '' : `scale(${zoom})`
+    const pause = lastClipMs === null ? null : pauseCrossed(trimTiming.value.holds, lastClipMs, clipMs)
+    lastClipMs = clipMs
+    if (pause) return holdFor(pause.durationMs, null, el)
+    if (clipMs >= clipLen - 60 && cards?.outro && !outroShown) {
+      outroShown = true
+      holdFor(cards.outro.durationMs, cards.outro, el)
+      // Stays paused at the end once the card is gone.
+      clearTimeout(timingWait)
+      timingWait = setTimeout(() => {
+        timingWait = undefined
+        cardShowing.value = null
+      }, cards.outro.durationMs)
+    }
+  }
+  watch([timingPreview, mode], ([on, m]) => {
+    resetTimingLook()
+    if (on && m === 'trim') timingFrame = requestAnimationFrame(followTiming)
+  })
+  onBeforeUnmount(resetTimingLook)
+
   // ── Cut out ranges ───────────────────────────────────────────────────────────
   const cuts = ref<CutRange[]>([])
   const trimAudio = ref<TrimAudioSettings | null>(null)
   const look = ref<VideoLook>({ ...PLAIN_LOOK })
+  /** A colour grade (a .cube upload of kind LUT) after the look; not shown in the preview. */
+  const lut = ref<{ key: string; name: string } | null>(null)
   /** The before/after divider on the preview, while a look is set (a way of looking, not part of the edit). */
   const lookCompare = ref(false)
   const lookCompareShown = computed(() => mode.value === 'trim' && lookCompare.value && !isPlainLook(look.value))
@@ -876,10 +1104,7 @@ export function useClipEditor(props: ClipEditorProps, emit: ClipEditorEmit) {
   }
 
   // ── Split into segments ──────────────────────────────────────────────────────
-  interface SegmentInput {
-    startMsSeconds: number
-    endMsSeconds: number | null
-  }
+  type SegmentInput = SegmentRow
   const segments = ref<SegmentInput[]>([{ startMsSeconds: 0, endMsSeconds: null }])
 
   // A quick-glance strip above the raw-seconds inputs — numbers alone make it
@@ -1012,6 +1237,246 @@ export function useClipEditor(props: ClipEditorProps, emit: ClipEditorEmit) {
     const rows = n ? splitEvenlyRows(durationMs.value, n) : []
     if (rows.length) segments.value = rows
   }
+
+  // "Split at markers": the video's markers (or only its chapter markers), loaded each time the Split tab opens.
+  const { list: listMarkers } = useVideoMarkers()
+  const markers = ref<VideoMarker[]>([])
+  const chaptersOnly = ref(false)
+  const hasChapterMarkers = computed(() => markers.value.some((m) => m.chapter) && markers.value.some((m) => !m.chapter))
+  const markerSplit = computed(() =>
+    rowsFromCutPoints(
+      durationMs.value,
+      markers.value.filter((m) => !chaptersOnly.value || !hasChapterMarkers.value || m.chapter).map((m) => m.atMs)
+    )
+  )
+  // Also the AI chapters and the transcript (what each part says); without one, its helper just doesn't show.
+  const { latest: latestAi } = useAi()
+  const aiChapters = ref<AiChapter[]>([])
+  const spoken = ref<(TimedCue & { text: string })[]>([])
+  watch(mode, (m) => {
+    if (m !== 'split') return
+    listMarkers(props.video.id)
+      .then((list) => (markers.value = list))
+      .catch(() => {})
+    latestAi(props.video.id)
+      .then((gens) => (aiChapters.value = pickAiChapters(gens, props.video.language)))
+      .catch(() => {})
+    loadSentences()
+      .then((cues) => (spoken.value = cues))
+      .catch(() => {})
+  })
+  function splitAtMarkers() {
+    const { rows, skipped } = markerSplit.value
+    if (!rows.length) return
+    segments.value = labelRowsAt(rows, markers.value)
+    selectedSegment.value = null
+    if (skipped)
+      toast.add({
+        title: `${skipped} marker${skipped === 1 ? '' : 's'} skipped`,
+        description: `Too close to another cut or an end (under ${MIN_TRIM_MS / 1000}s).`
+      })
+  }
+
+  // "Move cuts to sentence breaks": each cut inside a sentence goes to the nearest pause between sentences.
+  const hasSharedCuts = computed(() => segments.value.some((_, i) => boundaryAfter(segments.value, i) !== null))
+  const snappingCuts = ref(false)
+  async function snapCutsToSentences() {
+    snappingCuts.value = true
+    const sentences = await sentencesOrSay('to find the breaks between sentences')
+    snappingCuts.value = false
+    if (!sentences.length) return
+    const { rows, moved, unmoved } = snapCutsToBreaks(segments.value, sentenceBreaks(sentences), durationMs.value)
+    segments.value = rows
+    const left = unmoved ? ` ${unmoved} had no break within ${MAX_SNAP_MS / 1000}s and stayed.` : ''
+    toast.add({
+      title: moved ? `Moved ${moved} cut${moved === 1 ? '' : 's'} to a break between sentences` : 'No cut needed moving',
+      description: (moved ? 'Ctrl/⌘+Z puts them back.' : unmoved ? '' : 'Every cut already falls between sentences.') + left,
+      color: moved ? 'success' : 'neutral'
+    })
+  }
+  /** Sentences, or a toast saying why there are none (then empty). */
+  async function sentencesOrSay(why: string): Promise<(TimedCue & { text: string })[]> {
+    try {
+      const cues = await loadSentences()
+      if (!cues.length) toast.add({ title: 'No transcript yet', description: `Transcribe the video from its page ${why}.`, color: 'warning' })
+      return cues
+    } catch (err) {
+      toast.add({ title: 'Could not load the transcript', description: apiErrorMessage(err), color: 'error' })
+      return []
+    }
+  }
+
+  // "Split at AI chapters": straight from the AI-made chapters, without adding them as markers first.
+  const aiChapterSplit = computed(() =>
+    rowsFromCutPoints(
+      durationMs.value,
+      aiChapters.value.map((c) => c.startSeconds * 1000)
+    )
+  )
+  function splitAtAiChapters() {
+    if (!aiChapterSplit.value.rows.length) return
+    segments.value = labelRowsAt(
+      aiChapterSplit.value.rows,
+      aiChapters.value.map((c) => ({ atMs: c.startSeconds * 1000, label: c.title ?? '' }))
+    )
+    selectedSegment.value = null
+  }
+
+  // "Parts of about N seconds": each cut at the nearest break between sentences (at the exact mark without a transcript).
+  const nearSeconds = ref<number | null>(null)
+  async function splitNearLength() {
+    if (!nearSeconds.value) return
+    let cues: TimedCue[] = []
+    try {
+      cues = await loadSentences()
+    } catch {
+      // Cut at the marks instead.
+    }
+    const { rows, tooMany } = rowsNearLength(durationMs.value, nearSeconds.value * 1000, sentenceBreaks(cues))
+    if (!rows.length) {
+      toast.add({
+        title: tooMany ? `That makes more than ${MAX_SEGMENTS} parts` : 'Choose a length shorter than the video',
+        description: tooMany ? 'Choose a longer length.' : undefined,
+        color: 'warning'
+      })
+      return
+    }
+    segments.value = rows
+    selectedSegment.value = null
+    if (!cues.length) toast.add({ title: 'Cut at the exact times', description: "There's no transcript, so the cuts don't follow the sentences." })
+  }
+
+  // "Split at long pauses": the quiet stretches the server finds in the sound (the same as Remove the pauses).
+  const { pauses: findPauses } = useVideoEdits()
+  const PAUSE_SPLIT_SECONDS = [1, 2, 3, 5]
+  const pauseSplitSeconds = ref(2)
+  const pauseSplitting = ref(false)
+  async function splitAtPauses() {
+    pauseSplitting.value = true
+    try {
+      const { pauses } = await findPauses(props.video.id, PAUSE_LEVELS[0].value)
+      const cuts = cutsAtPauses(pauses, pauseSplitSeconds.value * 1000)
+      const { rows } = rowsFromCutPoints(durationMs.value, cuts)
+      if (!rows.length) {
+        toast.add({ title: `No pause of ${pauseSplitSeconds.value}s or more`, description: 'Try a shorter pause.', color: 'warning' })
+        return
+      }
+      segments.value = rows
+      selectedSegment.value = null
+      const long = pauses.filter((p) => p.endMs - p.startMs >= pauseSplitSeconds.value * 1000).length
+      toast.add({
+        title: `${rows.length} parts, cut at pauses of ${pauseSplitSeconds.value}s or more`,
+        description: long > rows.length - 1 ? `Only the ${rows.length - 1} longest of ${long} pauses (at most ${MAX_SEGMENTS} parts).` : undefined,
+        color: 'success'
+      })
+    } catch (err) {
+      toast.add({ title: 'Could not find the pauses', description: apiErrorMessage(err), color: 'error' })
+    } finally {
+      pauseSplitting.value = false
+    }
+  }
+
+  // What each part says, under its row.
+  function segmentSaying(seg: SegmentInput): string {
+    return spoken.value.length ? segmentSpeech(spoken.value, seg.startMsSeconds * 1000, segmentEndSeconds(seg) * 1000) : ''
+  }
+
+  // ▶ on a row plays just that part, stopping at its end (checked every frame; the time above comes ~4× a second).
+  const playingSegment = ref<number | null>(null)
+  let segmentFrame = 0
+  function stopSegment() {
+    cancelAnimationFrame(segmentFrame)
+    playingSegment.value = null
+  }
+  function followSegment() {
+    const el = preview.value?.videoEl
+    const seg = playingSegment.value === null ? undefined : segments.value[playingSegment.value]
+    if (!el || !seg) return stopSegment()
+    const ms = el.currentTime * 1000
+    if (ms >= segmentEndSeconds(seg) * 1000) {
+      preview.value?.pause()
+      return stopSegment()
+    }
+    // Moved elsewhere by hand: stop following.
+    if (ms < seg.startMsSeconds * 1000 - 500) return stopSegment()
+    segmentFrame = requestAnimationFrame(followSegment)
+  }
+  function playSegment(i: number) {
+    if (playingSegment.value === i) {
+      preview.value?.pause()
+      return stopSegment()
+    }
+    const seg = segments.value[i]
+    if (!seg) return
+    cancelAnimationFrame(segmentFrame)
+    selectedSegment.value = i
+    playingSegment.value = i
+    preview.value?.seek(seg.startMsSeconds * 1000, true)
+    segmentFrame = requestAnimationFrame(followSegment)
+  }
+  watch(
+    () => preview.value?.playing,
+    (p) => {
+      if (p === false && playingSegment.value !== null) stopSegment()
+    }
+  )
+  watch(mode, stopSegment)
+  onBeforeUnmount(() => cancelAnimationFrame(segmentFrame))
+
+  // "Longest part": rows over the chosen limit are flagged, and can be cut into parts that fit.
+  const lengthLimitMs = ref(0)
+  const longRows = computed(() => (lengthLimitMs.value ? rowsOverLimit(segments.value, lengthLimitMs.value, durationMs.value) : []))
+  function splitLongOnes() {
+    if (!lengthLimitMs.value) return
+    const { rows, tooMany } = splitLongRows(segments.value, lengthLimitMs.value, durationMs.value)
+    if (tooMany) {
+      toast.add({
+        title: `That makes more than ${MAX_SEGMENTS} parts`,
+        description: 'Choose a longer limit, or leave some of the video out.',
+        color: 'warning'
+      })
+      return
+    }
+    segments.value = rows
+    selectedSegment.value = null
+  }
+
+  // "Trim the quiet at the edges": each part starts and ends at its speech.
+  async function tightenSegments() {
+    const cues = await sentencesOrSay('to find where the speech starts and ends')
+    if (!cues.length) return
+    const { rows, changed } = tightenToSpeech(segments.value, cues, durationMs.value)
+    segments.value = rows
+    toast.add({
+      title: changed ? `Trimmed the quiet from ${changed} part${changed === 1 ? '' : 's'}` : 'No quiet to trim',
+      description: changed ? 'The time cut off is left out of the new videos. Ctrl/⌘+Z puts it back.' : 'Every part already starts and ends at its speech.',
+      color: changed ? 'success' : 'neutral'
+    })
+  }
+
+  // "Save the cuts as markers": keeps a planned split on the video's timeline (WRITE on videos).
+  const { create: createMarker } = useVideoMarkers()
+  const newCutMarkers = computed(() => cutMarkers(segments.value, markers.value, durationMs.value))
+  const savingMarkers = ref(false)
+  async function saveCutsAsMarkers() {
+    const toAdd = newCutMarkers.value
+    if (!toAdd.length) return
+    savingMarkers.value = true
+    let added = 0
+    try {
+      for (const m of toAdd) {
+        await createMarker(props.video.id, m)
+        added++
+      }
+      toast.add({ title: `Added ${added} marker${added === 1 ? '' : 's'}`, description: 'They show on the video’s timeline.', color: 'success' })
+    } catch (err) {
+      toast.add({ title: added ? `Added ${added} of ${toAdd.length} markers` : 'Could not add the markers', description: apiErrorMessage(err), color: 'error' })
+    } finally {
+      savingMarkers.value = false
+      markers.value = await listMarkers(props.video.id).catch(() => markers.value)
+    }
+  }
+
   const splitError = computed(() =>
     validateSegments(
       segments.value.map((s) => ({ startMs: Math.round(s.startMsSeconds * 1000), endMs: s.endMsSeconds == null ? null : Math.round(s.endMsSeconds * 1000) })),
@@ -1022,10 +1487,7 @@ export function useClipEditor(props: ClipEditorProps, emit: ClipEditorEmit) {
     if (splitError.value) return
     starting.value = true
     try {
-      const job = await startSplit(
-        props.video.id,
-        segments.value.map((s) => ({ startMs: Math.round(s.startMsSeconds * 1000), endMs: s.endMsSeconds == null ? null : Math.round(s.endMsSeconds * 1000) }))
-      )
+      const job = await startSplit(props.video.id, splitRequestSegments(segments.value))
       toast.add({ title: `Split queued — job #${job.id}`, color: 'success' })
       await load()
       scrollToResults()
@@ -1247,6 +1709,7 @@ export function useClipEditor(props: ClipEditorProps, emit: ClipEditorEmit) {
   const trimDirty = computed(
     () =>
       !isPlainLook(look.value) ||
+      !!lut.value ||
       !isPlainMotion(motion.value) ||
       !isPlainExtras(extras.value) ||
       !!trimAudio.value ||
@@ -1287,6 +1750,7 @@ export function useClipEditor(props: ClipEditorProps, emit: ClipEditorEmit) {
     if (extension.value) parts.push(`${formatMsShort(extension.value)} past the end (last frame held)`)
     const lookLine = describeVideoLook(look.value)
     if (lookLine) parts.push(lookLine)
+    if (lut.value) parts.push(`colour grade ${lut.value.name}`)
     const motionLine = describeMotion(motion.value)
     if (motionLine) parts.push(motionLine)
     const extrasLine = describeExtras(extras.value)
@@ -1395,6 +1859,7 @@ export function useClipEditor(props: ClipEditorProps, emit: ClipEditorEmit) {
         audio: trimAudio.value ? { ...trimAudio.value } : null,
         extend: extendOn.value,
         look: { ...look.value },
+        lut: lut.value ? { ...lut.value } : null,
         motion: JSON.parse(JSON.stringify(motion.value)) as VideoMotion,
         extras: JSON.parse(JSON.stringify(extras.value)) as TrimExtras
       },
@@ -1422,6 +1887,8 @@ export function useClipEditor(props: ClipEditorProps, emit: ClipEditorEmit) {
     extendOn.value = !!st.trim.extend
     // And a look.
     look.value = st.trim.look ? { ...PLAIN_LOOK, ...st.trim.look } : { ...PLAIN_LOOK }
+    // And a colour grade.
+    lut.value = st.trim.lut ? { ...st.trim.lut } : null
     // And motion & effects.
     motion.value = sanitizeMotion(st.trim.motion)
     extras.value = sanitizeExtras(st.trim.extras)
@@ -1479,6 +1946,11 @@ export function useClipEditor(props: ClipEditorProps, emit: ClipEditorEmit) {
 
   // ── Promote / discard ────────────────────────────────────────────────────────
   const CLIP_ICONS = CLIP_OPERATION_ICONS
+  /** " 3 markers came along." after a promote, when the server moved any. */
+  function markersNote(result: PromoteResult) {
+    const n = result.markers ?? 0
+    return n ? ` ${n} marker${n === 1 ? '' : 's'} came along to the new timing.` : ''
+  }
   function replaces(clip: VideoClip) {
     return clip.operation === 'TRIM' || clip.operation === 'AUDIO' || clip.operation === 'OVERLAY'
   }
@@ -1493,10 +1965,10 @@ export function useClipEditor(props: ClipEditorProps, emit: ClipEditorEmit) {
     try {
       const result = await promote(props.video.id, confirmPromote.value.id)
       if (result.kind === 'REPLACED') {
-        toast.add({ title: 'Video replaced', description: "The edited clip is now the video's file.", color: 'success' })
+        toast.add({ title: 'Video replaced', description: `The edited clip is now the video's file.${markersNote(result)}`, color: 'success' })
         emit('replaced')
       } else {
-        toast.add({ title: 'New video created', description: "It's disabled until you review and enable it.", color: 'success' })
+        toast.add({ title: 'New video created', description: `It's disabled until you review and enable it.${markersNote(result)}`, color: 'success' })
         if (result.newVideoId) emit('created', result.newVideoId)
       }
       confirmPromote.value = null
@@ -1513,7 +1985,7 @@ export function useClipEditor(props: ClipEditorProps, emit: ClipEditorEmit) {
   const asNewTitle = ref('')
   const creatingNew = ref(false)
   function openAsNew(clip: VideoClip) {
-    asNewTitle.value = suggestedNewTitle(props.video.title, clip.operation, clip.segmentIndex)
+    asNewTitle.value = suggestedNewTitle(props.video.title, clip.operation, clip.segmentIndex, clip.label)
     asNewClip.value = clip
   }
   async function onCreateNew() {
@@ -1523,7 +1995,7 @@ export function useClipEditor(props: ClipEditorProps, emit: ClipEditorEmit) {
     try {
       const result = await promote(props.video.id, clip.id, { asNew: true, title: asNewTitle.value })
       asNewClip.value = null
-      toast.add({ title: 'New video created', description: "It's disabled until you review and enable it.", color: 'success' })
+      toast.add({ title: 'New video created', description: `It's disabled until you review and enable it.${markersNote(result)}`, color: 'success' })
       if (result.newVideoId) emit('created', result.newVideoId)
       await load()
     } catch (err) {
@@ -1539,7 +2011,7 @@ export function useClipEditor(props: ClipEditorProps, emit: ClipEditorEmit) {
   const pickedClipIds = ref<number[]>([])
   const bulkBusy = ref(false)
   const confirmBulkDiscard = ref(false)
-  const selectableClips = computed(() => (data.value?.clips ?? []).filter((c) => c.operation !== 'EXTRACT'))
+  const selectableClips = computed(() => (data.value?.clips ?? []).filter((c) => !downloadOnly(c.operation)))
   const pickedClips = computed(() => selectableClips.value.filter((c) => pickedClipIds.value.includes(c.id)))
   const allClipsPicked = computed(() => selectableClips.value.length > 0 && pickedClips.value.length === selectableClips.value.length)
   function pickClip(id: number, on: boolean) {
@@ -1555,7 +2027,10 @@ export function useClipEditor(props: ClipEditorProps, emit: ClipEditorEmit) {
     let lastId: number | null = null
     try {
       for (const clip of list) {
-        const result = await promote(props.video.id, clip.id, { asNew: true, title: suggestedNewTitle(props.video.title, clip.operation, clip.segmentIndex) })
+        const result = await promote(props.video.id, clip.id, {
+          asNew: true,
+          title: suggestedNewTitle(props.video.title, clip.operation, clip.segmentIndex, clip.label)
+        })
         if (result.newVideoId) lastId = result.newVideoId
         done++
       }
@@ -1873,6 +2348,42 @@ export function useClipEditor(props: ClipEditorProps, emit: ClipEditorEmit) {
     tooManyPartsHint,
     customPartsValid,
     splitEvenly,
+    markers,
+    chaptersOnly,
+    hasChapterMarkers,
+    markerSplit,
+    splitAtMarkers,
+    hasSharedCuts,
+    snappingCuts,
+    snapCutsToSentences,
+    aiChapters,
+    aiChapterSplit,
+    splitAtAiChapters,
+    nearSeconds,
+    splitNearLength,
+    PAUSE_SPLIT_SECONDS,
+    pauseSplitSeconds,
+    pauseSplitting,
+    splitAtPauses,
+    segmentSaying,
+    playingSegment,
+    playSegment,
+    lengthLimitMs,
+    longRows,
+    splitLongOnes,
+    tightenSegments,
+    newCutMarkers,
+    savingMarkers,
+    saveCutsAsMarkers,
+    snapTrimToSentences,
+    lut,
+    sampleStarting,
+    onStartSample,
+    downloadTrimSubtitles,
+    platformCheckList,
+    timingPreview,
+    cardShowing,
+    thumbnailSaved: () => emit('updated'),
     splitError,
     onStartSplit,
     visibleJobs,

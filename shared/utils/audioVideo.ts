@@ -216,6 +216,9 @@ export interface SavedLook {
   blurBackdrop: boolean
   /** A thin bar along the bottom that fills up as the recording plays. */
   progressBar: boolean
+  /** The waveform shaded across to this colour (null = one colour), and a soft glow around it. */
+  waveColor2: string | null
+  waveGlow: boolean
 }
 
 export const DEFAULT_LOOK: SavedLook = {
@@ -232,7 +235,9 @@ export const DEFAULT_LOOK: SavedLook = {
   trimSilence: false,
   waveHeightPct: null,
   blurBackdrop: false,
-  progressBar: false
+  progressBar: false,
+  waveColor2: null,
+  waveGlow: false
 }
 
 /** Settings read back from storage, made safe: anything missing or not valid falls back to the default. */
@@ -259,7 +264,9 @@ export function sanitizeLook(raw: unknown): SavedLook {
         ? r.waveHeightPct
         : DEFAULT_LOOK.waveHeightPct,
     blurBackdrop: typeof r.blurBackdrop === 'boolean' ? r.blurBackdrop : DEFAULT_LOOK.blurBackdrop,
-    progressBar: typeof r.progressBar === 'boolean' ? r.progressBar : DEFAULT_LOOK.progressBar
+    progressBar: typeof r.progressBar === 'boolean' ? r.progressBar : DEFAULT_LOOK.progressBar,
+    waveColor2: normalizeHexColor(str(r.waveColor2)) ?? DEFAULT_LOOK.waveColor2,
+    waveGlow: typeof r.waveGlow === 'boolean' ? r.waveGlow : DEFAULT_LOOK.waveGlow
   }
 }
 

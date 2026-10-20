@@ -8,7 +8,7 @@
 import type { ApiEnvelope } from '#shared/types'
 import type { ProcessingJob } from '~/composables/useProcessingJobs'
 
-export type ClipOperation = 'TRIM' | 'SPLIT' | 'AUDIO' | 'EXTRACT' | 'OVERLAY'
+export type ClipOperation = 'TRIM' | 'SPLIT' | 'AUDIO' | 'EXTRACT' | 'OVERLAY' | 'SAMPLE'
 
 export interface CropRect {
   x: number
@@ -25,6 +25,12 @@ export interface ScaleSize {
 export interface SegmentRange {
   startMs: number
   endMs: number | null
+}
+
+/** A split part: optionally named (its new video's title ends with the name) and cropped to a shape (w/h, centred). */
+export interface SplitSegment extends SegmentRange {
+  label?: string
+  aspect?: number
 }
 
 /** A result on the Edit results page: the video it was made from, and the result. */
@@ -54,6 +60,8 @@ export interface VideoClip {
   summary: string | null
   createdAt: string
   expiresAt: string
+  /** SPLIT: the part's own name, if it was given one (missing from an older server). */
+  label?: string | null
 }
 
 /** An audio edit. Anything left out keeps the sound as it is; times are on the video's 1× timeline. */
@@ -137,6 +145,8 @@ export interface EditOverview {
 export interface PromoteResult {
   kind: 'REPLACED' | 'NEW_VIDEO'
   newVideoId: number | null
+  /** Markers moved along to the new timing (or copied to the new video); missing from an older server. */
+  markers?: number
 }
 
 export function useVideoEdits() {
@@ -188,6 +198,14 @@ export function useVideoEdits() {
       greenScreen?: { keyColor: string; similarity: number; background: string }
       /** Follow the action: a crop of this shape (w/h) that moves with the motion, instead of `crop`. */
       reframe?: { aspect: number }
+      /** Quick zooms in for these moments (on the trimmed clip). */
+      punchIn?: { scale: number; ranges: { startMs: number; endMs: number }[] }
+      /** A progress bar along the bottom, in this colour. */
+      progressBar?: string
+      /** A colour grade: an upload of kind LUT (.cube). */
+      lutKey?: string
+      /** Only a test render: the first few seconds, small; it can't become a video. */
+      sample?: boolean
       /** Blur, picture in picture & cards (shared/utils/trimExtras.ts). */
       blurs?: { x: number; y: number; w: number; h: number }[]
       pip?: { videoId: number; corner: string; sizePct: number }
@@ -203,7 +221,7 @@ export function useVideoEdits() {
     return (await api<ApiEnvelope<ProcessingJob>>(`${base(videoId)}/trim`, { method: 'POST', body })).data
   }
 
-  async function startSplit(videoId: number, segments: SegmentRange[]) {
+  async function startSplit(videoId: number, segments: SplitSegment[]) {
     return (await api<ApiEnvelope<ProcessingJob>>(`${base(videoId)}/split`, { method: 'POST', body: { segments } })).data
   }
 

@@ -78,7 +78,7 @@
     <ul v-if="data?.clips.length" class="divide-y divide-gray-100 dark:divide-gray-800 rounded-lg border border-gray-200 dark:border-gray-800">
       <li v-for="clip in data.clips" :key="clip.id" class="flex items-center gap-3 px-3 py-2" :class="freshClipIds.includes(clip.id) ? 'result-in' : ''">
         <UCheckbox
-          v-if="canWrite && selectableClips.length > 1 && clip.operation !== 'EXTRACT'"
+          v-if="canWrite && selectableClips.length > 1 && !downloadOnly(clip.operation)"
           :model-value="pickedClipIds.includes(clip.id)"
           :aria-label="`Select ${clipTitle(clip)}`"
           @update:model-value="(v: boolean | 'indeterminate') => pickClip(clip.id, v === true)"
@@ -101,6 +101,10 @@
         </div>
         <template v-if="clip.operation === 'EXTRACT'">
           <UButton size="xs" color="primary" variant="soft" icon="i-lucide-download" :href="clip.url" download>Download</UButton>
+        </template>
+        <template v-else-if="clip.operation === 'SAMPLE'">
+          <UButton size="xs" color="neutral" variant="soft" icon="i-lucide-play" @click="previewClip = clip">Preview</UButton>
+          <UButton size="xs" color="neutral" variant="ghost" icon="i-lucide-download" :href="clip.url" download>Download</UButton>
         </template>
         <template v-else>
           <UButton size="xs" color="neutral" variant="soft" icon="i-lucide-play" @click="previewClip = clip">Preview</UButton>
@@ -126,6 +130,7 @@
 // The editor's Results: jobs in progress (or the latest failure), then clips to preview, keep or discard.
 import { TAB_ACCENTS } from '#shared/utils/tabAccent'
 import { formatFileSize, formatTimeUntil } from '#shared/utils/format'
+import { downloadOnly } from '#shared/utils/editResults'
 const {
   data,
   freshClipIds,

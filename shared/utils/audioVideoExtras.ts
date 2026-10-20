@@ -137,3 +137,17 @@ export function cardsProblem(intro: { text: string; seconds: number }, outro: { 
 export function cardRequest(c: { text: string; seconds: number }): { text: string; durationMs: number } | undefined {
   return c.text.trim() ? { text: c.text.trim(), durationMs: Math.round(c.seconds * 1000) } : undefined
 }
+
+/** Where a new chapter goes: 0:00 for the first, else a minute after the last (kept 5 s inside the recording). */
+export function newChapterStart(chapters: ChapterMark[], durationMs: number | null): number {
+  if (!chapters.length) return 0
+  const after = Math.max(...chapters.map((c) => c.startMs)) + 60_000
+  return durationMs ? Math.max(0, Math.min(after, durationMs - MIN_CHAPTER_GAP_MS)) : after
+}
+
+/** The highlight moved to start at `startMs`, keeping its length, kept inside a recording `totalMs` long (whole ms). */
+export function moveRange(range: { startMs: number; endMs: number }, startMs: number, totalMs: number): { startMs: number; endMs: number } {
+  const length = range.endMs - range.startMs
+  const start = Math.round(Math.max(0, Math.min(startMs, totalMs - length)))
+  return { startMs: start, endMs: start + length }
+}

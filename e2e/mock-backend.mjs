@@ -82,14 +82,14 @@ function job(entry) {
     parameters: JSON.stringify({ operation: 'AUDIO_TO_VIDEO' }),
     attempts: 1,
     maxAttempts: 3,
-    errorMessage: failed ? 'ffmpeg could not read the audio' : null,
+    errorMessage: failed ? (entry.error ?? 'ffmpeg could not read the audio') : null,
     createdAt: null,
     startedAt: null,
     finishedAt: null,
     updatedAt: null,
     durationSeconds: 3,
     logCount: 0,
-    canRetry: failed,
+    canRetry: failed && entry.canRetry !== false,
     canCancel: false,
     canDelete: true
   }
@@ -149,7 +149,7 @@ function sendMedia(req, res) {
   res.end(SAMPLE.subarray(start, end + 1))
 }
 
-function route(method, path, body) {
+function route(method, path, body, query = new URLSearchParams()) {
   if (method === 'GET' && path === '/api/settings/client') return ok(clientSettings())
   if (path === '/api/me/preferences') return ok(method === 'GET' ? {} : body)
   if (method === 'GET' && path === '/api/admin/collections') return page([{ id: 5, title: 'Season one' }])
@@ -221,7 +221,43 @@ function route(method, path, body) {
   }
   // Jobs set by a test (config.running: shown as running; config.jobs: each job's latest state), for the header's job alerts.
   if (method === 'GET' && path === '/api/admin/processing-jobs/summary') return ok({ RUNNING: (config.running ?? []).length })
-  if (method === 'GET' && path === '/api/admin/processing-jobs') return page((config.running ?? []).map(job))
+  // The Failed filter lists the failed jobs a test set (config.jobs); otherwise the running ones.
+  if (method === 'GET' && path === '/api/admin/processing-jobs')
+    return query.get('status') === 'FAILED' ? page((config.jobs ?? []).filter((j) => j.status === 'FAILED').map(job)) : page((config.running ?? []).map(job))
+  // The storage report, and removing old versions.
+  if (method === 'GET' && path === '/api/admin/videos/storage')
+    return ok({
+      totals: { files: 300_000_000, versions: 120_000_000, results: 40_000_000, dubs: 0, exports: 10_000_000 },
+      totalBytes: 470_000_000,
+      videoCount: 2,
+      biggest: [
+        {
+          videoId: 7,
+          title: 'Sample lesson',
+          deleted: false,
+          fileBytes: 200_000_000,
+          versions: 2,
+          versionBytes: 120_000_000,
+          results: 1,
+          resultBytes: 40_000_000,
+          dubBytes: 0,
+          exportBytes: 0
+        },
+        {
+          videoId: 8,
+          title: 'Teacher camera',
+          deleted: false,
+          fileBytes: 100_000_000,
+          versions: 0,
+          versionBytes: 0,
+          results: 0,
+          resultBytes: 0,
+          dubBytes: 0,
+          exportBytes: 10_000_000
+        }
+      ]
+    })
+  if (method === 'POST' && path === '/api/admin/videos/storage/prune-versions') return ok({ removed: 2, freedBytes: 120_000_000 })
   const jobMatch = /^\/api\/admin\/processing-jobs\/(\d+)(\/retry)?$/.exec(path)
   if (jobMatch) {
     const entry = [...made, ...(config.jobs ?? [])].find((m) => m.jobId === Number(jobMatch[1]))
@@ -441,12 +477,12 @@ createServer((req, res) => {
       uploads = 0
       made = []
       notes = []
-      markers = []
+      markers = body?.markers ?? []
       config = body ?? {}
       return send(200, { ok: true })
     }
     if (!url.pathname.startsWith('/api/__storage/')) requests.push({ method: req.method, path: url.pathname, body })
-    const answer = route(req.method, url.pathname, body)
+    const answer = route(req.method, url.pathname, body, url.searchParams)
     if (answer) return send(200, answer)
     // Anything else: an empty list or nothing, so pages and widgets don't fall over.
     send(200, req.method === 'GET' ? page([]) : ok(null))

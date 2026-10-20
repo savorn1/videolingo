@@ -148,6 +148,10 @@ describe('findSplitTarget', () => {
 })
 
 describe('splitRowAt', () => {
+  it('gives the shape to both halves and the name to the first', () => {
+    const [a, b] = splitRowAt([{ startMsSeconds: 0, endMsSeconds: null, label: 'Intro', aspect: 1 }], 0, 3)
+    expect([a!.label, a!.aspect, b!.label, b!.aspect]).toEqual(['Intro', 1, undefined, 1])
+  })
   it('cuts one row into two that meet at the cut', () => {
     const rows = [{ startMsSeconds: 0, endMsSeconds: null }]
     expect(splitRowAt(rows, 0, 12.3456)).toEqual([
@@ -231,6 +235,10 @@ describe('replacesOriginal', () => {
 })
 
 describe('suggestedNewTitle', () => {
+  it('names a split part by its name when it has one, like the server', () => {
+    expect(suggestedNewTitle('Lesson', 'SPLIT', 0, ' Greetings ')).toBe('Lesson — Greetings')
+    expect(suggestedNewTitle('Lesson', 'SPLIT', 1, '  ')).toBe('Lesson — Part 2')
+  })
   it('says what was done to the original', () => {
     expect(suggestedNewTitle('Lesson', 'TRIM')).toBe('Lesson (trimmed)')
     expect(suggestedNewTitle('Lesson', 'AUDIO')).toBe('Lesson (edited audio)')

@@ -40,7 +40,16 @@ import {
 import { uploadToStorage, UploadInterruptedError, type ResumableUpload } from '~/composables/useVideos'
 import { formatTimecode, parseTimecode } from '#shared/utils/transport'
 import { MAX_SLIDES, nextSlideStart, slideIndexAt, slideProblem, slidesBeyond, spreadEvenly, swapContents } from '#shared/utils/slides'
-import { cardRequest, cardsProblem, chaptersForPart, highlightTitle, paletteFromPixels, tidyChapters, type ChapterMark } from '#shared/utils/audioVideoExtras'
+import {
+  cardRequest,
+  cardsProblem,
+  chaptersForPart,
+  highlightTitle,
+  moveRange,
+  paletteFromPixels,
+  tidyChapters,
+  type ChapterMark
+} from '#shared/utils/audioVideoExtras'
 import { fromDateTimeLocal, SCHEDULE_STEPS, schedulePresets, scheduleSeries, toDateTimeLocal } from '#shared/utils/publishSchedule'
 
 interface Item {
@@ -62,8 +71,11 @@ interface Item {
   coverUploading: boolean
   /** Where a large upload stopped, so "Try again" carries on from there. */
   resume: ResumableUpload | null
-  /** Chapters written in the file (ID3 CHAP), shown on the picture and kept as chapter markers. */
+  /** Chapters (from the file's ID3 CHAP, or added here), shown on the picture and kept as chapter markers. */
   chapters: ChapterMark[]
+  /** The stretch for its highlight clip, once found (and maybe moved); null = found when the videos are made. */
+  highlight: { startMs: number; endMs: number } | null
+  highlightFinding: boolean
 }
 interface Slide {
   id: number
@@ -127,13 +139,16 @@ export function useAudioToVideoForm() {
   const secondLanguage = ref<string | undefined>(undefined)
   const blurBackdrop = ref(false)
   const progressBar = ref(false)
+  /** The waveform shaded across to a second colour (null = one colour), and a soft glow around it. */
+  const waveColor2 = ref<string | null>(null)
+  const waveGlow = ref(false)
   /** Use the chapters found in the files: titles on the picture and chapter markers. */
   const useChapters = ref(true)
   const intro = reactive({ text: '', seconds: 3 })
   const outro = reactive({ text: '', seconds: 3 })
   const cardsError = computed(() => cardsProblem(intro, outro))
   /** Music under the recordings (an AUDIO upload), quieter under speech when ducked. */
-  const music = ref<{ key: string; name: string } | null>(null)
+  const music = ref<{ key: string; name: string; url: string } | null>(null)
   const musicUploading = ref(false)
   const musicProgress = ref(0)
   const musicVolume = ref(0.15)
@@ -299,6 +314,8 @@ export function useAudioToVideoForm() {
     waveHeight.value = look.waveHeightPct
     blurBackdrop.value = look.blurBackdrop
     progressBar.value = look.progressBar
+    waveColor2.value = look.waveColor2
+    waveGlow.value = look.waveGlow
   }
   function currentLook(): SavedLook {
     return {
@@ -315,7 +332,9 @@ export function useAudioToVideoForm() {
       trimSilence: trimSilence.value,
       waveHeightPct: waveHeight.value,
       blurBackdrop: blurBackdrop.value,
-      progressBar: progressBar.value
+      progressBar: progressBar.value,
+      waveColor2: waveColor2.value,
+      waveGlow: waveGlow.value
     }
   }
   // ── Saved looks for a series: the look plus the strip, the title card and the picture spread ──
@@ -339,7 +358,24 @@ export function useAudioToVideoForm() {
     outro.text = look.outroText
   }
   watch(
-    [background, resolution, waveform, waveAuto, waveColor, normalize, denoise, shape, motion, crossfade, trimSilence, waveHeight, blurBackdrop, progressBar],
+    [
+      background,
+      resolution,
+      waveform,
+      waveAuto,
+      waveColor,
+      normalize,
+      denoise,
+      shape,
+      motion,
+      crossfade,
+      trimSilence,
+      waveHeight,
+      blurBackdrop,
+      progressBar,
+      waveColor2,
+      waveGlow
+    ],
     () => {
       if (!lookRestored) return // still the defaults; don't overwrite what was saved
       setApp(LOOK_KEY, currentLook())
@@ -415,7 +451,9 @@ export function useAudioToVideoForm() {
       waveAuto.value ? null : waveColor.value,
       normalize.value,
       denoise.value,
-      waveHeight.value
+      waveHeight.value,
+      waveColor2.value,
+      waveGlow.value
     ])
   const testRenderStale = computed(() => !!testRender.value && testRender.value.signature !== testSignature())
   async function onTestRender() {
@@ -430,7 +468,9 @@ export function useAudioToVideoForm() {
         waveColor: waveAuto.value ? undefined : waveColor.value,
         normalize: normalize.value || undefined,
         denoise: denoise.value || undefined,
-        waveHeightPct: waveHeight.value ?? undefined
+        waveHeightPct: waveHeight.value ?? undefined,
+        waveColor2: waveColor2.value ?? undefined,
+        waveGlow: waveGlow.value || undefined
       })
       testRender.value = { url: result.url, signature }
     } catch (err) {
@@ -510,7 +550,9 @@ export function useAudioToVideoForm() {
         coverFromFile: false,
         coverUploading: false,
         resume: null,
-        chapters: []
+        chapters: [],
+        highlight: null,
+        highlightFinding: false
       })
     }
     if (rejected.length) errors.value.audio = rejected.join(' · ')
@@ -709,7 +751,9 @@ export function useAudioToVideoForm() {
       if (i.coverUrl) URL.revokeObjectURL(i.coverUrl)
     })
     if (logoUrl.value) URL.revokeObjectURL(logoUrl.value)
+    if (music.value) URL.revokeObjectURL(music.value.url)
     slides.value.forEach((sl) => URL.revokeObjectURL(sl.previewUrl))
+    stopMusicPreview()
   })
 
   // ── A recording's own picture, and the logo ──────────────────────────────────
@@ -783,13 +827,91 @@ export function useAudioToVideoForm() {
     musicProgress.value = 0
     try {
       const { key } = await videos.uploadFile('AUDIO', file, { onProgress: (f) => (musicProgress.value = f) })
-      music.value = { key, name: file.name }
+      if (music.value) URL.revokeObjectURL(music.value.url)
+      music.value = { key, name: file.name, url: URL.createObjectURL(file) }
     } catch (err) {
       toast.add({ title: 'Could not upload the music', description: apiErrorMessage(err), color: 'error' })
     } finally {
       musicUploading.value = false
     }
   }
+
+  // ── The highlight clip: found by the server for each recording, then moved and heard here ──
+  async function findHighlight(item: Item) {
+    if (!item.key || item.highlightFinding) return
+    item.highlightFinding = true
+    try {
+      const r = await videos.highlightFromAudio(item.key, highlightSeconds.value)
+      item.highlight = { startMs: r.startMs, endMs: r.endMs }
+    } catch (err) {
+      toast.add({ title: `Could not find the highlight of “${item.title || item.name}”`, description: apiErrorMessage(err), color: 'warning' })
+    } finally {
+      item.highlightFinding = false
+    }
+  }
+  /** Finds the highlight of every recording that has none yet, one at a time (they run on the server). */
+  async function findHighlights() {
+    for (const item of readyItems.value) if (!item.highlight) await findHighlight(item)
+  }
+  // Turned on, or a new length: find them (again).
+  watch(highlight, (on) => on && findHighlights())
+  watch(highlightSeconds, () => {
+    items.value.forEach((i) => (i.highlight = null))
+    if (highlight.value) findHighlights()
+  })
+  watch(
+    () => readyItems.value.length,
+    () => highlight.value && findHighlights()
+  )
+  function moveHighlight(item: Item, startMs: number) {
+    if (item.highlight && item.durationSeconds) item.highlight = moveRange(item.highlight, startMs, item.durationSeconds * 1000)
+  }
+  /** Plays a recording's highlight stretch (its own audio, in the browser), stopping at its end. */
+  function playHighlight(item: Item) {
+    const same = playingId.value === item.id
+    stopPlaying()
+    if (same || !item.highlight) return
+    const { startMs, endMs } = item.highlight
+    const el = new Audio(item.previewUrl)
+    el.currentTime = startMs / 1000
+    el.ontimeupdate = () => el.currentTime * 1000 >= endMs && stopPlaying()
+    el.onended = () => stopPlaying()
+    player = el
+    playingId.value = item.id
+    el.play().catch(() => player === el && stopPlaying())
+  }
+
+  function removeMusic() {
+    if (music.value) URL.revokeObjectURL(music.value.url)
+    music.value = null
+    stopMusicPreview()
+  }
+  /** The previewed recording and the music played together from the preview's time, for 15 s (no ducking here). */
+  let mixPlayers: HTMLAudioElement[] = []
+  const hearingMix = ref(false)
+  function stopMusicPreview() {
+    mixPlayers.forEach((p) => p.pause())
+    mixPlayers = []
+    hearingMix.value = false
+  }
+  function hearWithMusic() {
+    if (hearingMix.value) return stopMusicPreview()
+    const item = previewItem.value
+    if (!item || !music.value) return
+    stopPlaying()
+    const voice = new Audio(item.previewUrl)
+    voice.currentTime = previewSeconds.value
+    const bed = new Audio(music.value.url)
+    bed.loop = true
+    bed.volume = Math.min(1, musicVolume.value)
+    mixPlayers = [voice, bed]
+    hearingMix.value = true
+    const stopAt = previewSeconds.value + 15
+    voice.ontimeupdate = () => voice.currentTime >= stopAt && stopMusicPreview()
+    voice.onended = () => stopMusicPreview()
+    Promise.all([voice.play(), bed.play()]).catch(() => stopMusicPreview())
+  }
+  watch(musicVolume, (v) => mixPlayers[1] && (mixPlayers[1].volume = Math.min(1, v)))
 
   // ── Colours from the cover ───────────────────────────────────────────────────
   /** The picture to take colours from: the previewed recording's own, else the one showing. */
@@ -841,6 +963,8 @@ export function useAudioToVideoForm() {
       // One at a time and in order, so a collection ends up in the order the files were added.
       const shared = slides.value.map((sl) => ({ key: sl.key, startMs: sl.startMs }))
       const extras = {
+        waveColor2: waveform.value !== 'NONE' ? (waveColor2.value ?? undefined) : undefined,
+        waveGlow: waveform.value !== 'NONE' && waveGlow.value ? true : undefined,
         blurBackdrop: blurBackdrop.value || undefined,
         progressBar: progressBar.value || undefined,
         music: music.value ? { key: music.value.key, volume: musicVolume.value, loop: true, duck: musicDuck.value } : undefined
@@ -908,7 +1032,7 @@ export function useAudioToVideoForm() {
         if (highlight.value) {
           const title = highlightTitle(titles[i]!)
           try {
-            const range = await videos.highlightFromAudio(item.key, highlightSeconds.value)
+            const range = item.highlight ?? (await videos.highlightFromAudio(item.key, highlightSeconds.value))
             const pictures = recordingSlides(shared, item.coverKey, Math.round((range.endMs - range.startMs) / 1000), true)
             const result = await videos.createFromAudio({
               audioKey: item.key,
@@ -1050,6 +1174,8 @@ export function useAudioToVideoForm() {
     secondLanguage,
     blurBackdrop,
     progressBar,
+    waveColor2,
+    waveGlow,
     useChapters,
     chapterCount,
     intro,
@@ -1061,8 +1187,14 @@ export function useAudioToVideoForm() {
     musicVolume,
     musicDuck,
     onPickMusic,
+    removeMusic,
+    hearWithMusic,
+    hearingMix,
     highlight,
     highlightSeconds,
+    findHighlight,
+    moveHighlight,
+    playHighlight,
     schedule,
     scheduleStart,
     scheduleStep,

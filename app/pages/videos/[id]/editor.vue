@@ -39,7 +39,7 @@
           <UButton size="xs" color="neutral" variant="soft" :to="`/videos/${id}`">Open the video page</UButton>
         </template>
       </UAlert>
-      <VideoClipEditor v-else :video="video" :can-write="canWrite" @replaced="load" @created="onCreated" />
+      <VideoClipEditor v-else :video="video" :can-write="canWrite" @replaced="load" @updated="load" @created="onCreated" />
     </template>
   </div>
 </template>

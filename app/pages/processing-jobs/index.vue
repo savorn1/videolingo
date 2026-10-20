@@ -39,6 +39,8 @@
       </button>
     </div>
 
+    <FailedJobsPanel v-if="filter.status === 'FAILED'" @retried="refreshAll" />
+
     <UCard class="mb-4">
       <div class="flex flex-wrap gap-3">
         <UInput v-model="search" placeholder="Job # or video title" icon="i-lucide-search" class="w-64" />

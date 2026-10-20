@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { clipLabel, promotableAsNew } from './editResults'
 
 describe('clipLabel', () => {
+  it('shows the name of a split part', () => {
+    expect(clipLabel({ operation: 'SPLIT', segmentIndex: 1, startMs: 5000, endMs: null, label: 'Practice' })).toBe('Segment 2 · Practice · 0:05 – end')
+  })
   it('names each kind of result', () => {
     expect(clipLabel({ operation: 'TRIM', segmentIndex: null, startMs: 5000, endMs: 30_000 })).toBe('Trim · 0:05 – 0:30')
     expect(clipLabel({ operation: 'SPLIT', segmentIndex: 1, startMs: 60_000, endMs: null })).toBe('Segment 2 · 1:00 – end')

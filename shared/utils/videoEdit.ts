@@ -13,6 +13,9 @@ export const MAX_SEGMENTS = 20
 /** How many of one video's edits the server lets be queued or running at once (VideoEditService.MAX_QUEUED_EDITS_PER_VIDEO); they still run one at a time. */
 export const MAX_QUEUED_EDITS = 3
 
+/** A test render is the trim's first this-many seconds, small (backend VideoEditRules.SAMPLE_MS). */
+export const SAMPLE_SECONDS = 8
+
 /** How far past the end of the video a trim may run when extended (VideoEditRules.MAX_EXTEND_MS): the last frame is held and the sound is silent. */
 export const MAX_EXTEND_MS = 300_000
 
@@ -76,7 +79,14 @@ export const MIN_TRIM_MS = 500
 export interface SegmentRow {
   startMsSeconds: number
   endMsSeconds: number | null
+  /** Its new video's name, ending its title ("… — Greetings"); none = "— Part N". */
+  label?: string | null
+  /** Cropped to this shape (w/h), centred; none = the video's own. */
+  aspect?: number | null
 }
+
+/** The longest name a split part may have (backend VideoEditRules.MAX_PART_LABEL). */
+export const MAX_PART_LABEL = 80
 
 /** Moves one edge of the trim range, keeping it inside the video and at least MIN_TRIM_MS long. */
 export function withTrimEdge(range: [number, number], edge: 'start' | 'end', ms: number, durationMs: number): [number, number] {
@@ -96,12 +106,8 @@ export function splitRowAt(rows: SegmentRow[], index: number, seconds: number): 
   const row = rows[index]
   if (!row) return rows
   const t = Math.round(seconds * 100) / 100
-  return [
-    ...rows.slice(0, index),
-    { startMsSeconds: row.startMsSeconds, endMsSeconds: t },
-    { startMsSeconds: t, endMsSeconds: row.endMsSeconds },
-    ...rows.slice(index + 1)
-  ]
+  // The shape goes to both halves; the name stays with the first.
+  return [...rows.slice(0, index), { ...row, endMsSeconds: t }, { ...row, startMsSeconds: t, label: undefined }, ...rows.slice(index + 1)]
 }
 
 /** The most equal parts a video can be cut into: each at least MIN_TRIM_MS long, and no more than MAX_SEGMENTS. */
@@ -294,7 +300,7 @@ export function uncoveredMs(rows: SegmentRow[], durationMs: number): number {
 
 export const MAX_VIDEO_TITLE = 200
 
-export type ClipOperation = 'TRIM' | 'SPLIT' | 'AUDIO' | 'EXTRACT' | 'OVERLAY'
+export type ClipOperation = 'TRIM' | 'SPLIT' | 'AUDIO' | 'EXTRACT' | 'OVERLAY' | 'SAMPLE'
 
 /** Whether applying this result would replace the video's own file (so a separate video is the alternative). */
 export function replacesOriginal(operation: ClipOperation): boolean {
@@ -306,10 +312,17 @@ export function replacesOriginal(operation: ClipOperation): boolean {
  * Mirrors the server's own default (VideoEditService.promotedTitle), so what is shown here is what
  * is saved when the field is left alone.
  */
-export function suggestedNewTitle(sourceTitle: string | null | undefined, operation: ClipOperation, segmentIndex?: number | null): string {
+export function suggestedNewTitle(
+  sourceTitle: string | null | undefined,
+  operation: ClipOperation,
+  segmentIndex?: number | null,
+  label?: string | null
+): string {
   const suffix =
     operation === 'SPLIT'
-      ? ` — Part ${(segmentIndex ?? 0) + 1}`
+      ? label?.trim()
+        ? ` — ${label.trim()}`
+        : ` — Part ${(segmentIndex ?? 0) + 1}`
       : operation === 'TRIM'
         ? ' (trimmed)'
         : operation === 'AUDIO'

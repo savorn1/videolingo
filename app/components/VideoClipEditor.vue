@@ -70,7 +70,19 @@
                 @time="onTime"
                 @duration="onDuration"
               >
-                <template v-if="cropActive || overlayEdit.state.layers.length || mode === 'overlay' || showGuides || lookCompareShown || blursShown" #overlay>
+                <template
+                  v-if="cropActive || overlayEdit.state.layers.length || mode === 'overlay' || showGuides || lookCompareShown || blursShown || cardShowing"
+                  #overlay
+                >
+                  <!-- "Play the timing": the intro / outro card, as it will be shown -->
+                  <div
+                    v-if="cardShowing"
+                    class="absolute inset-0 z-30 flex items-center justify-center p-6 text-center text-xl font-semibold sm:text-3xl"
+                    :style="{ background: cardShowing.background, color: cardShowing.color }"
+                    data-testid="card-preview"
+                  >
+                    {{ cardShowing.text }}
+                  </div>
                   <BlurBoxesOverlay v-if="blursShown && !cropActive" v-model="extras.blurs" :natural-width="naturalWidth" :natural-height="naturalHeight" />
                   <LookCompare v-if="lookCompareShown && !cropActive" :video-el="preview?.videoEl" />
                   <OverlayLayers
@@ -158,6 +170,14 @@
             </button>
           </div>
         </div>
+        <ClipEditorFilmStrip
+          v-if="mode === 'trim' && durationMs && !stageFullscreen"
+          :video-url="video.videoUrl"
+          :duration-ms="durationMs"
+          :range="range"
+          :style="fitStyle"
+          @seek="(ms: number) => preview?.seek(ms, false)"
+        />
         <EditorTransport
           :player="preview"
           :selection="mode === 'trim' ? range : mode === 'audio' ? audioEdit.state.range : null"
@@ -220,6 +240,8 @@
                 <UIcon name="i-lucide-cloud-check" class="size-3.5" />
                 Draft saved {{ draftSavedLabel }}
               </span>
+              <ClipEditorThumbnailMaker v-if="canWrite && video.videoUrl" />
+              <ClipEditorBrandKitMenu />
               <UPopover v-model:open="recipesOpen">
                 <UButton size="xs" color="neutral" variant="soft" :class="HEADER_TONES.recipes" icon="i-lucide-chef-hat" title="Reuse a look on this video"
                   >Recipes</UButton
@@ -493,7 +515,7 @@ import { TAB_ACCENTS } from '#shared/utils/tabAccent'
 import { describeRecipe } from '#shared/utils/editRecipe'
 
 const props = defineProps<{ video: Video; canWrite: boolean }>()
-const emit = defineEmits<{ replaced: []; created: [videoId: number] }>()
+const emit = defineEmits<{ replaced: []; created: [videoId: number]; updated: [] }>()
 
 const {
   error,
@@ -517,6 +539,7 @@ const {
   cropActive,
   lookCompareShown,
   blursShown,
+  cardShowing,
   extras,
   showGuides,
   guideBox,

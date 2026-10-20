@@ -28,6 +28,16 @@ export const MIN_ZOOM_SIZE = 0.25
 export const MAX_ZOOM_SIZE = 0.95
 export const MIN_KEY_SIMILARITY = 0.05
 export const MAX_KEY_SIMILARITY = 0.6
+/** Punch-in zoom (backend VideoEditRules.MIN_PUNCH…). */
+export const MIN_PUNCH = 1.05
+export const MAX_PUNCH = 1.5
+export const MAX_PUNCH_RANGES = 60
+export const MIN_PUNCH_MS = 300
+export const PUNCH_SCALES = [
+  { label: 'Subtle (108%)', value: 1.08 },
+  { label: 'Clear (115%)', value: 1.15 },
+  { label: 'Strong (125%)', value: 1.25 }
+]
 
 export interface SpeedPart {
   startMs: number
@@ -50,6 +60,8 @@ export interface VideoMotion {
   /** Zoom from the whole picture into this area: its centre (0–1) and final size (a fraction of the picture). */
   zoomTo: { cx: number; cy: number; size: number } | null
   greenScreen: { keyColor: string; similarity: number; background: string } | null
+  /** Quick zooms in to `scale` for each moment (on the trimmed clip), e.g. every other sentence; backend VideoEditRules.PunchIn. */
+  punchIn: { scale: number; ranges: { startMs: number; endMs: number }[] } | null
 }
 
 export const PLAIN_MOTION: VideoMotion = {
@@ -63,7 +75,8 @@ export const PLAIN_MOTION: VideoMotion = {
   reverse: false,
   stabilize: false,
   zoomTo: null,
-  greenScreen: null
+  greenScreen: null,
+  punchIn: null
 }
 
 export function isPlainMotion(m: VideoMotion): boolean {
@@ -77,7 +90,8 @@ export function isPlainMotion(m: VideoMotion): boolean {
     !m.reverse &&
     !m.stabilize &&
     !m.zoomTo &&
-    !m.greenScreen
+    !m.greenScreen &&
+    !m.punchIn
   )
 }
 
@@ -121,6 +135,18 @@ export function motionProblem(m: VideoMotion, clipMs: number | null): string | n
     if (!HEX.test(g.keyColor) || !HEX.test(g.background)) return 'Green screen: pick the colours'
     if (g.similarity < MIN_KEY_SIMILARITY || g.similarity > MAX_KEY_SIMILARITY) return 'Green screen: the tolerance is between 5 and 60'
   }
+  if (m.punchIn) {
+    const p = m.punchIn
+    if (!(p.scale >= MIN_PUNCH && p.scale <= MAX_PUNCH)) return 'Punch-in: the zoom is between 105% and 150%'
+    if (!p.ranges.length) return 'Punch-in: there are no moments to zoom in on'
+    if (p.ranges.length > MAX_PUNCH_RANGES) return `Punch-in: at most ${MAX_PUNCH_RANGES} moments`
+    for (let i = 0; i < p.ranges.length; i++) {
+      const r = p.ranges[i]!
+      if (r.startMs < 0 || r.endMs - r.startMs < MIN_PUNCH_MS) return `Punch-in ${i + 1}: a moment is at least ${MIN_PUNCH_MS / 1000} s long`
+      if (clipMs && r.endMs > clipMs) return `Punch-in ${i + 1}: it runs past the end of the clip`
+      if (i && r.startMs < p.ranges[i - 1]!.endMs) return 'Punch-in moments must be in time order and not overlap'
+    }
+  }
   return null
 }
 
@@ -135,7 +161,8 @@ export function motionRequest(m: VideoMotion) {
     ...(m.reverse ? { reverse: true } : {}),
     ...(m.stabilize ? { stabilize: true } : {}),
     ...(m.zoomTo ? { zoomTo: { ...m.zoomTo } } : {}),
-    ...(m.greenScreen ? { greenScreen: { ...m.greenScreen } } : {})
+    ...(m.greenScreen ? { greenScreen: { ...m.greenScreen } } : {}),
+    ...(m.punchIn ? { punchIn: { scale: m.punchIn.scale, ranges: m.punchIn.ranges.map((r) => ({ ...r })) } } : {})
   }
 }
 
@@ -154,6 +181,7 @@ export function describeMotion(m: VideoMotion): string | null {
   if (m.stabilize) parts.push('steadied')
   if (m.zoomTo) parts.push(`zoom into ${Math.round(m.zoomTo.size * 100)}%`)
   if (m.greenScreen) parts.push('green screen')
+  if (m.punchIn) parts.push(`punch-in ×${m.punchIn.ranges.length}`)
   return parts.length ? parts.join(', ') : null
 }
 
@@ -165,6 +193,11 @@ export function sanitizeMotion(raw: unknown): VideoMotion {
   return {
     ...m,
     holds: Array.isArray(m.holds) ? m.holds.filter((h) => Number.isFinite(h?.atMs) && Number.isFinite(h?.durationMs)) : [],
+    // Drafts from before punch-ins have none.
+    punchIn:
+      m.punchIn && Number.isFinite(m.punchIn.scale) && Array.isArray(m.punchIn.ranges)
+        ? { scale: m.punchIn.scale, ranges: m.punchIn.ranges.filter((r) => Number.isFinite(r?.startMs) && Number.isFinite(r?.endMs)) }
+        : null,
     // Drafts from before several parts kept one `speed`.
     speeds: Array.isArray((raw as Partial<VideoMotion> | null)?.speeds) ? m.speeds.filter(ok) : ok(speed) ? [speed] : []
   }
@@ -207,4 +240,26 @@ export function sentencePauses(sentences: { endMs: number }[], startMs: number, 
     out.push({ atMs: Math.round(at), durationMs: holdMs })
   }
   return out
+}
+
+/**
+ * The moments to punch in on: every other sentence of the transcript inside the trim (the 2nd, 4th…, so it opens
+ * wide), on the trimmed clip's timeline, cut to it, in order and apart; at most MAX_PUNCH_RANGES.
+ */
+export function punchInRanges(sentences: { startMs: number; endMs: number }[], startMs: number, endMs: number): { startMs: number; endMs: number }[] {
+  const clipMs = endMs - startMs
+  const inside = [...sentences].sort((a, b) => a.startMs - b.startMs).filter((c) => c.endMs > startMs && c.startMs < endMs)
+  const out: { startMs: number; endMs: number }[] = []
+  inside.forEach((c, i) => {
+    if (i % 2 === 0 || out.length >= MAX_PUNCH_RANGES) return
+    const from = Math.max(0, c.startMs - startMs, out.at(-1)?.endMs ?? 0)
+    const to = Math.min(clipMs, c.endMs - startMs)
+    if (to - from >= MIN_PUNCH_MS) out.push({ startMs: from, endMs: to })
+  })
+  return out
+}
+
+/** The zoom at a moment of the trimmed clip: the punch-in's scale inside one of its moments, else 1 (for the preview). */
+export function punchAt(p: VideoMotion['punchIn'], clipMs: number): number {
+  return p && p.ranges.some((r) => clipMs >= r.startMs && clipMs <= r.endMs) ? p.scale : 1
 }

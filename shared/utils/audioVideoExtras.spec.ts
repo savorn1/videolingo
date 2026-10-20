@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest'
-import { cardRequest, cardsProblem, chapterProblem, chaptersForPart, highlightTitle, paletteFromPixels, tidyChapters } from './audioVideoExtras'
+import {
+  cardRequest,
+  cardsProblem,
+  chapterProblem,
+  chaptersForPart,
+  highlightTitle,
+  newChapterStart,
+  moveRange,
+  paletteFromPixels,
+  tidyChapters
+} from './audioVideoExtras'
 
 describe('chapters', () => {
   it('are tidied from what a file holds and checked like the server', () => {
@@ -73,5 +83,23 @@ describe('highlight and cards', () => {
     expect(cardsProblem({ text: 'Welcome', seconds: 8 }, { text: '', seconds: 3 })).toMatch(/Intro card: it lasts 1–6 s/)
     expect(cardRequest({ text: ' Thanks ', seconds: 2.5 })).toEqual({ text: 'Thanks', durationMs: 2500 })
     expect(cardRequest({ text: '', seconds: 3 })).toBeUndefined()
+  })
+})
+
+describe('adding a chapter', () => {
+  it('starts at 0:00, then a minute after the last, inside the recording', () => {
+    expect(newChapterStart([], 600_000)).toBe(0)
+    expect(newChapterStart([{ startMs: 0, title: 'A' }], 600_000)).toBe(60_000)
+    expect(newChapterStart([{ startMs: 580_000, title: 'A' }], 600_000)).toBe(595_000)
+    expect(newChapterStart([{ startMs: 0, title: 'A' }], null)).toBe(60_000)
+  })
+})
+
+describe('moving the highlight', () => {
+  it('keeps its length and stays inside the recording', () => {
+    const r = { startMs: 30_000, endMs: 75_000 }
+    expect(moveRange(r, 10_000, 120_000)).toEqual({ startMs: 10_000, endMs: 55_000 })
+    expect(moveRange(r, 100_000, 120_000)).toEqual({ startMs: 75_000, endMs: 120_000 })
+    expect(moveRange(r, -5, 120_000)).toEqual({ startMs: 0, endMs: 45_000 })
   })
 })

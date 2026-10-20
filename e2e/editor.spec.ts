@@ -31,7 +31,7 @@ test('Trim: resize to 1080p keeps the shape, warns it is larger, and queues that
   const resize = page.getByTestId('resize')
   await resize.getByRole('button', { name: /1080p/ }).click()
   await expect(resize).toContainText('From 320×180')
-  await expect(resize).toContainText('bigger, not sharper')
+  await expect(resize).toContainText('6× larger than the picture')
   await expect(resize).not.toContainText('stretched')
 
   // With Keep shape on, typing the width works out the height
@@ -148,6 +148,23 @@ test('Trim: long pauses are found and added to Cut out', async ({ page }) => {
   await expect(page.getByTestId('cut-row')).toHaveCount(1)
   await expect(page.getByTestId('cut-row').getByLabel('Cut 1 start')).toHaveValue(/0:02\.2/)
   await expect(page.getByTestId('cut-row').getByLabel('Cut 1 end')).toHaveValue(/0:03\.8/)
+})
+
+test('Trim: [ ] move by sentence, and { } put the trim start and end at the sentence', async ({ page }) => {
+  await openEditor(page)
+  // The sample transcript's sentences: 0–2 s, 2.3–4 s, 4.5–6 s, 6.5–10 s.
+  await page.keyboard.press(']')
+  const start = page.locator('#trim-start')
+  const end = page.locator('#trim-end')
+  // The seek lands a moment later; { then takes the sentence playing.
+  await expect
+    .poll(async () => {
+      await page.keyboard.press('{')
+      return start.inputValue()
+    })
+    .toMatch(/0:02\.3/)
+  await page.keyboard.press('}')
+  await expect(end).toHaveValue(/0:04\.0/)
 })
 
 test('Trim: a pause after each sentence is placed from the transcript and sent', async ({ page }) => {
@@ -382,7 +399,7 @@ test('History lists the steps by name, and a click goes back to one', async ({ p
 test('Split: three even parts queue a split into three segments', async ({ page }) => {
   await openEditor(page)
   await page.getByRole('tab', { name: /Split/ }).click()
-  await page.getByRole('button', { name: '3 parts' }).click()
+  await page.getByRole('button', { name: '3 parts', exact: true }).click()
   await page.getByRole('button', { name: /Start split/ }).click()
 
   await expect.poll(async () => (await mockRequests()).find((r) => r.path === '/api/admin/videos/7/edits/split')?.body?.segments?.length).toBe(3)
@@ -391,7 +408,7 @@ test('Split: three even parts queue a split into three segments', async ({ page 
 test('Split: dragging the cut between two segments moves it', async ({ page }) => {
   await openEditor(page)
   await page.getByRole('tab', { name: /Split/ }).click()
-  await page.getByRole('button', { name: '3 parts' }).click()
+  await page.getByRole('button', { name: '3 parts', exact: true }).click()
   const end = page.getByLabel('Segment 1 end')
   const before = await end.inputValue()
 
@@ -406,6 +423,123 @@ test('Split: dragging the cut between two segments moves it', async ({ page }) =
 
   await expect(end).not.toHaveValue(before)
   await expect(end).toHaveValue(/^0:02/)
+})
+
+test('Split: at the markers, chapters only', async ({ page }) => {
+  const marker = { color: null, createdBy: 'admin', createdAt: '2026-10-13T09:00:00' }
+  await resetMock({
+    markers: [
+      { ...marker, id: 1, atMs: 3000, label: 'Intro done', chapter: true },
+      { ...marker, id: 2, atMs: 5000, label: 'Check this', chapter: false },
+      { ...marker, id: 3, atMs: 7000, label: 'Practice', chapter: true }
+    ]
+  })
+  await openEditor(page)
+  await page.getByRole('tab', { name: /Split/ }).click()
+  await page.getByRole('button', { name: 'Split at markers (4 parts)' }).click()
+  await expect(page.getByLabel('Segment 2 start')).toHaveValue(/^0:03/)
+
+  await page.getByRole('checkbox', { name: 'Chapters only' }).click()
+  await page.getByRole('button', { name: 'Split at chapters (3 parts)' }).click()
+  await expect(page.getByLabel('Segment 3 start')).toHaveValue(/^0:07/)
+  await page.getByRole('button', { name: /Start split/ }).click()
+
+  await expect
+    .poll(async () => (await mockRequests()).find((r) => r.path === '/api/admin/videos/7/edits/split')?.body?.segments)
+    .toEqual([
+      { startMs: 0, endMs: 3000 },
+      { startMs: 3000, endMs: 7000, label: 'Intro done' },
+      { startMs: 7000, endMs: null, label: 'Practice' }
+    ])
+})
+
+test('Split: cuts move to the nearest break between sentences', async ({ page }) => {
+  await openEditor(page)
+  await page.getByRole('tab', { name: /Split/ }).click()
+  await page.getByRole('button', { name: '2 parts', exact: true }).click()
+  // 0:05 is inside "Okay, sorry about that." (4.5–6 s); the nearest pause is 4–4.5 s.
+  await page.getByRole('button', { name: 'Move cuts to sentence breaks' }).click()
+  await expect(page.getByText('Moved 1 cut to a break between sentences', { exact: true })).toBeVisible()
+  await expect(page.getByLabel('Segment 1 end')).toHaveValue(/^0:04\.2/)
+})
+
+test('Split: at long pauses, at AI chapters, and parts of about N seconds between sentences', async ({ page }) => {
+  await openEditor(page)
+  await page.getByRole('tab', { name: /Split/ }).click()
+
+  // The sample's sound is quiet 2–4 s; at pauses of 2 s or more, the cut is in its middle.
+  await page.getByRole('button', { name: 'Split at pauses' }).click()
+  await expect(page.getByLabel('Segment 2 start')).toHaveValue('0:03.00')
+
+  // The AI chapters start at 0 s and 5 s.
+  await page.getByRole('button', { name: 'Split at AI chapters (2 parts)' }).click()
+  await expect(page.getByLabel('Segment 2 start')).toHaveValue('0:05.00')
+
+  // About 2 s each, each cut in the nearest pause between sentences (2.0–2.3 s, 4.0–4.5 s, 6.0–6.5 s).
+  await page.getByLabel('Seconds per part, cut between sentences').fill('2')
+  await page.getByTestId('split-near').getByRole('button', { name: 'Split' }).click()
+  await expect(page.getByLabel('Segment 2 start')).toHaveValue('0:02.15')
+  await expect(page.getByLabel('Segment 3 start')).toHaveValue('0:04.25')
+  // What each part says shows under its row.
+  await expect(page.getByText('“Hello and welcome.”')).toBeVisible()
+})
+
+test('Split: a part can be named and given its own shape', async ({ page }) => {
+  await openEditor(page)
+  await page.getByRole('tab', { name: /Split/ }).click()
+  await page.getByRole('button', { name: '2 parts', exact: true }).click()
+  await page.getByLabel('Segment 1 name').fill('Welcome')
+  await page.getByRole('combobox', { name: 'Segment 2 shape' }).click()
+  await page.getByRole('option', { name: '9:16' }).click()
+  await page.getByRole('button', { name: /Start split/ }).click()
+
+  await expect
+    .poll(async () => (await mockRequests()).find((r) => r.path === '/api/admin/videos/7/edits/split')?.body?.segments)
+    .toEqual([
+      { startMs: 0, endMs: 5000, label: 'Welcome' },
+      { startMs: 5000, endMs: null, aspect: 9 / 16 }
+    ])
+})
+
+test('Split: a segment plays on its own and stops at its end', async ({ page }) => {
+  await openEditor(page)
+  await page.getByRole('tab', { name: /Split/ }).click()
+  await page.getByRole('button', { name: '10 parts', exact: true }).click()
+  await page.getByRole('button', { name: 'Play segment 1', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Stop segment 1', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Play segment 1', exact: true })).toBeVisible({ timeout: 5000 })
+  const at = await page
+    .locator('video')
+    .first()
+    .evaluate((v: HTMLVideoElement) => v.currentTime)
+  expect(at).toBeGreaterThanOrEqual(0.9)
+  expect(at).toBeLessThan(1.5)
+})
+
+test('Split: the cuts are saved as markers', async ({ page }) => {
+  await openEditor(page)
+  await page.getByRole('tab', { name: /Split/ }).click()
+  await page.getByRole('button', { name: '3 parts', exact: true }).click()
+  await page.getByRole('button', { name: 'Save the cuts as markers (2)' }).click()
+  await expect(page.getByText('Added 2 markers', { exact: true })).toBeVisible()
+
+  const posted = (await mockRequests()).filter((r) => r.method === 'POST' && r.path === '/api/admin/videos/7/markers').map((r) => r.body)
+  expect(posted).toEqual([
+    { atMs: 3330, label: 'Part 2' },
+    { atMs: 6670, label: 'Part 3' }
+  ])
+  // Now marked, so there is nothing left to save, and Split at markers gives the same parts.
+  await expect(page.getByRole('button', { name: 'Save the cuts as markers' })).toBeDisabled()
+  await expect(page.getByRole('button', { name: 'Split at markers (3 parts)' })).toBeVisible()
+})
+
+test('Trim: start and end move to breaks between sentences', async ({ page }) => {
+  await openEditor(page)
+  const start = page.getByRole('slider').first()
+  await start.focus()
+  for (let i = 0; i < 15; i++) await start.press('ArrowRight') // 1.5 s, inside "Hello and welcome."
+  await page.getByRole('button', { name: 'Start and end between sentences' }).click()
+  await expect(page.locator('#trim-start')).toHaveValue('0:02.15')
 })
 
 test('Results come into view once a trim is queued', async ({ page }) => {

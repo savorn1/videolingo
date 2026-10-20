@@ -59,6 +59,16 @@
           </UButton>
         </div>
       </div>
+      <UButton
+        size="xs"
+        color="neutral"
+        variant="soft"
+        icon="i-lucide-text-cursor"
+        :title="`Moves the start and end up to ${MAX_SNAP_MS / 1000}s each, to a pause in the transcript`"
+        @click="snapTrimToSentences"
+      >
+        Start and end between sentences
+      </UButton>
       <p class="text-xs text-gray-500 dark:text-gray-400">Type a time like 1:23.5, or step by single frames with ← → under the video.</p>
       <USwitch v-model="extendOn" size="xs" label="Extend past the end of the video" data-testid="trim-extend" />
       <p v-if="extendOn" class="text-xs text-gray-500 dark:text-gray-400">
@@ -334,7 +344,11 @@
           <UButton size="xs" color="neutral" variant="link" :padded="false" @click="matchScaleShape">Match the shape</UButton>
         </p>
         <p v-if="scaleNotes.larger" class="text-xs text-gray-600 dark:text-gray-300" role="status">
-          Larger than the picture: it gets bigger, not sharper — no detail is added, and the file grows.
+          {{ upscaleFactor }}× larger than the picture: it is enlarged smoothly and sharpened a little, but no detail is added, and the file grows.<template
+            v-if="upscaleFactor >= 2"
+          >
+            Twice the size or more usually looks soft.</template
+          >
         </p>
       </div>
 
@@ -400,7 +414,29 @@
       </div>
     </section>
 
-    <LookPanel v-model="look" v-model:compare="lookCompare" />
+    <!-- Before exporting for a platform: what fits it -->
+    <section
+      v-if="platformCheckList"
+      class="space-y-1.5 rounded-md border border-gray-200 p-3 dark:border-gray-800"
+      data-testid="platform-checks"
+      aria-label="Platform checklist"
+    >
+      <p class="text-xs font-semibold text-gray-900 dark:text-white">Checklist for {{ activePreset?.label }}</p>
+      <ul class="space-y-1">
+        <li
+          v-for="c in platformCheckList"
+          :key="c.text"
+          class="flex items-start gap-1.5 text-xs"
+          :class="c.ok ? 'text-gray-600 dark:text-gray-300' : 'text-warning-700 dark:text-warning-400'"
+        >
+          <UIcon :name="c.ok ? 'i-lucide-check' : 'i-lucide-triangle-alert'" class="mt-0.5 size-3.5 shrink-0" :class="c.ok ? 'text-success-500' : ''" />
+          {{ c.text }}
+        </li>
+      </ul>
+      <p class="text-[11px] text-gray-500 dark:text-gray-400">A guide — the platforms change their limits.</p>
+    </section>
+
+    <LookPanel v-model="look" v-model:compare="lookCompare" v-model:lut="lut" />
 
     <ClipEditorMotionPanel :video-id="video.id" :video-language="video.language" />
 
@@ -434,6 +470,13 @@
     <section class="sticky bottom-0 z-10 space-y-2 border-t bg-default pb-3 pt-4" :class="TAB_ACCENTS.trim.divider" aria-label="Start trim">
       <p class="text-sm text-gray-700 dark:text-gray-300" data-testid="trim-summary">{{ trimSummary }}</p>
       <p v-if="trimSizeHint" class="text-xs text-gray-500 dark:text-gray-400" data-testid="trim-size-hint">{{ trimSizeHint }}</p>
+      <USwitch
+        v-model="timingPreview"
+        size="xs"
+        label="Play the timing in the preview"
+        description="Speed changes, pauses, punch-ins and cards, roughly — without rendering."
+        data-testid="timing-preview"
+      />
       <!-- Always takes its line, so the layout (and the video) don't jump while a crop is being drawn. -->
       <p class="text-xs min-h-4" :class="trimError ? 'text-error-500' : 'text-gray-500 dark:text-gray-400'">
         {{ trimError ?? (trimDirty ? '' : 'Change the range, or turn on crop or resize, to make a trim.') }}
@@ -450,6 +493,31 @@
       >
         Start trim
       </UButton>
+      <div class="flex flex-wrap gap-2">
+        <UButton
+          v-if="canWrite"
+          size="xs"
+          color="neutral"
+          variant="soft"
+          icon="i-lucide-flask-conical"
+          :loading="sampleStarting"
+          :disabled="!!trimError || !trimDirty || busy"
+          :title="`Renders the first ${SAMPLE_SECONDS} s small, with every setting — for what the preview can't show`"
+          @click="onStartSample"
+        >
+          Test render ({{ SAMPLE_SECONDS }} s, small)
+        </UButton>
+        <UButton
+          size="xs"
+          color="neutral"
+          variant="ghost"
+          icon="i-lucide-captions"
+          title="The transcript, timed for the trimmed video"
+          @click="downloadTrimSubtitles"
+        >
+          Subtitles for this trim (.srt)
+        </UButton>
+      </div>
       <p class="text-xs text-gray-500 dark:text-gray-400">
         The result appears under Results, where you can replace the original (kept under Versions) or add it as a new video.
       </p>
@@ -459,7 +527,8 @@
 
 <script setup lang="ts">
 // The Trim tab of the video editor: range, crop, resize, turn and flip, the look, export presets, and the button that starts a trim.
-import { NO_ORIENTATION, describeOrientation, turned } from '#shared/utils/videoEdit'
+import { MAX_SNAP_MS } from '#shared/utils/splitPoints'
+import { NO_ORIENTATION, SAMPLE_SECONDS, describeOrientation, turned } from '#shared/utils/videoEdit'
 import { formatTimecode } from '#shared/utils/transport'
 import { ratioLabel } from '#shared/utils/exportPreset'
 import { TAB_ACCENTS } from '#shared/utils/tabAccent'
@@ -519,6 +588,7 @@ const {
   setEdge,
   nudgeEdge,
   typeEdge,
+  snapTrimToSentences,
   autoCentering,
   onAutoCenter,
   scaleOn,
@@ -534,6 +604,12 @@ const {
   trimError,
   starting,
   onStartTrim,
+  lut,
+  sampleStarting,
+  onStartSample,
+  downloadTrimSubtitles,
+  platformCheckList,
+  timingPreview,
   cuts,
   trimAudio,
   look,
@@ -549,6 +625,9 @@ const {
   presetFileInput,
   renameInput
 } = useClipEditorContext()
+
+// How many times larger the resize makes the picture (the bigger side's factor), to one decimal.
+const upscaleFactor = computed(() => (resizeFrom.value ? Math.round(Math.max(scale.w / resizeFrom.value.w, scale.h / resizeFrom.value.h) * 10) / 10 : 1))
 
 // What the resize starts from, when it isn't simply the whole video.
 const resizeFromNote = computed(() => [cropOn.value && 'the crop', orientActive.value && 'turned'].filter(Boolean).join(', '))

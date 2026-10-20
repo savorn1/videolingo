@@ -15,7 +15,7 @@
           <template v-else>
             <UIcon name="i-lucide-music" class="size-4 shrink-0 text-gray-400" />
             <span class="min-w-0 truncate text-sm text-gray-900 dark:text-white" :title="music.name">{{ music.name }}</span>
-            <UButton size="xs" color="neutral" variant="ghost" icon="i-lucide-x" aria-label="Remove the music" @click="music = null" />
+            <UButton size="xs" color="neutral" variant="ghost" icon="i-lucide-x" aria-label="Remove the music" @click="removeMusic" />
           </template>
         </div>
         <template v-if="music">
@@ -83,6 +83,7 @@ const {
   musicProgress,
   musicVolume,
   musicDuck,
-  onPickMusic
+  onPickMusic,
+  removeMusic
 } = useAudioToVideoFormContext()
 </script>

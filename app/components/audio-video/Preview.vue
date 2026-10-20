@@ -43,18 +43,22 @@
         <UIcon name="i-lucide-audio-lines" class="h-12 w-12" :class="darkBackground ? 'text-white/40' : 'text-black/30'" />
       </div>
       <!-- A moving sketch of the chosen style, so the look and placement can be judged -->
+      <!-- The gradient as a second copy in the second colour, faded in from the left; the glow as a soft shadow -->
       <WaveformPreview
-        v-if="waveform !== 'NONE'"
+        v-for="layer in waveLayers"
+        :key="layer.key"
         :kind="waveform"
-        :color="waveDrawColor"
+        :color="layer.color"
         :audio="audioPeaks.peaks.value"
         class="absolute w-full"
         :class="waveformPlacement(waveform) === 'CENTER' ? 'inset-x-[10%] w-4/5' : 'inset-x-0 bottom-[5%]'"
-        :style="
+        :style="[
           waveformPlacement(waveform) === 'CENTER'
             ? { height: `${waveHeightShown}%`, top: `${(100 - waveHeightShown) / 2}%` }
-            : { height: `${waveHeightShown}%` }
-        "
+            : { height: `${waveHeightShown}%` },
+          layer.style
+        ]"
+        :data-testid="layer.key === 'base' ? 'preview-wave' : undefined"
       />
       <!-- The strip, the logo and a sample subtitle, placed as the server places them -->
       <span
@@ -83,6 +87,39 @@
         ><span v-if="subtitleStyle === 'KARAOKE'"><span class="text-amber-300">The spoken words</span> appear here</span
         ><span v-else :class="subtitleStyle === 'BOX' ? 'rounded-sm bg-black/50 px-1' : ''">The spoken words appear here</span
         ><span v-if="secondLanguage" class="block text-[9px] font-semibold text-yellow-100">…and their translation here</span></span
+      >
+      <!-- An intro or outro card, as the video shows it before or after the recording -->
+      <div
+        v-if="shownCard"
+        class="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 px-[10%] text-center"
+        :style="{ backgroundColor: background }"
+        data-testid="preview-card"
+      >
+        <img v-if="logoUrl" :src="logoUrl" alt="" class="w-[18%] object-contain" />
+        <p class="text-base font-bold leading-tight sm:text-lg" :style="{ color: textColor }">{{ shownCard }}</p>
+      </div>
+    </div>
+    <div v-if="intro.text.trim() || outro.text.trim() || music" class="flex flex-wrap items-center gap-1.5">
+      <template v-for="c in previewCards" :key="c.which">
+        <UButton
+          v-if="c.text"
+          size="xs"
+          :color="showCard === c.which ? 'primary' : 'neutral'"
+          :variant="showCard === c.which ? 'soft' : 'ghost'"
+          :aria-pressed="showCard === c.which"
+          @click="showCard = showCard === c.which ? null : c.which"
+          >{{ c.label }}</UButton
+        >
+      </template>
+      <UButton
+        v-if="music && previewItem"
+        size="xs"
+        color="neutral"
+        variant="ghost"
+        :icon="hearingMix ? 'i-lucide-square' : 'i-lucide-music'"
+        :title="hearingMix ? undefined : 'From the preview time, for 15 s. The video also dips the music under speech.'"
+        @click="hearWithMusic"
+        >{{ hearingMix ? 'Stop' : 'Hear it with the music' }}</UButton
       >
     </div>
     <div v-if="(slides.length > 1 || progressBar || previewChapters.length) && previewMax > 0" class="space-y-1">
@@ -145,8 +182,36 @@ const {
   blurBackdrop,
   progressBar,
   useChapters,
-  secondLanguage
+  secondLanguage,
+  waveColor2,
+  waveGlow,
+  intro,
+  outro,
+  music,
+  hearWithMusic,
+  hearingMix
 } = useAudioToVideoFormContext()
+
+// Showing a card in the frame, by choice (it goes when its text is cleared).
+const showCard = ref<'intro' | 'outro' | null>(null)
+const previewCards = computed(() => [
+  { which: 'intro' as const, label: 'Intro card', text: intro.text.trim() },
+  { which: 'outro' as const, label: 'Outro card', text: outro.text.trim() }
+])
+const shownCard = computed(() => previewCards.value.find((c) => c.which === showCard.value)?.text || null)
+
+const waveLayers = computed(() => {
+  if (waveform.value === 'NONE') return []
+  const glow: Record<string, string> = waveGlow.value
+    ? { filter: `drop-shadow(0 0 3px ${waveDrawColor.value}) drop-shadow(0 0 6px ${waveDrawColor.value})` }
+    : {}
+  const layers: { key: string; color: string; style: Record<string, string> }[] = [{ key: 'base', color: waveDrawColor.value, style: glow }]
+  if (waveColor2.value) {
+    const fade = 'linear-gradient(to right, transparent, black)'
+    layers.push({ key: 'shade', color: waveColor2.value, style: { maskImage: fade, WebkitMaskImage: fade } })
+  }
+  return layers
+})
 
 // The chapter title showing at the previewed time (as the video shows it: for 4 s from the chapter's start).
 const previewChapters = computed(() => (useChapters.value ? (previewItem.value?.chapters ?? []) : []))

@@ -164,7 +164,7 @@ async function bulkAddAsNew() {
   const failed: string[] = []
   for (const r of pickedRows.value) {
     try {
-      await promote(r.videoId, r.clip.id, { asNew: true, title: suggestedNewTitle(r.videoTitle, r.clip.operation, r.clip.segmentIndex) })
+      await promote(r.videoId, r.clip.id, { asNew: true, title: suggestedNewTitle(r.videoTitle, r.clip.operation, r.clip.segmentIndex, r.clip.label) })
       ok++
     } catch (err) {
       failed.push(`${r.videoTitle ?? r.videoId}: ${apiErrorMessage(err)}`)

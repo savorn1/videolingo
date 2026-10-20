@@ -17,6 +17,7 @@ import type {
   Video
 } from '~/composables/useVideos'
 import type { MediaRules } from '#shared/utils/mediaRules'
+import type { SplitSegment, VideoClip } from '~/composables/useVideoEdits'
 
 type Schemas = components['schemas']
 
@@ -40,11 +41,13 @@ export type ApiContract = [
   Expect<Matches<MergeVideosPayload, Schemas['MergeVideosRequest']>>,
   Expect<Matches<CreateVideoPayload, Schemas['CreateVideoRequest']>>,
   Expect<Matches<UpdateVideoPayload, Schemas['UpdateVideoRequest']>>,
+  Expect<Matches<SplitSegment, Schemas['SplitSegment']>>,
   // What it reads.
   Expect<Matches<UploadTicket, Schemas['UploadTicket']>>,
   Expect<Matches<MultipartTicket, Schemas['MultipartTicket']>>,
   Expect<Matches<{ url: string; length: number }, Schemas['PartUrl']>>,
   Expect<Matches<ClientSettings, Schemas['ClientSettings']>>,
   Expect<Matches<MediaRules, Schemas['MediaRules']>>,
-  Expect<Matches<Video, Schemas['VideoResponse']>>
+  Expect<Matches<Video, Schemas['VideoResponse']>>,
+  Expect<Matches<VideoClip, Schemas['ClipResponse']>>
 ]

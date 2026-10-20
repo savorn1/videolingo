@@ -169,7 +169,7 @@ test('Chapters from the file, a progress bar, an intro card, music, a highlight 
   await expect(page.getByLabel('Title for episode-7.mp3')).toHaveValue('Episode 7')
 
   const onPicture = page.getByTestId('on-picture')
-  await expect(onPicture.getByRole('switch', { name: 'Use the chapters in the files (2)' })).toBeChecked()
+  await expect(onPicture.getByRole('switch', { name: 'Use the chapters (2)' })).toBeChecked()
   await onPicture.getByRole('switch', { name: 'Progress bar' }).click()
   await onPicture.getByLabel('Intro card text').fill('Episode 7 — New words')
   await expect(page.getByTestId('preview-progress')).toBeVisible()
@@ -179,6 +179,7 @@ test('Chapters from the file, a progress bar, an intro card, music, a highlight 
 
   await page.getByRole('switch', { name: 'Also make a highlight clip' }).click()
   await page.getByRole('radio', { name: 'About 30 s' }).click()
+  await expect(page.getByTestId('highlight-picks')).toContainText('0:30.00 – 1:14.50')
   await page.getByRole('switch', { name: 'Publish them on a schedule' }).click()
   await page.getByRole('button', { name: 'Make the video' }).click()
 
@@ -196,7 +197,8 @@ test('Chapters from the file, a progress bar, an intro card, music, a highlight 
     music: { key: expect.stringMatching(/^uploads\//), volume: 0.15, loop: true, duck: true }
   })
   expect(main.outro).toBeUndefined()
-  expect(sent.find((r) => r.path === '/api/admin/videos/from-audio/highlight')?.body).toEqual({ audioKey: main.audioKey, seconds: 30 })
+  // Found when turned on (45 s), and again for the length chosen; the one shown is what's made.
+  expect(sent.filter((r) => r.path === '/api/admin/videos/from-audio/highlight').map((r) => r.body.seconds)).toEqual([45, 30])
   expect(clip).toMatchObject({ title: 'Episode 7 (highlight)', shape: 'TALL', audioStartMs: 30_000, audioEndMs: 74_500, progressBar: true })
   expect(clip.chapters).toBeUndefined()
   expect(clip.intro).toBeUndefined()
@@ -204,4 +206,39 @@ test('Chapters from the file, a progress bar, an intro card, music, a highlight 
   const scheduled = sent.filter((r) => /\/schedule$/.test(r.path))
   expect(scheduled.map((r) => r.path)).toEqual(['/api/admin/videos/42/schedule'])
   expect(scheduled[0]!.body.publishAt).toBeTruthy()
+})
+
+test('Chapters can be added by hand, and the cards and music previewed', async ({ page }) => {
+  await openReady(page, '/videos/from-audio')
+  await page.getByLabel('Choose audio files').setInputFiles(wavFile('lesson.wav', 20))
+  await expect(page.getByText('Uploaded')).toBeVisible()
+
+  await page.getByRole('button', { name: 'Chapters of lesson.wav' }).click()
+  const editor = page.getByTestId('chapters-editor')
+  await editor.getByRole('button', { name: 'Add a chapter' }).click()
+  await editor.getByLabel('Chapter 1 title').fill('Hello')
+  await editor.getByRole('button', { name: 'Add a chapter' }).click()
+  await editor.getByLabel('Chapter 2 title').fill('Numbers')
+  // Too close to the first: refused until moved.
+  await editor.getByLabel('Chapter 2 starts at').fill('0:03')
+  await editor.getByLabel('Chapter 2 starts at').press('Tab')
+  await expect(editor.getByRole('alert')).toContainText('5 s apart')
+  await editor.getByLabel('Chapter 2 starts at').fill('0:10')
+  await editor.getByLabel('Chapter 2 starts at').press('Tab')
+  await editor.getByRole('button', { name: 'Save chapters' }).click()
+  await expect(page.getByRole('button', { name: 'Chapters of lesson.wav' })).toHaveText('Chapters (2)')
+
+  await page.getByTestId('on-picture').getByLabel('Intro card text').fill('Lesson 1')
+  await page.getByRole('button', { name: 'Intro card' }).click()
+  await expect(page.getByTestId('preview-card')).toHaveText('Lesson 1')
+  await page.getByTestId('music').locator('input[type=file]').setInputFiles(wavFile('bed.wav', 1))
+  await expect(page.getByRole('button', { name: 'Hear it with the music' })).toBeVisible()
+
+  await page.getByRole('button', { name: 'Make the video' }).click()
+  await expect
+    .poll(async () => (await mockRequests()).find((r) => r.path === '/api/admin/videos/from-audio')?.body?.chapters)
+    .toEqual([
+      { startMs: 0, title: 'Hello' },
+      { startMs: 10_000, title: 'Numbers' }
+    ])
 })

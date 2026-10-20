@@ -43,3 +43,15 @@ describe('extrasRequest and describeExtras', () => {
     expect(sanitizeExtras(undefined)).toEqual(PLAIN_EXTRAS)
   })
 })
+
+describe('progress bar', () => {
+  it('is checked, sent, described and read back from drafts', () => {
+    const e = { ...PLAIN_EXTRAS, progressBar: '#ffcc00' }
+    expect(isPlainExtras(e)).toBe(false)
+    expect(extrasProblem({ ...e, progressBar: 'yellow' }, 0, 0)).toContain('colour')
+    expect(extrasRequest(e)).toEqual({ progressBar: '#ffcc00' })
+    expect(describeExtras(e)).toBe('progress bar')
+    expect(sanitizeExtras({ blurs: [] }).progressBar).toBeNull()
+    expect(sanitizeExtras(e).progressBar).toBe('#ffcc00')
+  })
+})

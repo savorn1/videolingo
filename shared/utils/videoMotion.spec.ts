@@ -7,6 +7,8 @@ import {
   motionRequest,
   PLAIN_MOTION,
   nextSpeedPart,
+  punchAt,
+  punchInRanges,
   sanitizeMotion,
   sentencePauses
 } from './videoMotion'
@@ -122,5 +124,30 @@ describe('several parts at another speed', () => {
     expect(nextSpeedPart([slow, fast], 2000, 10_000)).toEqual({ startMs: 3000, endMs: 5000, speed: 0.5 })
     expect(nextSpeedPart([slow, fast], 6000, 10_000)).toEqual({ startMs: 7000, endMs: 9000, speed: 0.5 })
     expect(nextSpeedPart([], 9800, 10_000)).toBeNull()
+  })
+})
+
+describe('punch-in', () => {
+  it('zooms in on every other sentence inside the trim, on its timeline', () => {
+    const sentences = [
+      { startMs: 0, endMs: 2000 },
+      { startMs: 2300, endMs: 4000 },
+      { startMs: 4500, endMs: 6000 },
+      { startMs: 6500, endMs: 10_000 }
+    ]
+    expect(punchInRanges(sentences, 1000, 9000)).toEqual([
+      { startMs: 1300, endMs: 3000 },
+      { startMs: 5500, endMs: 8000 }
+    ])
+  })
+  it('checks it and sends it', () => {
+    const m = { ...PLAIN_MOTION, punchIn: { scale: 1.15, ranges: [{ startMs: 1000, endMs: 2000 }] } }
+    expect(motionProblem(m, 10_000)).toBeNull()
+    expect(motionProblem({ ...m, punchIn: { scale: 2, ranges: m.punchIn.ranges } }, 10_000)).toContain('150%')
+    expect(motionProblem(m, 1500)).toContain('past the end')
+    expect(motionRequest(m)).toEqual({ punchIn: { scale: 1.15, ranges: [{ startMs: 1000, endMs: 2000 }] } })
+    expect(punchAt(m.punchIn, 1500)).toBe(1.15)
+    expect(punchAt(m.punchIn, 2500)).toBe(1)
+    expect(sanitizeMotion({}).punchIn).toBeNull()
   })
 })

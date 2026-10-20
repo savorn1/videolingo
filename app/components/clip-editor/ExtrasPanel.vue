@@ -179,6 +179,24 @@
         </div>
       </div>
     </div>
+
+    <!-- Progress bar -->
+    <div class="space-y-2" data-testid="progress-bar">
+      <USwitch
+        :model-value="!!extras.progressBar"
+        label="Progress bar"
+        description="A thin bar along the bottom edge showing how far the video has played."
+        @update:model-value="(on: boolean) => (extras.progressBar = on ? '#facc15' : null)"
+      />
+      <label v-if="extras.progressBar" class="flex items-center gap-1.5 pl-11 text-xs text-gray-600 dark:text-gray-300"
+        >Colour
+        <input
+          v-model="extras.progressBar"
+          type="color"
+          class="h-7 w-9 cursor-pointer rounded border border-gray-200 dark:border-gray-700"
+          aria-label="Progress bar colour"
+      /></label>
+    </div>
   </EditorSection>
 </template>
 

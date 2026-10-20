@@ -101,6 +101,17 @@
               @change="(e) => onPickItemPicture(it.id, e)"
             />
           </label>
+          <UButton
+            v-if="it.status === 'ready'"
+            size="xs"
+            color="neutral"
+            variant="link"
+            :padded="false"
+            icon="i-lucide-list"
+            :aria-label="`Chapters of ${it.name}`"
+            @click="chaptersFor = it.id"
+            >{{ it.chapters.length ? `Chapters (${it.chapters.length})` : 'Add chapters' }}</UButton
+          >
         </div>
         <audio v-if="items.length === 1 && it.status === 'ready'" :src="it.previewUrl" controls preload="metadata" class="h-10 w-full" />
       </li>
@@ -125,6 +136,14 @@
       />
     </label>
     <p v-if="errors.audio" class="mt-2 text-sm text-error-600 dark:text-error-400" role="alert">{{ errors.audio }}</p>
+    <AudioVideoChaptersEditor
+      v-if="editing"
+      v-model="editing.chapters"
+      :open="!!editing"
+      :name="editing.title.trim() || editing.name"
+      :duration-ms="editing.durationSeconds ? editing.durationSeconds * 1000 : null"
+      @update:open="(on: boolean) => !on && (chaptersFor = null)"
+    />
   </AudioVideoStepCard>
 </template>
 
@@ -148,4 +167,7 @@ const {
   onPickItemPicture,
   clearItemPicture
 } = useAudioToVideoFormContext()
+// The recording whose chapters are being edited.
+const chaptersFor = ref<number | null>(null)
+const editing = computed(() => items.value.find((i) => i.id === chaptersFor.value) ?? null)
 </script>

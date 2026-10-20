@@ -44,6 +44,15 @@
             <span class="h-4 w-1 rounded bg-white/90 shadow" />
           </button>
         </template>
+        <!-- The video's markers, where "Split at markers" would cut -->
+        <span
+          v-for="m in markers"
+          :key="`marker-${m.id}`"
+          class="absolute top-0 h-2 w-0.5 -ml-px pointer-events-none"
+          :class="m.chapter ? 'bg-amber-400' : 'bg-white/80 dark:bg-gray-300'"
+          :style="{ left: `${Math.min(100, (m.atMs / durationMs) * 100)}%` }"
+          aria-hidden="true"
+        />
         <!-- Playhead -->
         <span
           class="absolute inset-y-0 w-0.5 bg-black/70 dark:bg-white/80 pointer-events-none"
@@ -89,7 +98,41 @@
           @change="(e: Event) => typeSegment(i, 'end', e)"
         />
         <span class="text-xs text-gray-500 dark:text-gray-400 tabular-nums ml-auto">{{ segmentLength(seg) }}</span>
+        <UButton
+          size="xs"
+          color="neutral"
+          variant="ghost"
+          :icon="playingSegment === i ? 'i-lucide-square' : 'i-lucide-play'"
+          :aria-label="playingSegment === i ? `Stop segment ${i + 1}` : `Play segment ${i + 1}`"
+          :disabled="!!rowProblem(seg)"
+          @click="playSegment(i)"
+        />
         <p v-if="rowProblem(seg)" class="basis-full pl-7 text-xs text-error-600 dark:text-error-400" role="alert">{{ rowProblem(seg) }}</p>
+        <p v-else-if="longRows.includes(i)" class="basis-full pl-7 text-xs text-warning-600 dark:text-warning-400">
+          Longer than {{ formatMsShort(lengthLimitMs) }}
+        </p>
+        <div class="basis-full flex flex-wrap items-center gap-2 pl-7">
+          <UInput
+            :model-value="seg.label ?? ''"
+            @update:model-value="(v: string) => (seg.label = v)"
+            size="xs"
+            class="min-w-0 flex-1"
+            :maxlength="MAX_PART_LABEL"
+            :placeholder="`Name (else “Part ${i + 1}”)`"
+            :aria-label="`Segment ${i + 1} name`"
+          />
+          <USelect
+            :model-value="seg.aspect ?? 0"
+            size="xs"
+            class="w-32"
+            :items="PART_SHAPES.map((sh) => ({ label: sh.label, value: sh.value }))"
+            :aria-label="`Segment ${i + 1} shape`"
+            @update:model-value="(v: number) => (seg.aspect = v || null)"
+          />
+        </div>
+        <p v-if="segmentSaying(seg)" class="basis-full pl-7 text-xs italic text-gray-500 dark:text-gray-400 truncate" :title="segmentSaying(seg)">
+          “{{ segmentSaying(seg) }}”
+        </p>
         <UButton
           size="xs"
           color="error"
@@ -173,6 +216,7 @@
             type="number"
             size="xs"
             :min="MIN_TRIM_MS / 1000"
+            step="any"
             class="w-20"
             aria-label="Seconds per part"
             :disabled="!durationMs"
@@ -181,10 +225,144 @@
           <UButton type="submit" size="xs" color="neutral" variant="soft" :class="TAB_ACCENTS.split.button" :disabled="!everyRows.length">Split</UButton>
         </form>
       </div>
+      <form class="flex flex-wrap items-center gap-2" data-testid="split-near" @submit.prevent="splitNearLength">
+        <span class="text-xs text-gray-500">Parts of about</span>
+        <UInput
+          v-model.number="nearSeconds"
+          type="number"
+          size="xs"
+          :min="MIN_TRIM_MS / 1000"
+          step="any"
+          class="w-20"
+          aria-label="Seconds per part, cut between sentences"
+          :disabled="!durationMs"
+        />
+        <span class="text-xs text-gray-500">seconds, cut between sentences</span>
+        <UButton type="submit" size="xs" color="neutral" variant="soft" :class="TAB_ACCENTS.split.button" :disabled="!nearSeconds || !durationMs"
+          >Split</UButton
+        >
+      </form>
+      <div class="flex flex-wrap items-center gap-2">
+        <span class="text-xs text-gray-500">At pauses of</span>
+        <USelect
+          v-model="pauseSplitSeconds"
+          size="xs"
+          class="w-20"
+          :items="PAUSE_SPLIT_SECONDS.map((n) => ({ label: `${n}s`, value: n }))"
+          aria-label="Shortest pause to cut at"
+        />
+        <span class="text-xs text-gray-500">or longer</span>
+        <UButton
+          size="xs"
+          color="neutral"
+          variant="soft"
+          :class="TAB_ACCENTS.split.button"
+          icon="i-lucide-audio-lines"
+          :loading="pauseSplitting"
+          :disabled="!durationMs"
+          @click="splitAtPauses"
+        >
+          Split at pauses
+        </UButton>
+      </div>
+      <div v-if="markers.length || aiChapters.length" class="flex flex-wrap items-center gap-2">
+        <UButton
+          v-if="markers.length"
+          size="xs"
+          color="neutral"
+          variant="soft"
+          :class="TAB_ACCENTS.split.soft"
+          icon="i-lucide-flag"
+          :disabled="!markerSplit.rows.length"
+          :title="markerSplit.tooMany ? `More than ${MAX_SEGMENTS} parts` : !markerSplit.rows.length ? 'No marker is far enough inside the video' : undefined"
+          @click="splitAtMarkers"
+        >
+          Split at {{ chaptersOnly && hasChapterMarkers ? 'chapters' : 'markers' }}{{ markerSplit.rows.length ? ` (${markerSplit.rows.length} parts)` : '' }}
+        </UButton>
+        <UCheckbox v-if="hasChapterMarkers" v-model="chaptersOnly" size="xs" label="Chapters only" />
+        <UButton
+          v-if="aiChapters.length"
+          size="xs"
+          color="neutral"
+          variant="soft"
+          :class="TAB_ACCENTS.split.soft"
+          icon="i-lucide-sparkles"
+          :disabled="!aiChapterSplit.rows.length"
+          :title="
+            aiChapterSplit.tooMany
+              ? `More than ${MAX_SEGMENTS} parts`
+              : !aiChapterSplit.rows.length
+                ? 'No AI chapter is far enough inside the video'
+                : undefined
+          "
+          @click="splitAtAiChapters"
+        >
+          Split at AI chapters{{ aiChapterSplit.rows.length ? ` (${aiChapterSplit.rows.length} parts)` : '' }}
+        </UButton>
+      </div>
       <p class="text-xs text-gray-500 dark:text-gray-400">
         Play to a moment and press “Split at playhead” (or S) to cut the segment there in two. Drag a cut on the strip to move it; [ and ] jump between
         segments.
       </p>
+    </section>
+
+    <!-- Tidy the cuts made above -->
+    <section class="space-y-2" aria-labelledby="split-tidy-h">
+      <h3 id="split-tidy-h" class="text-xs font-semibold uppercase tracking-wide" :class="TAB_ACCENTS.split.heading">Tidy the cuts</h3>
+      <div class="flex flex-wrap items-center gap-2">
+        <UButton
+          size="xs"
+          color="neutral"
+          variant="soft"
+          :class="TAB_ACCENTS.split.soft"
+          icon="i-lucide-text-cursor"
+          :loading="snappingCuts"
+          :disabled="!hasSharedCuts"
+          :title="hasSharedCuts ? `Moves each cut up to ${MAX_SNAP_MS / 1000}s, to a pause in the transcript` : 'Make a cut first'"
+          @click="snapCutsToSentences"
+        >
+          Move cuts to sentence breaks
+        </UButton>
+        <UButton
+          size="xs"
+          color="neutral"
+          variant="soft"
+          :class="TAB_ACCENTS.split.soft"
+          icon="i-lucide-scissors"
+          title="Each part starts and ends at its speech; the quiet cut off is left out"
+          @click="tightenSegments"
+        >
+          Trim the quiet at the edges
+        </UButton>
+        <UButton
+          v-if="canWrite"
+          size="xs"
+          color="neutral"
+          variant="soft"
+          :class="TAB_ACCENTS.split.soft"
+          icon="i-lucide-bookmark-plus"
+          :loading="savingMarkers"
+          :disabled="!newCutMarkers.length"
+          :title="newCutMarkers.length ? 'Keeps this split on the video’s timeline' : 'Every cut is marked already'"
+          @click="saveCutsAsMarkers"
+        >
+          Save the cuts as markers{{ newCutMarkers.length ? ` (${newCutMarkers.length})` : '' }}
+        </UButton>
+      </div>
+      <div class="flex flex-wrap items-center gap-2">
+        <span class="text-xs text-gray-500">Longest part</span>
+        <USelect
+          v-model="lengthLimitMs"
+          size="xs"
+          class="w-48"
+          :items="[{ label: 'No limit', value: 0 }, ...SEGMENT_LENGTH_LIMITS.map((l) => ({ label: l.label, value: l.ms }))]"
+          aria-label="Longest part allowed"
+        />
+        <template v-if="longRows.length">
+          <span class="text-xs text-warning-600 dark:text-warning-400">{{ longRows.length }} too long</span>
+          <UButton size="xs" color="neutral" variant="soft" :class="TAB_ACCENTS.split.button" @click="splitLongOnes">Split the long ones</UButton>
+        </template>
+      </div>
     </section>
 
     <!-- Action -->
@@ -206,14 +384,17 @@
       >
         Start split
       </UButton>
-      <p class="text-xs text-gray-500 dark:text-gray-400">Each segment becomes a new video, disabled until you review and enable it.</p>
+      <p class="text-xs text-gray-500 dark:text-gray-400">
+        Each segment becomes a new video, disabled until you review and enable it, titled with its name (or “Part N”) and cropped to its shape.
+      </p>
     </section>
   </div>
 </template>
 
 <script setup lang="ts">
 // The Split tab of the video editor: the segment strip, the typed rows, the split helpers, and the button that starts a split.
-import { boundaryAfter, MIN_TRIM_MS } from '#shared/utils/videoEdit'
+import { boundaryAfter, MAX_PART_LABEL, MAX_SEGMENTS, MIN_TRIM_MS } from '#shared/utils/videoEdit'
+import { MAX_SNAP_MS, PART_SHAPES, SEGMENT_LENGTH_LIMITS } from '#shared/utils/splitPoints'
 import { formatTimecode } from '#shared/utils/transport'
 import { TAB_ACCENTS } from '#shared/utils/tabAccent'
 const {
@@ -245,6 +426,33 @@ const {
   tooManyPartsHint,
   customPartsValid,
   splitEvenly,
+  markers,
+  chaptersOnly,
+  hasChapterMarkers,
+  markerSplit,
+  splitAtMarkers,
+  hasSharedCuts,
+  snappingCuts,
+  snapCutsToSentences,
+  aiChapters,
+  aiChapterSplit,
+  splitAtAiChapters,
+  nearSeconds,
+  splitNearLength,
+  PAUSE_SPLIT_SECONDS,
+  pauseSplitSeconds,
+  pauseSplitting,
+  splitAtPauses,
+  segmentSaying,
+  playingSegment,
+  playSegment,
+  lengthLimitMs,
+  longRows,
+  splitLongOnes,
+  tightenSegments,
+  newCutMarkers,
+  savingMarkers,
+  saveCutsAsMarkers,
   splitError,
   onStartSplit,
   busy,

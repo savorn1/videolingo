@@ -171,6 +171,7 @@ const items = computed<SidebarItem[]>(() => [
             { label: 'Subtitles', to: '/subtitles', icon: 'i-lucide-subtitles' },
             { label: 'Glossaries', to: '/glossaries', icon: 'i-lucide-book-a' },
             { label: 'Edit results', to: '/videos/edit-results', icon: 'i-lucide-list-checks' },
+            { label: 'Storage', to: '/videos/storage', icon: 'i-lucide-hard-drive' },
             { label: 'Processing jobs', to: '/processing-jobs', icon: 'i-lucide-cpu' }
           ]
         },

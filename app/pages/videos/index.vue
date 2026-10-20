@@ -145,6 +145,12 @@
           <span class="inline-flex items-center gap-1 whitespace-nowrap tabular-nums">
             <UIcon name="i-lucide-clock" class="size-3.5 text-violet-600 dark:text-violet-400" />
             {{ formatDuration(row.durationSeconds) }}
+            <span
+              v-if="describeResolution(row.width, row.height)"
+              class="ml-1 rounded bg-gray-100 px-1 text-[10px] font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300"
+              :title="[describeResolution(row.width, row.height)!.size, describeResolution(row.width, row.height)!.aspect].filter(Boolean).join(' · ')"
+              >{{ describeResolution(row.width, row.height)!.quality }}</span
+            >
           </span>
         </template>
 

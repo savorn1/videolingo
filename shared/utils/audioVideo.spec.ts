@@ -177,7 +177,9 @@ describe('sanitizeLook', () => {
       trimSilence: true,
       waveHeightPct: 60,
       blurBackdrop: true,
-      progressBar: true
+      progressBar: true,
+      waveColor2: '#00c8ff',
+      waveGlow: true
     }
     expect(sanitizeLook(look)).toEqual(look)
   })

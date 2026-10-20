@@ -4603,8 +4603,17 @@ export interface components {
       /** Format: int64 */
       endMs?: number
     }
+    SplitSegment: {
+      /** Format: int64 */
+      startMs?: number
+      /** Format: int64 */
+      endMs?: number
+      label?: string
+      /** Format: double */
+      aspect?: number
+    }
     SplitRequest: {
-      segments?: components['schemas']['SegmentRange'][]
+      segments?: components['schemas']['SplitSegment'][]
     }
     Captions: {
       /** Format: int64 */
@@ -4932,6 +4941,8 @@ export interface components {
       intro?: components['schemas']['TitleCardDto']
       outro?: components['schemas']['TitleCardDto']
       music?: components['schemas']['MusicDto']
+      waveColor2?: string
+      waveGlow?: boolean
     }
     BurnSubtitlesDto: {
       style?: string
@@ -4980,6 +4991,8 @@ export interface components {
       denoise?: boolean
       /** Format: int32 */
       waveHeightPct?: number
+      waveColor2?: string
+      waveGlow?: boolean
     }
     ApiResponseAudioPreviewResponse: {
       traceId?: string
@@ -5699,6 +5712,7 @@ export interface components {
       expiresAt?: string
       /** Format: int64 */
       durationMs?: number
+      label?: string
     }
     EditOverview: {
       clips?: components['schemas']['ClipResponse'][]

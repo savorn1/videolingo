@@ -272,6 +272,17 @@
                 class="h-8 w-10 cursor-pointer rounded border border-gray-200 dark:border-gray-700"
               />
             </div>
+            <div class="flex flex-wrap items-center gap-3" data-testid="wave-finish">
+              <USwitch :model-value="!!waveColor2" label="Shade across to" @update:model-value="(on) => (waveColor2 = on ? '#00c8ff' : null)" />
+              <input
+                v-if="waveColor2"
+                v-model="waveColor2"
+                type="color"
+                aria-label="Waveform second colour"
+                class="h-8 w-10 cursor-pointer rounded border border-gray-200 dark:border-gray-700"
+              />
+              <USwitch v-model="waveGlow" label="Glow" description="A soft halo around the waveform." />
+            </div>
           </div>
         </div>
         <!-- How close the preview is: from the user's own sound, or a sketch; plus a real test render -->
@@ -370,7 +381,7 @@
         <USwitch
           v-if="chapterCount"
           v-model="useChapters"
-          :label="`Use the chapters in the files (${chapterCount})`"
+          :label="`Use the chapters (${chapterCount})`"
           description="Each chapter's title shows top left for a few seconds as it starts, and learners can jump between them under Chapters."
         />
         <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -485,7 +496,9 @@ const {
   outro,
   cardsError,
   paletteSource,
-  useCoverColours
+  useCoverColours,
+  waveColor2,
+  waveGlow
 } = useAudioToVideoFormContext()
 const cards = [
   { name: 'Intro', card: intro, hint: 'Before the recording, on the background with the logo.', placeholder: 'e.g. Lesson 4 — Greetings' },

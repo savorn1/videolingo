@@ -112,6 +112,39 @@
             >About {{ sec }} s</UButton
           >
         </div>
+        <ul v-if="highlight" class="space-y-2 pl-11" data-testid="highlight-picks">
+          <li v-for="it in readyItems" :key="it.id" class="space-y-1">
+            <div class="flex items-center gap-2 text-xs">
+              <span class="min-w-0 flex-1 truncate font-medium text-gray-900 dark:text-white">{{ it.title || it.name }}</span>
+              <template v-if="it.highlight">
+                <span class="tabular-nums text-gray-500 dark:text-gray-400"
+                  >{{ formatTimecode(it.highlight.startMs) }} – {{ formatTimecode(it.highlight.endMs) }}</span
+                >
+                <UButton
+                  size="xs"
+                  color="neutral"
+                  variant="ghost"
+                  :icon="playingId === it.id ? 'i-lucide-square' : 'i-lucide-play'"
+                  :aria-label="playingId === it.id ? `Stop the highlight of ${it.name}` : `Play the highlight of ${it.name}`"
+                  @click="playHighlight(it)"
+                />
+              </template>
+              <span v-else-if="it.highlightFinding" class="text-gray-500 dark:text-gray-400">Finding the liveliest part…</span>
+              <UButton v-else size="xs" color="neutral" variant="link" :padded="false" @click="findHighlight(it)">Find it</UButton>
+            </div>
+            <USlider
+              v-if="it.highlight && it.durationSeconds"
+              :model-value="Math.round(it.highlight.startMs / 1000)"
+              :min="0"
+              :max="Math.max(0, it.durationSeconds - Math.round((it.highlight.endMs - it.highlight.startMs) / 1000))"
+              :step="1"
+              size="xs"
+              :aria-label="`Highlight start for ${it.name}`"
+              @update:model-value="(v) => moveHighlight(it, Number(v) * 1000)"
+            />
+          </li>
+          <li class="text-xs text-gray-500 dark:text-gray-400">Picked at the loudest, busiest stretch — slide to move it, ▶ to hear it.</li>
+        </ul>
       </div>
 
       <div class="space-y-2" data-testid="schedule-on-make">
@@ -143,6 +176,7 @@
 // Step 4 of "Video from audio": what the videos are filed under, transcripts and subtitles, a highlight clip, and a schedule.
 import { BURN_STYLES } from '#shared/utils/audioVideo'
 import { HIGHLIGHT_LENGTHS } from '#shared/utils/audioVideoExtras'
+import { formatTimecode } from '#shared/utils/transport'
 import { SCHEDULE_STEPS } from '#shared/utils/publishSchedule'
 const {
   maxCategories,
@@ -164,6 +198,11 @@ const {
   secondLanguage,
   highlight,
   highlightSeconds,
+  readyItems,
+  playingId,
+  findHighlight,
+  moveHighlight,
+  playHighlight,
   schedule,
   scheduleStart,
   scheduleStep

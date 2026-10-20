@@ -15,8 +15,10 @@ describe('describeResolution', () => {
     expect(describeResolution(426, 240)?.quality).toBe('240p')
   })
 
-  it('omits a ratio that is not a recognisable one', () => {
-    expect(describeResolution(1366, 768)?.aspect).toBeNull()
+  it('calls a near-standard size by the ratio it is sold as, and omits an odd one', () => {
+    expect(describeResolution(1366, 768)?.aspect).toBe('16:9')
+    expect(describeResolution(2560, 1080)?.aspect).toBe('21:9')
+    expect(describeResolution(1000, 777)?.aspect).toBeNull()
   })
 
   it('returns null when either dimension is missing', () => {

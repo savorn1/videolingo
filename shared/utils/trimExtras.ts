@@ -35,12 +35,14 @@ export interface TrimExtras {
   blurs: BlurBox[]
   pip: { videoId: number | null; videoTitle: string | null; corner: PipCorner; sizePct: number } | null
   cards: { intro: TitleCard | null; outro: TitleCard | null; background: string; color: string; logoKey: string | null; logoName: string | null } | null
+  /** A thin bar along the bottom showing how far the clip has played, in this colour; null = none. */
+  progressBar: string | null
 }
 
-export const PLAIN_EXTRAS: TrimExtras = { blurs: [], pip: null, cards: null }
+export const PLAIN_EXTRAS: TrimExtras = { blurs: [], pip: null, cards: null, progressBar: null }
 
 export function isPlainExtras(e: TrimExtras): boolean {
-  return !e.blurs.length && !e.pip && !e.cards
+  return !e.blurs.length && !e.pip && !e.cards && !e.progressBar
 }
 
 /** A new blur box: a quarter of the picture, in the middle. */
@@ -77,6 +79,7 @@ export function extrasProblem(e: TrimExtras, width: number, height: number): str
     }
     if (!HEX.test(c.background) || !HEX.test(c.color)) return 'Cards: pick the colours'
   }
+  if (e.progressBar && !HEX.test(e.progressBar)) return 'Progress bar: pick a colour'
   return null
 }
 
@@ -95,7 +98,8 @@ export function extrasRequest(e: TrimExtras) {
             logoKey: e.cards.logoKey
           }
         }
-      : {})
+      : {}),
+    ...(e.progressBar ? { progressBar: e.progressBar } : {})
   }
 }
 
@@ -105,11 +109,18 @@ export function describeExtras(e: TrimExtras): string | null {
   if (e.blurs.length) parts.push(`${e.blurs.length} blurred area${e.blurs.length === 1 ? '' : 's'}`)
   if (e.pip?.videoId) parts.push('picture in picture')
   if (e.cards) parts.push(e.cards.intro && e.cards.outro ? 'intro and outro cards' : e.cards.intro ? 'intro card' : 'outro card')
+  if (e.progressBar) parts.push('progress bar')
   return parts.length ? parts.join(', ') : null
 }
 
 /** From a draft saved by any version (missing parts are none). */
 export function sanitizeExtras(raw: unknown): TrimExtras {
   const r = raw && typeof raw === 'object' ? (raw as Partial<TrimExtras>) : {}
-  return { blurs: Array.isArray(r.blurs) ? r.blurs.map((b) => ({ ...b })) : [], pip: r.pip ? { ...r.pip } : null, cards: r.cards ? { ...r.cards } : null }
+  return {
+    blurs: Array.isArray(r.blurs) ? r.blurs.map((b) => ({ ...b })) : [],
+    pip: r.pip ? { ...r.pip } : null,
+    cards: r.cards ? { ...r.cards } : null,
+    // Drafts from before the progress bar have none.
+    progressBar: typeof r.progressBar === 'string' && HEX.test(r.progressBar) ? r.progressBar : null
+  }
 }

@@ -94,6 +94,24 @@
       <p v-if="pausesNote" class="text-xs text-gray-500 dark:text-gray-400" role="status">{{ pausesNote }}</p>
     </div>
 
+    <!-- Punch in on every other sentence -->
+    <div class="space-y-2" data-testid="punch-in">
+      <div class="flex flex-wrap items-end gap-2">
+        <div class="min-w-48 flex-1">
+          <p class="text-sm font-medium text-gray-900 dark:text-white">Punch in on every other sentence</p>
+          <p class="text-xs text-gray-500 dark:text-gray-400">
+            A quick zoom in for every second sentence and back out — keeps a talking head lively, as in short videos. Uses the transcript.
+          </p>
+        </div>
+        <USelect v-model="punchScale" :items="PUNCH_SCALES" size="xs" class="w-36" aria-label="Punch-in zoom" />
+        <UButton size="xs" color="neutral" variant="soft" icon="i-lucide-zoom-in" :loading="punchLoading" @click="addPunchIns">
+          {{ motion.punchIn ? 'Place again' : 'Add the punch-ins' }}
+        </UButton>
+        <UButton v-if="motion.punchIn" size="xs" color="neutral" variant="ghost" icon="i-lucide-x" @click="motion.punchIn = null">Remove</UButton>
+      </div>
+      <p v-if="punchNote" class="text-xs text-gray-500 dark:text-gray-400" role="status">{{ punchNote }}</p>
+    </div>
+
     <!-- Parts at another speed -->
     <div class="space-y-2" data-testid="speed-parts">
       <div class="flex flex-wrap items-end gap-2">
@@ -242,7 +260,17 @@
 <script setup lang="ts">
 // Motion & effects on a trim: effect, fades, a held frame, part at another speed, backwards, steadied, zoom into an
 // area, green screen. The settings live in useClipEditor (motion, in undo and drafts); rules in videoMotion.ts.
-import { describeMotion, isPlainMotion, MAX_REVERSE_MS, nextSpeedPart, RAMP_SPEEDS, sentencePauses, TRIM_EFFECTS } from '#shared/utils/videoMotion'
+import {
+  describeMotion,
+  isPlainMotion,
+  MAX_REVERSE_MS,
+  nextSpeedPart,
+  PUNCH_SCALES,
+  punchInRanges,
+  RAMP_SPEEDS,
+  sentencePauses,
+  TRIM_EFFECTS
+} from '#shared/utils/videoMotion'
 
 const props = defineProps<{ videoId: number; videoLanguage: string | null }>()
 const { motion, currentMs, range } = useClipEditorContext()
@@ -254,17 +282,22 @@ const pauseMs = ref(2000)
 const pausesLoading = ref(false)
 const pausesNote = ref('')
 const { list: listTranscripts, get: getTranscript } = useTranscripts()
+const NO_TRANSCRIPT = "This video has no transcript yet — make one from the video's page (Transcribe)."
+/** The spoken-language transcript's sentences, or null when there is none. */
+async function transcriptSentences() {
+  const all = (await listTranscripts({ videoId: props.videoId, size: 50 })).data.filter((t) => t.segmentCount > 0)
+  const pick = all.find((t) => t.language === props.videoLanguage) ?? all[0]
+  return pick ? ((await getTranscript(pick.id)).segments ?? []) : null
+}
 async function addSentencePauses() {
   pausesLoading.value = true
   pausesNote.value = ''
   try {
-    const all = (await listTranscripts({ videoId: props.videoId, size: 50 })).data.filter((t) => t.segmentCount > 0)
-    const pick = all.find((t) => t.language === props.videoLanguage) ?? all[0]
-    if (!pick) {
-      pausesNote.value = "This video has no transcript yet — make one from the video's page (Transcribe)."
+    const segments = await transcriptSentences()
+    if (!segments) {
+      pausesNote.value = NO_TRANSCRIPT
       return
     }
-    const segments = (await getTranscript(pick.id)).segments ?? []
     motion.value.holds = sentencePauses(segments, Math.round(range.value[0]), Math.round(range.value[1]), pauseMs.value)
     const n = motion.value.holds.length
     pausesNote.value = n
@@ -274,6 +307,34 @@ async function addSentencePauses() {
     pausesNote.value = apiErrorMessage(err)
   } finally {
     pausesLoading.value = false
+  }
+}
+
+// ── Punch in on every other sentence ──
+const punchScale = ref(PUNCH_SCALES[1]!.value)
+const punchLoading = ref(false)
+const punchNote = ref('')
+watch(punchScale, (s) => {
+  if (motion.value.punchIn) motion.value.punchIn = { ...motion.value.punchIn, scale: s }
+})
+async function addPunchIns() {
+  punchLoading.value = true
+  punchNote.value = ''
+  try {
+    const segments = await transcriptSentences()
+    if (!segments) {
+      punchNote.value = NO_TRANSCRIPT
+      return
+    }
+    const ranges = punchInRanges(segments, Math.round(range.value[0]), Math.round(range.value[1]))
+    motion.value.punchIn = ranges.length ? { scale: punchScale.value, ranges } : null
+    punchNote.value = ranges.length
+      ? `${ranges.length} punch-in${ranges.length === 1 ? '' : 's'} to ${Math.round(punchScale.value * 100)}% — turn on “Play the timing in the preview” to see them.`
+      : 'Fewer than two sentences inside the trimmed part.'
+  } catch (err) {
+    punchNote.value = apiErrorMessage(err)
+  } finally {
+    punchLoading.value = false
   }
 }
 

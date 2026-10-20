@@ -324,6 +324,8 @@ export function useVideos() {
     normalize?: boolean
     denoise?: boolean
     waveHeightPct?: number
+    waveColor2?: string
+    waveGlow?: boolean
   }) {
     return (await api<ApiEnvelope<{ url: string; seconds: number }>>('/api/admin/videos/from-audio/preview', { method: 'POST', body: payload })).data
   }
@@ -393,7 +395,7 @@ export interface InspectedLink {
   duplicates: { id: number; title: string; trashed: boolean }[]
 }
 
-export type UploadKind = 'VIDEO' | 'THUMBNAIL' | 'AUDIO' | 'OVERLAY'
+export type UploadKind = 'VIDEO' | 'THUMBNAIL' | 'AUDIO' | 'OVERLAY' | 'LUT'
 
 /** A large upload started in parts (VideoIngestDtos.MultipartTicket). */
 export interface MultipartTicket {
@@ -490,6 +492,9 @@ export interface AudioToVideoPayload {
   /** Title cards before and after (1–6 s), on the background colour with the logo. */
   intro?: { text: string; durationMs: number }
   outro?: { text: string; durationMs: number }
+  /** The waveform shaded across to a second colour, and a soft glow around it. */
+  waveColor2?: string
+  waveGlow?: boolean
   /** Music under the recording (an AUDIO upload), 0–1, quieter under speech when duck. */
   music?: { key: string; volume: number; loop: boolean; duck: boolean }
   title: string

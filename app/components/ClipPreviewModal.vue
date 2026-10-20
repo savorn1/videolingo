@@ -28,9 +28,11 @@
           {{
             clip.operation === 'EXTRACT'
               ? 'Download it to keep it.'
-              : replaces
-                ? 'Adding it as a new video keeps your original as it is.'
-                : 'Each segment becomes its own new video.'
+              : clip.operation === 'SAMPLE'
+                ? 'A check of the settings — it can’t become a video. Start the trim when it looks right.'
+                : replaces
+                  ? 'Adding it as a new video keeps your original as it is.'
+                  : 'Each segment becomes its own new video.'
           }}
           Expires {{ expires }}.
         </p>
@@ -43,7 +45,7 @@
         <UButton v-if="clip.operation !== 'EXTRACT' && canCompare" color="neutral" variant="ghost" icon="i-lucide-columns-2" @click="act('compare', close)"
           >Compare</UButton
         >
-        <UButton v-if="clip.operation === 'EXTRACT'" color="neutral" :class="TAB_ACCENTS.audio.button" icon="i-lucide-download" :href="clip.url" download
+        <UButton v-if="downloadOnly(clip.operation)" color="neutral" :class="TAB_ACCENTS.audio.button" icon="i-lucide-download" :href="clip.url" download
           >Download</UButton
         >
         <template v-else-if="canWrite">
@@ -57,6 +59,7 @@
 </template>
 
 <script setup lang="ts">
+import { downloadOnly } from '#shared/utils/editResults'
 // A result (trim, split segment, audio edit, text overlay, extracted audio) watched or heard
 // right on the page, with what was done to it and what can be done next — instead of a link
 // that opens the bare file in another tab.
@@ -82,7 +85,8 @@ const OPERATIONS: Record<VideoClip['operation'], string> = {
   SPLIT: 'Split segment',
   AUDIO: 'Video with new audio',
   EXTRACT: 'Extracted audio',
-  OVERLAY: 'Text & overlays'
+  OVERLAY: 'Text & overlays',
+  SAMPLE: 'Test render'
 }
 const subtitle = computed(() => (props.clip ? OPERATIONS[props.clip.operation] : ''))
 const expires = computed(() => (props.clip ? formatTimeUntil(props.clip.expiresAt) : ''))
