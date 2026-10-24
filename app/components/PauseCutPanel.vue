@@ -12,7 +12,7 @@
         class="w-48"
         aria-label="How quiet a pause is"
       />
-      <UButton size="xs" color="neutral" variant="soft" icon="i-lucide-audio-waveform" :loading="finding" @click="find">
+      <UButton size="xs" color="neutral" variant="soft" :class="TAB_ACCENTS.trim.soft" icon="i-lucide-audio-waveform" :loading="finding" @click="find">
         {{ found ? 'Find again' : 'Find the pauses' }}
       </UButton>
     </div>

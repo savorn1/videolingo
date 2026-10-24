@@ -386,7 +386,7 @@
         />
         <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div v-for="c in cards" :key="c.name" class="space-y-1">
-            <UFormField :label="`${c.name} card`" :description="c.hint">
+            <UFormField :label="`${c.name} card`">
               <div class="flex items-center gap-2">
                 <UInput
                   v-model="c.card.text"
@@ -408,6 +408,8 @@
                 />
                 <span class="text-xs text-gray-500 dark:text-gray-400">s</span>
               </div>
+              <!-- Under the boxes, so the intro's and outro's boxes line up whatever the length of their notes -->
+              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ c.hint }}</p>
             </UFormField>
           </div>
         </div>

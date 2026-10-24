@@ -14,6 +14,7 @@ import {
   clampPartMinutes,
   estimatedParts,
   frameSizeLabel,
+  freshFiles,
   partTitle,
   recordingSlides,
   defaultWaveHeight,
@@ -46,6 +47,10 @@ import {
   chaptersForPart,
   highlightTitle,
   moveRange,
+  numberTitles,
+  orderRecordings,
+  replaceInTitles,
+  type RecordingOrder,
   paletteFromPixels,
   tidyChapters,
   type ChapterMark
@@ -73,6 +78,9 @@ interface Item {
   resume: ResumableUpload | null
   /** Chapters (from the file's ID3 CHAP, or added here), shown on the picture and kept as chapter markers. */
   chapters: ChapterMark[]
+  /** Its track and disc number from the file's tags, for putting the batch in album order. */
+  track: number | null
+  disc: number | null
   /** The stretch for its highlight clip, once found (and maybe moved); null = found when the videos are made. */
   highlight: { startMs: number; endMs: number } | null
   highlightFinding: boolean
@@ -519,8 +527,17 @@ export function useAudioToVideoForm() {
 
   // ── The audio files ──────────────────────────────────────────────────────────
   let nextId = 1
-  function addFiles(files: File[]) {
+  function addFiles(picked: File[]) {
     errors.value.audio = ''
+    // The same recording twice would make the same video twice.
+    const { fresh: files, duplicates } = freshFiles(picked, items.value)
+    if (duplicates.length)
+      toast.add({
+        title: duplicates.length === 1 ? `“${duplicates[0]}” is already in the list` : `${duplicates.length} files are already in the list`,
+        description: duplicates.length > 1 ? duplicates.join(', ') : 'It was left out.',
+        color: 'neutral'
+      })
+    if (!files.length) return
     const problem = batchProblem(items.value.length + files.length)
     if (problem) {
       errors.value.audio = problem
@@ -551,6 +568,8 @@ export function useAudioToVideoForm() {
         coverUploading: false,
         resume: null,
         chapters: [],
+        track: null,
+        disc: null,
         highlight: null,
         highlightFinding: false
       })
@@ -608,6 +627,8 @@ export function useAudioToVideoForm() {
       // The title written in the file, unless one was already typed.
       if (tags.title && item.title === titleFromFileName(item.name)) item.title = tags.title.slice(0, 200)
       if (tags.chapters?.length) item.chapters = tidyChapters(tags.chapters)
+      item.track = tags.track ?? null
+      item.disc = tags.disc ?? null
       const { key } = await videos.uploadFile('AUDIO', file, { onProgress: (f) => (item.progress = f), resume: item.resume })
       item.key = key
       item.resume = null
@@ -649,6 +670,32 @@ export function useAudioToVideoForm() {
     const next = [...items.value]
     ;[next[index], next[j]] = [next[j]!, next[index]!]
     items.value = next
+  }
+  /** Find and replace across every title; returns how many changed. */
+  function replaceItemTitles(find: string, replace: string, matchCase: boolean) {
+    const titled = items.value.filter((i) => i.status !== 'error')
+    const { titles, changed } = replaceInTitles(
+      titled.map((i) => i.title),
+      find,
+      replace,
+      matchCase
+    )
+    titles.forEach((t, k) => (titled[k]!.title = t))
+    return changed
+  }
+  /** Whether any file has a track number in its tags (so ordering by it means something). */
+  const hasTracks = computed(() => items.value.some((i) => i.track !== null))
+  function orderItems(by: RecordingOrder) {
+    items.value = orderRecordings(items.value, by)
+  }
+  /** Numbers every title in the current order ("Episode {n}: {title}"); typed over afterwards like any title. */
+  function numberItemTitles(pattern: string, start: number) {
+    const titled = items.value.filter((i) => i.status !== 'error')
+    numberTitles(
+      titled.map((i) => i.title.trim()),
+      pattern,
+      start
+    ).forEach((t, k) => (titled[k]!.title = t))
   }
 
   // ── Listening to a file before making it ─────────────────────────────────────
@@ -1274,6 +1321,10 @@ export function useAudioToVideoForm() {
     retryItem,
     removeItem,
     moveItem,
+    hasTracks,
+    orderItems,
+    numberItemTitles,
+    replaceItemTitles,
     playingId,
     stopPlaying,
     togglePlay,

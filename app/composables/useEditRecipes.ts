@@ -3,7 +3,7 @@
 // video can be applied to the next. See shared/utils/editRecipe.ts for what is kept.
 
 import { addEntry, removeEntry, renameEntry } from '#shared/utils/namedList'
-import { sanitizeRecipes, type EditRecipe, type SavedRecipe } from '#shared/utils/editRecipe'
+import { recipesFileJson, recipesFromFile, sanitizeRecipes, type EditRecipe, type SavedRecipe } from '#shared/utils/editRecipe'
 
 const STORAGE_KEY = 'videolingo:edit-recipes'
 
@@ -42,5 +42,21 @@ export function useEditRecipes() {
     write(saved.value)
   }
 
-  return { saved, save, remove, rename }
+  /** The saved recipes as a JSON file's text, to share or keep. */
+  function exportJson(): string {
+    return recipesFileJson(saved.value)
+  }
+  /** Adds the recipes in a file made by exportJson; ones already here (same name and settings) are skipped. Returns how many were added; throws on a file that has none. */
+  function importJson(text: string): number {
+    let added = 0
+    for (const e of [...recipesFromFile(text)].reverse()) {
+      if (saved.value.some((s) => s.name === e.name && JSON.stringify(s.data) === JSON.stringify(e.data))) continue
+      saved.value = addEntry(saved.value, e.name, e.data)
+      added++
+    }
+    if (added) write(saved.value)
+    return added
+  }
+
+  return { saved, save, remove, rename, exportJson, importJson }
 }

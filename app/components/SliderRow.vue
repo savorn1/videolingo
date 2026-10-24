@@ -10,7 +10,7 @@
       :aria-label="label"
       @update:model-value="(v) => (model = tidy(Number(v)))"
     />
-    <div class="flex w-24 shrink-0 items-center gap-1">
+    <div class="flex w-28 shrink-0 items-center gap-1">
       <UInput
         :model-value="model"
         type="number"

@@ -1,4 +1,4 @@
-// The title, artist and cover art written inside an audio file — ID3v2 tags in
+// The title, artist, track number and cover art written inside an audio file — ID3v2 tags in
 // MP3s (versions 2.2–2.4), the iTunes-style "ilst" atoms in M4A/MP4 files — so
 // Video from audio can fill in each video's title and picture by itself. Only
 // what the page uses is read; anything unexpected gives up quietly. Pure (bytes
@@ -9,6 +9,9 @@ export interface AudioTags {
   artist?: string
   album?: string
   cover?: { mime: string; data: Uint8Array }
+  /** Its place in the album or series ("3" of "3/12"), and the disc it is on, when written. */
+  track?: number
+  disc?: number
   /** Chapters written in the file (ID3 CHAP frames, as podcast tools write them), in time order. */
   chapters?: { startMs: number; title: string }[]
 }
@@ -22,6 +25,12 @@ function ascii(b: Uint8Array, at: number, n: number): string {
 
 function syncsafe(b: Uint8Array, at: number): number {
   return ((b[at]! & 0x7f) << 21) | ((b[at + 1]! & 0x7f) << 14) | ((b[at + 2]! & 0x7f) << 7) | (b[at + 3]! & 0x7f)
+}
+
+/** "3", "03" or "3/12" → 3; undefined for anything else (or 0). */
+function position(text: string | undefined): number | undefined {
+  const m = text?.trim().match(/^(\d{1,4})(?:\s*\/\s*\d*)?$/)
+  return m && Number(m[1]) > 0 ? Number(m[1]) : undefined
 }
 
 function uint32(b: Uint8Array, at: number): number {
@@ -106,6 +115,8 @@ export function parseId3(buf: Uint8Array): AudioTags {
     if (id === 'TIT2' || id === 'TT2') tags.title ||= decodeText(enc, data.subarray(1)) || undefined
     else if (id === 'TPE1' || id === 'TP1') tags.artist ||= decodeText(enc, data.subarray(1)) || undefined
     else if (id === 'TALB' || id === 'TAL') tags.album ||= decodeText(enc, data.subarray(1)) || undefined
+    else if (id === 'TRCK' || id === 'TRK') tags.track ??= position(decodeText(enc, data.subarray(1)))
+    else if (id === 'TPOS' || id === 'TPA') tags.disc ??= position(decodeText(enc, data.subarray(1)))
     else if (id === 'APIC' || id === 'PIC') {
       const wide = enc === 1 || enc === 2
       let at: number
@@ -194,7 +205,13 @@ export function parseMp4(buf: Uint8Array): AudioTags {
     const d = item(type)
     return d ? utf8.decode(d.bytes).trim() || undefined : undefined
   }
-  const tags: AudioTags = { title: text('©nam'), artist: text('©ART'), album: text('©alb') }
+  // 'trkn' and 'disk' hold two bytes of padding, then the number and the total as 16-bit numbers.
+  const pos = (type: string) => {
+    const d = item(type)
+    const n = d && d.bytes.length >= 4 ? (d.bytes[2]! << 8) | d.bytes[3]! : 0
+    return n || undefined
+  }
+  const tags: AudioTags = { title: text('©nam'), artist: text('©ART'), album: text('©alb'), track: pos('trkn'), disc: pos('disk') }
   const covr = item('covr')
   if (covr?.bytes.length) tags.cover = { mime: covr.kind === 14 ? 'image/png' : 'image/jpeg', data: covr.bytes }
   return Object.fromEntries(Object.entries(tags).filter(([, v]) => v !== undefined)) as AudioTags
@@ -264,6 +281,8 @@ export function parseVorbisComment(b: Uint8Array, tags: AudioTags = {}, kept = {
     if (key === 'TITLE') tags.title ||= value
     else if (key === 'ARTIST') tags.artist ||= value
     else if (key === 'ALBUM') tags.album ||= value
+    else if (key === 'TRACKNUMBER') tags.track ??= position(value)
+    else if (key === 'DISCNUMBER') tags.disc ??= position(value)
   }
   return tags
 }

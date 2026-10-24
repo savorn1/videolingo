@@ -3,6 +3,10 @@
 // Tailwind sees them. Light-mode shades are picked for contrast on white
 // (text and icons at 700/600, white text on 700 fills — all above 4.5:1 for
 // text, 3:1 for icons); dark mode uses the 400s with near-black text.
+//
+// Which button gets which: the tab's main action (and its one "make something" button, e.g. Add text) is
+// `button`; tools that change the edit are `soft`; moving around, resetting, import/export are plain neutral
+// ghost buttons; deleting is color="error" variant="ghost".
 
 export type EditorTab = 'trim' | 'split' | 'audio' | 'overlay' | 'join'
 
@@ -24,6 +28,9 @@ export interface TabAccent {
   /** Wrapper class that recolours Nuxt UI's primary (sliders, switches, focus rings) inside the tab; see main.css. */
   scope: string
 }
+
+/** The header's tools, which act on the whole video whatever tab is open (Thumbnail, Brand kit, Recipes). */
+export const EDITOR_TOOL_TONE = 'bg-amber-50 text-amber-800 hover:bg-amber-100 dark:bg-amber-950/50 dark:text-amber-300 dark:hover:bg-amber-900/60'
 
 const BUTTON_BASE = 'text-white disabled:bg-gray-200 disabled:text-gray-400 dark:text-gray-950 dark:disabled:bg-gray-800 dark:disabled:text-gray-500'
 

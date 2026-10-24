@@ -1,5 +1,13 @@
 <template>
-  <UButton size="xs" color="neutral" variant="soft" icon="i-lucide-image" title="Make a thumbnail from a frame, with words on it" @click="openMaker">
+  <UButton
+    size="xs"
+    color="neutral"
+    variant="soft"
+    :class="EDITOR_TOOL_TONE"
+    icon="i-lucide-image"
+    title="Make a thumbnail from a frame, with words on it"
+    @click="openMaker"
+  >
     Thumbnail
   </UButton>
   <UModal v-model:open="open" title="Make a thumbnail" description="The frame at the playhead, with words on it, becomes the video's thumbnail.">
@@ -46,6 +54,7 @@
 // (an upload of kind THUMBNAIL, like the video form's frame picker). The video is read cross-origin, which our storage allows.
 import { thumbnailFontPx, thumbnailLines } from '#shared/utils/filmstrip'
 import { uploadToStorage } from '~/composables/useVideos'
+import { EDITOR_TOOL_TONE } from '#shared/utils/tabAccent'
 
 const { video, currentMs, thumbnailSaved } = useClipEditorContext()
 const { requestUpload, update } = useVideos()

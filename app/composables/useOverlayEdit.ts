@@ -239,6 +239,28 @@ export function useOverlayEdit(durationMs: Ref<number>) {
     return usable.length
   }
 
+  /** A title for each chapter (chapterTitleSpans), as a slide-in lower-third at the top left; returns how many were added. */
+  function addChapterTitles(spans: { startMs: number; endMs: number; text: string }[]) {
+    for (const c of spans) {
+      state.layers.push({
+        ...base(),
+        kind: 'TEXT',
+        text: c.text,
+        startMs: c.startMs,
+        endMs: c.endMs,
+        x: 0.2,
+        y: 0.12,
+        align: 'LEFT',
+        sizePct: 5.5,
+        weight: 700,
+        backgroundOpacity: 0.7,
+        animation: 'SLIDE_LEFT'
+      })
+    }
+    if (spans.length) state.selectedId = state.layers[state.layers.length - 1]!.id
+    return spans.length
+  }
+
   /** Gives every text layer the look of `id` (font, size, colours, box, alignment). */
   function applyStyleToAll(id: string) {
     const from = state.layers.find((l) => l.id === id)
@@ -345,6 +367,7 @@ export function useOverlayEdit(durationMs: Ref<number>) {
     addTextWatermark,
     addPreset,
     addFromCues,
+    addChapterTitles,
     applyStyleToAll,
     keepInSafeArea,
     addTemplate,

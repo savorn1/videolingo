@@ -7,6 +7,11 @@ import {
   highlightTitle,
   newChapterStart,
   moveRange,
+  numberTitles,
+  orderRecordings,
+  parseChapterList,
+  replaceInTitles,
+  titlePatternProblem,
   paletteFromPixels,
   tidyChapters
 } from './audioVideoExtras'
@@ -101,5 +106,64 @@ describe('moving the highlight', () => {
     expect(moveRange(r, 10_000, 120_000)).toEqual({ startMs: 10_000, endMs: 55_000 })
     expect(moveRange(r, 100_000, 120_000)).toEqual({ startMs: 75_000, endMs: 120_000 })
     expect(moveRange(r, -5, 120_000)).toEqual({ startMs: 0, endMs: 45_000 })
+  })
+})
+
+describe('a pasted chapter list', () => {
+  it('reads the usual ways of writing one, in time order, and counts the lines it left out', () => {
+    const { chapters, skipped } = parseChapterList(
+      ['Chapters:', '0:00 Welcome', '- 01:05:30 - Practice', '[12:30] Verbs', 'Numbers (4:05)', '', '3 things to know', '7:75 Not a time', '9:00'].join('\n')
+    )
+    expect(chapters).toEqual([
+      { startMs: 0, title: 'Welcome' },
+      { startMs: 245_000, title: 'Numbers' },
+      { startMs: 750_000, title: 'Verbs' },
+      { startMs: 3_930_000, title: 'Practice' }
+    ])
+    expect(skipped).toBe(4)
+  })
+  it('keeps fractions of a second and cuts long titles', () => {
+    expect(parseChapterList(`1:23.5 ${'x'.repeat(100)}`).chapters).toEqual([{ startMs: 83_500, title: 'x'.repeat(80) }])
+  })
+})
+
+describe('order and numbering of a batch', () => {
+  const rec = (name: string, track: number | null, disc: number | null = null) => ({ name, track, disc })
+  it('orders by track (disc first, unnumbered last in their order) or by file name as read', () => {
+    const items = [rec('b.mp3', null), rec('x.mp3', 2), rec('a.mp3', null), rec('y.mp3', 1, 2), rec('z.mp3', 5, 1)]
+    expect(orderRecordings(items, 'TRACK').map((i) => i.name)).toEqual(['x.mp3', 'z.mp3', 'y.mp3', 'b.mp3', 'a.mp3'])
+    const names = [rec('Lesson 10.mp3', null), rec('lesson 2.mp3', null), rec('Lesson 1.mp3', null)]
+    expect(orderRecordings(names, 'NAME').map((i) => i.name)).toEqual(['Lesson 1.mp3', 'lesson 2.mp3', 'Lesson 10.mp3'])
+  })
+  it('numbers titles with a pattern, padding {nn} to the widest number', () => {
+    expect(numberTitles(['Greetings', 'Food'], 'Episode {n}: {title}', 9)).toEqual(['Episode 9: Greetings', 'Episode 10: Food'])
+    expect(numberTitles(['A', 'B'], 'Lesson {nn} — {title}')).toEqual(['Lesson 01 — A', 'Lesson 02 — B'])
+    expect(numberTitles(['A'], 'Part {n}')).toEqual(['Part 1'])
+  })
+  it('never numbers a title twice: numbering again renumbers, and file-name numbers shared by all go', () => {
+    const once = numberTitles(['Greetings', 'Food'], 'Episode {n}: {title}')
+    expect(numberTitles([once[1]!, once[0]!], 'Episode {n}: {title}')).toEqual(['Episode 1: Food', 'Episode 2: Greetings'])
+    expect(numberTitles(['01 Greetings', '02 - Food'], '{n}. {title}')).toEqual(['1. Greetings', '2. Food'])
+    // Not every title starts with a number, or there is only one: they are titles, not numbering.
+    expect(numberTitles(['100 words', 'Food'], '{n}. {title}')).toEqual(['1. 100 words', '2. Food'])
+    expect(numberTitles(['100 words'], '{n}. {title}')).toEqual(['1. 100 words'])
+  })
+  it('keeps titles within 200 characters and checks the pattern', () => {
+    expect(numberTitles(['x'.repeat(200)], '{n}. {title}')[0]).toHaveLength(200)
+    expect(titlePatternProblem('{title}')).toMatch(/\{n\}/)
+    expect(titlePatternProblem(' {n} ')).toMatch(/words/)
+    expect(titlePatternProblem('{nn} {title}')).toBeNull()
+  })
+})
+
+describe('find and replace in titles', () => {
+  it('replaces every match as written, case-blind unless asked, and counts the titles changed', () => {
+    const titles = ['Lesson 1: lesson plan', 'Episode (2)', 'Intro']
+    expect(replaceInTitles(titles, 'lesson', 'Lecture')).toEqual({ titles: ['Lecture 1: Lecture plan', 'Episode (2)', 'Intro'], changed: 1 })
+    expect(replaceInTitles(titles, 'lesson', 'Lecture', true).titles[0]).toBe('Lesson 1: Lecture plan')
+    // Not a pattern: brackets are just characters; "$&" in the replacement is kept as written.
+    expect(replaceInTitles(titles, '(2)', '$&!').titles[1]).toBe('Episode $&!')
+    expect(replaceInTitles(['Part  one '], 'one', '')).toEqual({ titles: ['Part'], changed: 1 })
+    expect(replaceInTitles(titles, '', 'x').changed).toBe(0)
   })
 })

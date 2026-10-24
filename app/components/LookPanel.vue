@@ -99,7 +99,15 @@
           <span class="max-w-40 truncate text-xs text-gray-700 dark:text-gray-300" data-testid="colour-grade-name">{{ lut.name }}</span>
           <UButton size="xs" color="neutral" variant="ghost" icon="i-lucide-x" aria-label="Remove the colour grade" @click="lut = null" />
         </template>
-        <UButton size="xs" color="neutral" variant="soft" icon="i-lucide-palette" :loading="lutProgress !== null" @click="lutInput?.click()">
+        <UButton
+          size="xs"
+          color="neutral"
+          variant="soft"
+          :class="TAB_ACCENTS.trim.soft"
+          icon="i-lucide-palette"
+          :loading="lutProgress !== null"
+          @click="lutInput?.click()"
+        >
           {{ lut ? 'Change' : 'Choose a .cube file' }}
         </UButton>
         <input ref="lutInput" type="file" accept=".cube" class="hidden" aria-label="Colour grade file" @change="onLutFile" />
@@ -113,6 +121,7 @@
 </template>
 
 <script setup lang="ts">
+import { TAB_ACCENTS } from '#shared/utils/tabAccent'
 import { LOOK_PRESETS, MAX_LOOK_BLUR, PLAIN_LOOK, describeVideoLook, isPlainLook, matchingPreset, type VideoLook } from '#shared/utils/videoLook'
 import { uploadToStorage } from '~/composables/useVideos'
 

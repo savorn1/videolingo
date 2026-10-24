@@ -147,6 +147,8 @@ export interface PromoteResult {
   newVideoId: number | null
   /** Markers moved along to the new timing (or copied to the new video); missing from an older server. */
   markers?: number
+  /** Transcripts moved along the same way (copied to a new video); missing from an older server. */
+  transcripts?: number
 }
 
 export function useVideoEdits() {
@@ -275,6 +277,11 @@ export function useVideoEdits() {
     return (await api<ApiEnvelope<{ durationMs: number; pauses: { startMs: number; endMs: number }[] }>>(`${base(videoId)}/pauses?noiseDb=${noiseDb}`)).data
   }
 
+  /** Where the picture changes scene (ms), for "Split at scene changes"; sensitivity LOW, MEDIUM or HIGH. */
+  async function scenes(videoId: number, sensitivity: 'LOW' | 'MEDIUM' | 'HIGH') {
+    return (await api<ApiEnvelope<{ durationMs: number; cuts: number[] }>>(`${base(videoId)}/scenes?sensitivity=${sensitivity}`)).data
+  }
+
   async function waveform(videoId: number, options: { key?: string | null; points?: number } = {}) {
     const query = new URLSearchParams({ points: String(options.points ?? 2000) })
     if (options.key) query.set('key', options.key)
@@ -306,6 +313,7 @@ export function useVideoEdits() {
     startOverlay,
     fonts,
     waveform,
+    scenes,
     pauses,
     narrate,
     autoCrop,

@@ -41,7 +41,9 @@
         <div v-for="edge in TRIM_EDGES" :key="edge.key" class="space-y-1">
           <label :for="`trim-${edge.key}`" class="text-xs font-medium text-gray-700 dark:text-gray-300">{{ edge.label }}</label>
           <div class="flex items-center gap-1">
-            <UButton size="xs" color="neutral" variant="soft" aria-label="1 second earlier" @click="nudgeEdge(edge.key, -1000)">−1s</UButton>
+            <UButton size="xs" color="neutral" variant="soft" :class="TAB_ACCENTS.trim.soft" aria-label="1 second earlier" @click="nudgeEdge(edge.key, -1000)"
+              >−1s</UButton
+            >
             <UInput
               :id="`trim-${edge.key}`"
               :model-value="formatTimecode(range[edge.key === 'start' ? 0 : 1])"
@@ -52,7 +54,9 @@
               @change="(e: Event) => typeEdge(edge.key, e)"
               @keydown.enter="(e: KeyboardEvent) => (e.target as HTMLInputElement).blur()"
             />
-            <UButton size="xs" color="neutral" variant="soft" aria-label="1 second later" @click="nudgeEdge(edge.key, 1000)">+1s</UButton>
+            <UButton size="xs" color="neutral" variant="soft" :class="TAB_ACCENTS.trim.soft" aria-label="1 second later" @click="nudgeEdge(edge.key, 1000)"
+              >+1s</UButton
+            >
           </div>
           <UButton size="xs" color="neutral" variant="link" icon="i-lucide-crosshair" :padded="false" @click="setEdge(edge.key, Math.round(currentMs))">
             Use current time
@@ -63,6 +67,7 @@
         size="xs"
         color="neutral"
         variant="soft"
+        :class="TAB_ACCENTS.trim.soft"
         icon="i-lucide-text-cursor"
         :title="`Moves the start and end up to ${MAX_SNAP_MS / 1000}s each, to a pause in the transcript`"
         @click="snapTrimToSentences"
@@ -91,7 +96,7 @@
             <button
               type="button"
               :aria-pressed="isPresetOn(p)"
-              class="flex w-full items-center gap-2.5 rounded-lg border px-3 py-2 text-left transition-colors focus-visible:outline-2 focus-visible:outline-primary-500"
+              class="flex h-full w-full items-center gap-2 rounded-lg border px-2.5 py-2 text-left transition-colors focus-visible:outline-2 focus-visible:outline-primary-500"
               :class="
                 isPresetOn(p)
                   ? [presetTone(p).active, 'ring-1']
@@ -108,8 +113,8 @@
                 />
               </span>
               <span class="min-w-0" :class="p.customId ? 'pr-14' : ''">
-                <span class="block text-sm font-medium truncate" :title="p.label">{{ p.label }}</span>
-                <span class="block text-xs opacity-70 tabular-nums">{{ p.ratio }} · {{ p.w }}×{{ p.h }}</span>
+                <span class="line-clamp-2 break-words text-sm font-medium leading-snug" :title="p.label">{{ p.label }}</span>
+                <span class="block whitespace-nowrap text-xs opacity-70 tabular-nums">{{ p.ratio }} · {{ p.w }}×{{ p.h }}</span>
               </span>
             </button>
             <div
@@ -499,6 +504,7 @@
           size="xs"
           color="neutral"
           variant="soft"
+          :class="TAB_ACCENTS.trim.soft"
           icon="i-lucide-flask-conical"
           :loading="sampleStarting"
           :disabled="!!trimError || !trimDirty || busy"

@@ -55,6 +55,10 @@ describe('ID3v2', () => {
       expect(tags.title).toBe('Ep 1')
     }
   })
+  it('reads the track and disc numbers ("3/12" is track 3), ignoring ones that are not numbers', () => {
+    expect(parseId3(tag(3, [frame('TRCK', bytes([0], '03/12'), 3), frame('TPOS', bytes([0], '2'), 3)]))).toMatchObject({ track: 3, disc: 2 })
+    expect(parseId3(tag(4, [frame('TRCK', bytes([3], 'side A'), 4)])).track).toBeUndefined()
+  })
   it('stops quietly at padding and gives nothing for a file without a tag', () => {
     const t = tag(3, [frame('TIT2', bytes([0], 'A'), 3), Uint8Array.from([0, 0, 0, 0, 0, 0, 0, 0, 0, 0])])
     expect(parseId3(t)).toEqual({ title: 'A' })
@@ -79,7 +83,8 @@ describe('MP4 / M4A', () => {
     'ilst',
     box('©nam', dataBox(1, enc.encode('Episode 12'))),
     box('©ART', dataBox(1, enc.encode('The Khmer Podcast'))),
-    box('covr', dataBox(14, Uint8Array.from([0x89, 0x50, 0x4e, 0x47])))
+    box('covr', dataBox(14, Uint8Array.from([0x89, 0x50, 0x4e, 0x47]))),
+    box('trkn', dataBox(0, Uint8Array.from([0, 0, 0, 7, 0, 10, 0, 0])))
   )
   const meta = box('meta', Uint8Array.from([0, 0, 0, 0]), box('hdlr', Uint8Array.from([0, 0, 0, 0])), ilst)
   const moov = box('moov', box('mvhd', Uint8Array.from([0, 0])), box('udta', meta))
@@ -95,7 +100,9 @@ describe('MP4 / M4A', () => {
       expect(tags.title).toBe('Episode 12')
       expect(tags.artist).toBe('The Khmer Podcast')
       expect(tags.cover?.mime).toBe('image/png')
+      expect(tags.track).toBe(7)
       expect(tags.album).toBeUndefined()
+      expect(tags.disc).toBeUndefined()
     }
   })
   it('gives nothing when there are no tags', () => {
@@ -133,6 +140,9 @@ describe('Vorbis comments', () => {
   it('reads title, artist and album, whatever the key case, keeping the first of each', () => {
     const tags = parseVorbisComment(vorbisComment(['title=Lesson 5', 'ARTIST=Dara', 'Album=Khmer A1', 'TITLE=ignored', 'NOEQUALS']))
     expect(tags).toEqual({ title: 'Lesson 5', artist: 'Dara', album: 'Khmer A1' })
+  })
+  it('reads the track and disc numbers', () => {
+    expect(parseVorbisComment(vorbisComment(['TRACKNUMBER=4/9', 'DISCNUMBER=1', 'TITLE=x']))).toEqual({ title: 'x', track: 4, disc: 1 })
   })
   it('reads a cover carried as METADATA_BLOCK_PICTURE', () => {
     const b64 = btoa(String.fromCharCode(...flacPicture(3, 'image/png', png)))

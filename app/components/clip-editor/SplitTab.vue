@@ -69,7 +69,7 @@
       <div
         v-for="(seg, i) in segments"
         :key="i"
-        class="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-md px-1.5 py-1 -mx-1.5"
+        class="flex flex-wrap items-center gap-x-1.5 gap-y-1 rounded-md px-1.5 py-1 -mx-1.5"
         :class="[
           selectedSegment === i ? TAB_ACCENTS.split.selected : '',
           rowProblem(seg) ? 'ring-1 ring-inset ring-error-400 bg-error-50/60 dark:bg-error-950/30' : ''
@@ -82,7 +82,7 @@
         <UInput
           :model-value="formatTimecode(seg.startMsSeconds * 1000)"
           size="sm"
-          class="w-24"
+          class="w-[5.25rem]"
           :ui="{ base: 'tabular-nums' }"
           :aria-label="`Segment ${i + 1} start`"
           @change="(e: Event) => typeSegment(i, 'start', e)"
@@ -91,7 +91,7 @@
         <UInput
           :model-value="seg.endMsSeconds == null ? '' : formatTimecode(seg.endMsSeconds * 1000)"
           size="sm"
-          class="w-24"
+          class="w-[5.25rem]"
           placeholder="end"
           :ui="{ base: 'tabular-nums' }"
           :aria-label="`Segment ${i + 1} end`"
@@ -106,6 +106,15 @@
           :aria-label="playingSegment === i ? `Stop segment ${i + 1}` : `Play segment ${i + 1}`"
           :disabled="!!rowProblem(seg)"
           @click="playSegment(i)"
+        />
+        <UButton
+          size="xs"
+          color="error"
+          variant="ghost"
+          icon="i-lucide-x"
+          :aria-label="`Remove segment ${i + 1}`"
+          :disabled="segments.length <= 1"
+          @click="removeSegment(i)"
         />
         <p v-if="rowProblem(seg)" class="basis-full pl-7 text-xs text-error-600 dark:text-error-400" role="alert">{{ rowProblem(seg) }}</p>
         <p v-else-if="longRows.includes(i)" class="basis-full pl-7 text-xs text-warning-600 dark:text-warning-400">
@@ -133,15 +142,6 @@
         <p v-if="segmentSaying(seg)" class="basis-full pl-7 text-xs italic text-gray-500 dark:text-gray-400 truncate" :title="segmentSaying(seg)">
           “{{ segmentSaying(seg) }}”
         </p>
-        <UButton
-          size="xs"
-          color="error"
-          variant="ghost"
-          icon="i-lucide-x"
-          aria-label="Remove segment"
-          :disabled="segments.length <= 1"
-          @click="removeSegment(i)"
-        />
       </div>
     </section>
 
@@ -168,102 +168,142 @@
           Add segment
         </UButton>
       </div>
-      <div class="flex flex-wrap items-center gap-2">
-        <span class="text-xs text-gray-500">Split evenly:</span>
-        <UButton
-          v-for="n in [2, 3, 4, 5, 6, 8, 10]"
-          :key="n"
-          size="xs"
-          color="neutral"
-          variant="soft"
-          :class="TAB_ACCENTS.split.soft"
-          :disabled="!durationMs || n > evenPartsMax"
-          :title="durationMs && n > evenPartsMax ? tooManyPartsHint : undefined"
-          @click="splitEvenly(n)"
-        >
-          {{ n }} parts
-        </UButton>
-        <form class="flex items-center gap-1" @submit.prevent="splitEvenly(customParts)">
-          <UInput
-            v-model.number="customParts"
-            type="number"
-            size="xs"
-            :min="2"
-            :max="evenPartsMax"
-            class="w-16"
-            aria-label="Number of equal parts"
-            :disabled="!durationMs"
-          />
+      <!-- The ways to place the cuts: a short name on the left, its settings and button on the right -->
+      <h3 class="pt-1 text-xs font-semibold uppercase tracking-wide" :class="TAB_ACCENTS.split.heading">Ways to split</h3>
+      <div class="grid grid-cols-[5.5rem_minmax(0,1fr)] items-center gap-x-2 gap-y-2.5 text-xs text-gray-500 dark:text-gray-400" data-testid="split-ways">
+        <span>Evenly</span>
+        <div class="flex flex-wrap items-center gap-1">
           <UButton
-            type="submit"
+            v-for="n in [2, 3, 4, 5, 6, 8, 10]"
+            :key="n"
             size="xs"
             color="neutral"
             variant="soft"
-            :class="TAB_ACCENTS.split.button"
-            :disabled="!customPartsValid"
-            :title="customPartsValid ? undefined : tooManyPartsHint"
+            class="min-w-7 justify-center tabular-nums"
+            :class="TAB_ACCENTS.split.soft"
+            :aria-label="`${n} parts`"
+            :disabled="!durationMs || n > evenPartsMax"
+            :title="durationMs && n > evenPartsMax ? tooManyPartsHint : `${n} equal parts`"
+            @click="splitEvenly(n)"
           >
-            Split
+            {{ n }}
           </UButton>
-        </form>
-      </div>
-      <p v-if="evenPreview" class="text-xs text-gray-500 dark:text-gray-400">{{ evenPreview }}</p>
-      <div class="flex flex-wrap items-center gap-2">
-        <span class="text-xs text-gray-500">Or every</span>
-        <form class="flex items-center gap-1" @submit.prevent="splitEvery">
+          <form class="flex items-center gap-1" @submit.prevent="splitEvenly(customParts)">
+            <UInput
+              v-model.number="customParts"
+              type="number"
+              size="xs"
+              :min="2"
+              :max="evenPartsMax"
+              class="w-14"
+              placeholder="N"
+              aria-label="Number of equal parts"
+              :disabled="!durationMs"
+            />
+            <UButton
+              type="submit"
+              size="xs"
+              color="neutral"
+              variant="soft"
+              :class="TAB_ACCENTS.split.soft"
+              :disabled="!customPartsValid"
+              :title="customPartsValid ? undefined : tooManyPartsHint"
+            >
+              Split
+            </UButton>
+          </form>
+        </div>
+        <p v-if="evenPreview" class="col-start-2 -mt-1.5">{{ evenPreview }}</p>
+
+        <span>Every</span>
+        <form class="flex flex-wrap items-center gap-1" @submit.prevent="splitEvery">
           <UInput
             v-model.number="everySeconds"
             type="number"
             size="xs"
             :min="MIN_TRIM_MS / 1000"
             step="any"
-            class="w-20"
+            class="w-16"
+            placeholder="30"
             aria-label="Seconds per part"
             :disabled="!durationMs"
           />
-          <span class="text-xs text-gray-500">seconds</span>
-          <UButton type="submit" size="xs" color="neutral" variant="soft" :class="TAB_ACCENTS.split.button" :disabled="!everyRows.length">Split</UButton>
+          <span>seconds</span>
+          <UButton type="submit" size="xs" color="neutral" variant="soft" :class="TAB_ACCENTS.split.soft" :disabled="!everyRows.length">Split</UButton>
         </form>
-      </div>
-      <form class="flex flex-wrap items-center gap-2" data-testid="split-near" @submit.prevent="splitNearLength">
-        <span class="text-xs text-gray-500">Parts of about</span>
-        <UInput
-          v-model.number="nearSeconds"
-          type="number"
-          size="xs"
-          :min="MIN_TRIM_MS / 1000"
-          step="any"
-          class="w-20"
-          aria-label="Seconds per part, cut between sentences"
-          :disabled="!durationMs"
-        />
-        <span class="text-xs text-gray-500">seconds, cut between sentences</span>
-        <UButton type="submit" size="xs" color="neutral" variant="soft" :class="TAB_ACCENTS.split.button" :disabled="!nearSeconds || !durationMs"
-          >Split</UButton
-        >
-      </form>
-      <div class="flex flex-wrap items-center gap-2">
-        <span class="text-xs text-gray-500">At pauses of</span>
-        <USelect
-          v-model="pauseSplitSeconds"
-          size="xs"
-          class="w-20"
-          :items="PAUSE_SPLIT_SECONDS.map((n) => ({ label: `${n}s`, value: n }))"
-          aria-label="Shortest pause to cut at"
-        />
-        <span class="text-xs text-gray-500">or longer</span>
-        <UButton
-          size="xs"
-          color="neutral"
-          variant="soft"
-          :class="TAB_ACCENTS.split.button"
-          icon="i-lucide-audio-lines"
-          :loading="pauseSplitting"
-          :disabled="!durationMs"
-          @click="splitAtPauses"
-        >
-          Split at pauses
-        </UButton>
+
+        <span>About</span>
+        <form class="flex flex-wrap items-center gap-1" data-testid="split-near" @submit.prevent="splitNearLength">
+          <UInput
+            v-model.number="nearSeconds"
+            type="number"
+            size="xs"
+            :min="MIN_TRIM_MS / 1000"
+            step="any"
+            class="w-16"
+            placeholder="60"
+            aria-label="Seconds per part, cut between sentences"
+            :disabled="!durationMs"
+          />
+          <span>s each</span>
+          <UButton
+            type="submit"
+            size="xs"
+            color="neutral"
+            variant="soft"
+            :class="TAB_ACCENTS.split.soft"
+            :disabled="!nearSeconds || !durationMs"
+            title="Each cut moves to the nearest pause between sentences"
+            >Split between sentences</UButton
+          >
+        </form>
+
+        <span>At pauses</span>
+        <div class="flex flex-wrap items-center gap-1">
+          <USelect
+            v-model="pauseSplitSeconds"
+            size="xs"
+            class="w-20"
+            :items="PAUSE_SPLIT_SECONDS.map((n) => ({ label: `${n}s +`, value: n }))"
+            aria-label="Shortest pause to cut at"
+          />
+          <UButton
+            size="xs"
+            color="neutral"
+            variant="soft"
+            :class="TAB_ACCENTS.split.soft"
+            icon="i-lucide-audio-lines"
+            :loading="pauseSplitting"
+            :disabled="!durationMs"
+            title="Cuts in the middle of each quiet stretch this long or longer"
+            @click="splitAtPauses"
+          >
+            Split at pauses
+          </UButton>
+        </div>
+
+        <span>At scenes</span>
+        <div class="flex flex-wrap items-center gap-1">
+          <USelect
+            v-model="sceneSensitivity"
+            size="xs"
+            class="w-36"
+            :items="SCENE_SENSITIVITIES.map((s) => ({ label: s.label, value: s.value }))"
+            aria-label="Which scene changes"
+          />
+          <UButton
+            size="xs"
+            color="neutral"
+            variant="soft"
+            :class="TAB_ACCENTS.split.soft"
+            icon="i-lucide-clapperboard"
+            :loading="sceneSplitting"
+            :disabled="!durationMs"
+            @click="splitAtScenes"
+          >
+            Split at scenes
+          </UButton>
+        </div>
       </div>
       <div v-if="markers.length || aiChapters.length" class="flex flex-wrap items-center gap-2">
         <UButton
@@ -300,6 +340,36 @@
           Split at AI chapters{{ aiChapterSplit.rows.length ? ` (${aiChapterSplit.rows.length} parts)` : '' }}
         </UButton>
       </div>
+      <details class="group" data-testid="split-list">
+        <summary class="cursor-pointer text-xs font-medium text-gray-700 dark:text-gray-300">Split at a pasted list</summary>
+        <div class="mt-2 space-y-2">
+          <UTextarea
+            v-model="pastedList"
+            :rows="4"
+            autoresize
+            :maxrows="10"
+            class="w-full font-mono"
+            aria-label="List of times"
+            placeholder="0:00 Welcome&#10;1:15 Greetings&#10;4:30 Numbers"
+          />
+          <div class="flex flex-wrap items-center gap-2">
+            <p class="min-w-0 flex-1 text-xs text-gray-500 dark:text-gray-400">
+              One a line, time first or last — chapters from a description or show notes. Each part is named after its line.
+            </p>
+            <UButton
+              size="xs"
+              color="neutral"
+              variant="soft"
+              :class="TAB_ACCENTS.split.soft"
+              icon="i-lucide-list"
+              :disabled="!listSplit.found"
+              @click="splitAtList"
+            >
+              Split at these{{ listSplit.rows.length ? ` (${listSplit.rows.length} parts)` : '' }}
+            </UButton>
+          </div>
+        </div>
+      </details>
       <p class="text-xs text-gray-500 dark:text-gray-400">
         Play to a moment and press “Split at playhead” (or S) to cut the segment there in two. Drag a cut on the strip to move it; [ and ] jump between
         segments.
@@ -333,6 +403,31 @@
           @click="tightenSegments"
         >
           Trim the quiet at the edges
+        </UButton>
+        <UButton
+          size="xs"
+          color="neutral"
+          variant="soft"
+          :class="TAB_ACCENTS.split.soft"
+          icon="i-lucide-tag"
+          :loading="naming"
+          :disabled="segments.length < 2 || segments.every((s) => s.label?.trim())"
+          title="Each part without a name takes the first words it says"
+          @click="nameFromSpeech"
+        >
+          Name the parts from what they say
+        </UButton>
+        <UButton
+          size="xs"
+          color="neutral"
+          variant="soft"
+          :class="TAB_ACCENTS.split.soft"
+          icon="i-lucide-clipboard-copy"
+          :disabled="segments.length < 2"
+          title="“0:00 Name” lines, for the video’s description"
+          @click="copyPartsList"
+        >
+          Copy the parts as a list
         </UButton>
         <UButton
           v-if="canWrite"
@@ -437,12 +532,22 @@ const {
   aiChapters,
   aiChapterSplit,
   splitAtAiChapters,
+  pastedList,
+  listSplit,
+  splitAtList,
+  copyPartsList,
+  naming,
+  nameFromSpeech,
   nearSeconds,
   splitNearLength,
   PAUSE_SPLIT_SECONDS,
   pauseSplitSeconds,
   pauseSplitting,
   splitAtPauses,
+  SCENE_SENSITIVITIES,
+  sceneSensitivity,
+  sceneSplitting,
+  splitAtScenes,
   segmentSaying,
   playingSegment,
   playSegment,

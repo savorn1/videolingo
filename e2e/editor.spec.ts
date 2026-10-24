@@ -477,7 +477,7 @@ test('Split: at long pauses, at AI chapters, and parts of about N seconds betwee
 
   // About 2 s each, each cut in the nearest pause between sentences (2.0–2.3 s, 4.0–4.5 s, 6.0–6.5 s).
   await page.getByLabel('Seconds per part, cut between sentences').fill('2')
-  await page.getByTestId('split-near').getByRole('button', { name: 'Split' }).click()
+  await page.getByTestId('split-near').getByRole('button', { name: 'Split between sentences' }).click()
   await expect(page.getByLabel('Segment 2 start')).toHaveValue('0:02.15')
   await expect(page.getByLabel('Segment 3 start')).toHaveValue('0:04.25')
   // What each part says shows under its row.
@@ -552,4 +552,69 @@ test('Results come into view once a trim is queued', async ({ page }) => {
   await expect(results).not.toBeInViewport()
   await page.getByRole('button', { name: 'Start trim' }).click()
   await expect(results).toBeInViewport()
+})
+
+test('Split: at a pasted list, parts named from what they say, and copied as a list', async ({ page, context }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write'])
+  await openEditor(page)
+  await page.getByRole('tab', { name: /Split/ }).click()
+
+  // A pasted list cuts at its times and names each part after its line; a line without a time is left out.
+  const list = page.getByTestId('split-list')
+  await list.getByText('Split at a pasted list').click()
+  await list.getByLabel('List of times').fill('Chapters\n0:00 Intro\n0:06.5 Practice')
+  await list.getByRole('button', { name: 'Split at these (2 parts)' }).click()
+  await expect(page.getByLabel('Segment 2 start')).toHaveValue('0:06.50')
+  await expect(page.getByLabel('Segment 2 name')).toHaveValue('Practice')
+
+  // Even parts have no names; each takes the first words of its speech (0–2 s "Hello and welcome.", 4.5–6 s "Okay, sorry about that.").
+  await page.getByRole('button', { name: '2 parts', exact: true }).click()
+  await page.getByRole('button', { name: 'Name the parts from what they say' }).click()
+  await expect(page.getByLabel('Segment 1 name')).toHaveValue('Hello and welcome')
+  await expect(page.getByLabel('Segment 2 name')).toHaveValue('Okay, sorry about that')
+
+  await page.getByRole('button', { name: 'Copy the parts as a list' }).click()
+  await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe('0:00 Hello and welcome\n0:05 Okay, sorry about that')
+})
+
+test('Audio: words typed are muted wherever the transcript hears them', async ({ page }) => {
+  await openEditor(page)
+  await page.getByRole('tab', { name: /Audio/ }).click()
+  const form = page.getByTestId('mute-words')
+  // "notes." is said at 3.55–4 s in the sample's transcript; "zebra" never is.
+  await form.getByLabel('Words to mute').fill('zebra')
+  await form.getByRole('button', { name: 'Mute words' }).click()
+  await expect(page.getByText('None of those words is said', { exact: true })).toBeVisible()
+  await form.getByLabel('Words to mute').fill('Notes, zeb*')
+  await form.getByRole('button', { name: 'Mute words' }).click()
+  await expect(page.getByText('Muted 1 word', { exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Unmute 0:03.49' })).toBeVisible()
+  await page.getByRole('button', { name: /Render video with this audio/ }).click()
+
+  await expect
+    .poll(async () => (await mockRequests()).find((r) => r.path === '/api/admin/videos/7/edits/audio')?.body?.mutes)
+    .toEqual([{ startMs: 3490, endMs: 4060 }])
+})
+
+test('Text: a title on the picture as each chapter marker starts', async ({ page }) => {
+  const marker = { color: null, createdBy: 'admin', createdAt: '2026-10-13T09:00:00' }
+  await resetMock({
+    markers: [
+      { ...marker, id: 1, atMs: 0, label: 'Welcome', chapter: true },
+      { ...marker, id: 2, atMs: 1000, label: 'A note', chapter: false },
+      { ...marker, id: 3, atMs: 6000, label: 'Practice', chapter: true }
+    ]
+  })
+  await openEditor(page)
+  await page.getByRole('tab', { name: /Text/ }).click()
+  await page.getByRole('button', { name: 'Chapter titles' }).click()
+  await expect(page.getByText('2 chapter titles added', { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: /Render layers/ }).click()
+
+  await expect
+    .poll(async () => (await mockRequests()).find((r) => r.path === '/api/admin/videos/7/edits/overlay')?.body?.layers)
+    .toMatchObject([
+      { kind: 'TEXT', text: 'Welcome', startMs: 0, endMs: 4000, animation: 'SLIDE_LEFT' },
+      { kind: 'TEXT', text: 'Practice', startMs: 6000, endMs: 10_000 }
+    ])
 })

@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest'
-import { audioDifferences, describeRecipe, fullAudio, isRecipeEmpty, sanitizeRecipe, sanitizeRecipes, type EditRecipe } from './editRecipe'
+import {
+  audioDifferences,
+  describeRecipe,
+  fullAudio,
+  isRecipeEmpty,
+  recipesFileJson,
+  recipesFromFile,
+  sanitizeRecipe,
+  sanitizeRecipes,
+  type EditRecipe
+} from './editRecipe'
 
 const layer = { id: 'a', kind: 'TEXT' as const, text: 'Hi' }
 
@@ -71,5 +81,17 @@ describe('turn and flip in a recipe', () => {
       layers: []
     })
     expect(sanitizeRecipe({ frame: null, orient: { rotate: 45, flipH: false, flipV: false }, audio: { normalize: true }, layers: [] })?.orient).toBeUndefined()
+  })
+})
+
+describe('recipes file', () => {
+  const recipe = { id: 'r1', name: 'Reel look', savedAt: 1, data: { frame: { aspect: 9 / 16, w: 1080, h: 1920 }, audio: {}, layers: [] } }
+  it('goes out and comes back the same', () => {
+    expect(recipesFromFile(recipesFileJson([recipe]))).toEqual([recipe])
+    expect(recipesFromFile(JSON.stringify([recipe]))).toEqual([recipe])
+  })
+  it('says why a file is refused', () => {
+    expect(() => recipesFromFile('{nope')).toThrow('not valid JSON')
+    expect(() => recipesFromFile('{"recipes":[]}')).toThrow('No edit recipes')
   })
 })

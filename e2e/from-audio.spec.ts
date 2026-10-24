@@ -88,6 +88,8 @@ test('V18: an older server that cannot draw Stereo is not offered it', async ({ 
   await resetMock({ waveforms: ['NONE', 'WAVES', 'BARS', 'COLUMNS'] })
   await openReady(page, '/videos/from-audio')
   const templates = page.getByRole('group', { name: 'Waveform templates' })
+  // Only the styles this server draws: few enough to show without "Show all".
+  await expect(templates.getByRole('button', { name: /Show all/ })).toHaveCount(0)
   await expect(templates.getByRole('button', { name: /Equaliser/ })).toBeVisible()
   await expect(templates.getByRole('button', { name: /Duet/ })).toHaveCount(0)
   await expect(templates.getByRole('button', { name: /Neon/ })).toBeVisible()
@@ -241,4 +243,72 @@ test('Chapters can be added by hand, and the cards and music previewed', async (
       { startMs: 0, title: 'Hello' },
       { startMs: 10_000, title: 'Numbers' }
     ])
+})
+
+test('A batch is put in file-name order, its titles numbered, and chapters pasted as a list', async ({ page }) => {
+  await openReady(page, '/videos/from-audio')
+  await page.getByLabel('Choose audio files').setInputFiles([wavFile('lesson-10.wav', 20), wavFile('lesson-2.wav', 20)])
+  await expect(page.getByText('Uploaded')).toHaveCount(2)
+
+  // A WAV has no tags, so there is no track number to order by.
+  const tools = page.getByTestId('batch-tools')
+  await expect(tools.getByRole('button', { name: 'By track number' })).toHaveCount(0)
+  await tools.getByRole('button', { name: 'By file name' }).click()
+  await tools.getByRole('button', { name: 'Number the titles' }).click()
+  const numbering = page.getByTestId('number-titles')
+  await expect(numbering).toContainText('First: Episode 1: Lesson 2')
+  await numbering.getByLabel('Title pattern').fill('{title}')
+  await expect(numbering).toContainText('Put {n} where the number goes')
+  await numbering.getByRole('button', { name: '{n}. {title}' }).click()
+  await numbering.getByRole('button', { name: 'Number 2 titles' }).click()
+  await expect(page.getByLabel('Title for lesson-2.wav')).toHaveValue('1. Lesson 2')
+  await expect(page.getByLabel('Title for lesson-10.wav')).toHaveValue('2. Lesson 10')
+
+  await page.getByRole('button', { name: 'Chapters of lesson-2.wav' }).click()
+  const editor = page.getByTestId('chapters-editor')
+  await editor.getByRole('button', { name: 'Paste a list' }).click()
+  await editor.getByLabel('Chapter list').fill('Chapters\n0:00 Welcome\n0:12 - Greetings')
+  await expect(editor).toContainText('2 found, 1 line without a time left out')
+  await editor.getByRole('button', { name: 'Use these' }).click()
+  await expect(editor.getByLabel('Chapter 2 title')).toHaveValue('Greetings')
+  await editor.getByRole('button', { name: 'Save chapters' }).click()
+  await expect(page.getByRole('button', { name: 'Chapters of lesson-2.wav' })).toHaveText('Chapters (2)')
+
+  await page.getByRole('button', { name: 'Make 2 videos' }).click()
+  await expect(page).toHaveURL(/\/videos\/made/)
+  const made = (await mockRequests()).filter((r) => r.path === '/api/admin/videos/from-audio').map((r) => r.body)
+  expect(made.map((b) => b.title)).toEqual(['1. Lesson 2', '2. Lesson 10'])
+  expect(made[0].chapters).toEqual([
+    { startMs: 0, title: 'Welcome' },
+    { startMs: 12_000, title: 'Greetings' }
+  ])
+})
+
+test('A file added twice is left out, and the titles can be changed with find and replace', async ({ page }) => {
+  await openReady(page, '/videos/from-audio')
+  await page.getByLabel('Choose audio files').setInputFiles([wavFile('lesson-1.wav'), wavFile('lesson-2.wav')])
+  await expect(page.getByText('Uploaded')).toHaveCount(2)
+  await page.getByLabel('Choose audio files').setInputFiles(wavFile('lesson-1.wav'))
+  await expect(page.getByText('“lesson-1.wav” is already in the list', { exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: /^Remove lesson/ })).toHaveCount(2)
+
+  await page.getByTestId('batch-tools').getByRole('button', { name: 'Find and replace' }).click()
+  const form = page.getByTestId('replace-titles')
+  await form.getByLabel('Find in the titles').fill('lesson')
+  await form.getByLabel('Replace with').fill('Lecture')
+  await expect(form).toContainText('In 2 of 2 titles.')
+  await form.getByRole('button', { name: 'Replace' }).click()
+  await expect(page.getByLabel('Title for lesson-1.wav')).toHaveValue('Lecture 1')
+  await expect(page.getByLabel('Title for lesson-2.wav')).toHaveValue('Lecture 2')
+})
+
+test('The waveform templates show two rows, and Show all opens the rest', async ({ page }) => {
+  await openReady(page, '/videos/from-audio')
+  const templates = page.getByRole('group', { name: 'Waveform templates' })
+  await expect(templates.getByRole('button', { name: /Lavender/ })).toHaveCount(0)
+  await templates.getByRole('button', { name: /Show all/ }).click()
+  await templates.getByRole('button', { name: /Lavender/ }).click()
+  // Folded again, the chosen one stays in view.
+  await templates.getByRole('button', { name: 'Show fewer' }).click()
+  await expect(templates.getByRole('button', { name: /Lavender/ })).toHaveAttribute('aria-pressed', 'true')
 })

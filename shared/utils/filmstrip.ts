@@ -26,3 +26,13 @@ export function thumbnailLines(text: string, maxChars: number, maxLines = 3): st
 export function thumbnailFontPx(height: number, lines: number): number {
   return Math.round(height * (lines <= 1 ? 0.14 : lines === 2 ? 0.12 : 0.1))
 }
+
+/** The waveform's peaks (0–1) as `count` columns, each the loudest of its slice. */
+export function peakColumns(peaks: number[], count: number): number[] {
+  if (!peaks.length || count <= 0) return []
+  return Array.from({ length: count }, (_, i) => {
+    const from = Math.floor((i * peaks.length) / count)
+    const to = Math.max(from + 1, Math.floor(((i + 1) * peaks.length) / count))
+    return Math.max(...peaks.slice(from, to))
+  })
+}

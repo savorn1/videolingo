@@ -7,7 +7,15 @@
     @dragleave.self="dragging = false"
     @drop.prevent="onDrop"
   >
-    <UButton size="xs" color="neutral" variant="soft" :icon="icon ?? 'i-lucide-upload'" :loading="progress != null" @click="input?.click()">
+    <UButton
+      size="xs"
+      color="neutral"
+      :variant="variant ?? 'soft'"
+      :class="buttonClass"
+      :icon="icon ?? 'i-lucide-upload'"
+      :loading="progress != null"
+      @click="input?.click()"
+    >
       {{ progress != null ? `Uploading ${Math.round(progress * 100)}%` : label }}
     </UButton>
     <UProgress v-if="progress != null" :model-value="Math.round(progress * 100)" size="xs" class="flex-1" />
@@ -18,8 +26,9 @@
 
 <script setup lang="ts">
 // A button that opens the file picker, or takes a dropped file — the parent
-// does the uploading and passes its progress (0–1) back, or null when idle.
-defineProps<{ label: string; icon?: string; accept?: string; progress: number | null }>()
+// does the uploading and passes its progress (0–1) back, or null when idle. `buttonClass` colours the button
+// (an editor tab's soft accent).
+defineProps<{ label: string; icon?: string; accept?: string; progress: number | null; buttonClass?: string; variant?: 'soft' | 'ghost' }>()
 const emit = defineEmits<{ pick: [file: File] }>()
 const input = useTemplateRef<HTMLInputElement>('input')
 const dragging = ref(false)

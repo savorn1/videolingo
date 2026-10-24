@@ -3,6 +3,7 @@
 // seconds like the rest of the Split tab (a null end = "to the end"). Pure, so tested.
 import { boundaryAfter, MAX_PART_LABEL, MAX_SEGMENTS, MIN_TRIM_MS, moveBoundary, type SegmentRow } from './videoEdit'
 import type { TimedCue } from './sentences'
+import { parseChapterList } from './audioVideoExtras'
 
 /** How far (ms) a cut may move to reach a sentence break. */
 export const MAX_SNAP_MS = 3000
@@ -243,4 +244,44 @@ export function splitRequestSegments(rows: SegmentRow[]): { startMs: number; end
     ...(r.label?.trim() ? { label: r.label.trim().slice(0, MAX_PART_LABEL) } : {}),
     ...(r.aspect ? { aspect: r.aspect } : {})
   }))
+}
+
+// ── A pasted list, the parts as a list, and names from the speech ──
+
+/**
+ * Rows cut at the times of a pasted "0:00 Intro" list (as parseChapterList reads it), each named after its line.
+ * `lines` counts the lines with no time; `skipped` the times too close to another cut or an end, as rowsFromCutPoints.
+ */
+export function rowsFromList(text: string, durationMs: number): { rows: SegmentRow[]; found: number; lines: number; skipped: number; tooMany: boolean } {
+  const { chapters, skipped: lines } = parseChapterList(text)
+  // A list starting at 0:00 has no cut there; its first title names the first part.
+  const { rows, skipped, tooMany } = rowsFromCutPoints(
+    durationMs,
+    chapters.filter((c) => c.startMs > 0).map((c) => c.startMs)
+  )
+  const marks = chapters.map((c) => ({ atMs: c.startMs, label: c.title }))
+  return { rows: labelRowsAt(rows, marks), found: chapters.length, lines, skipped, tooMany }
+}
+
+function listStamp(ms: number, hours: boolean): string {
+  const s = Math.floor(ms / 1000)
+  const two = (n: number) => String(n).padStart(2, '0')
+  return hours ? `${Math.floor(s / 3600)}:${two(Math.floor(s / 60) % 60)}:${two(s % 60)}` : `${Math.floor(s / 60)}:${two(s % 60)}`
+}
+
+/** The parts as "0:00 Name" lines, in row order (a part without a name is "Part N"), for a description or show notes. */
+export function partsAsList(rows: SegmentRow[], durationMs: number): string {
+  const hours = durationMs >= 3_600_000
+  return rows.map((r, i) => `${listStamp(r.startMsSeconds * 1000, hours)} ${r.label?.trim() || `Part ${i + 1}`}`).join('\n')
+}
+
+/** A part's name from what it says: its first few words (to a sentence's end, if sooner), capitalised, without the closing punctuation. */
+export function labelFromSpeech(text: string, maxWords = 6): string {
+  const sentence = text.replace(/…$/, '').split(/(?<=[.!?។])\s/)[0]!
+  const words = sentence.trim().split(/\s+/).filter(Boolean).slice(0, maxWords)
+  const label = words
+    .join(' ')
+    .replace(/[\s.,;:!?។…"“”'‘’-]+$/u, '')
+    .slice(0, MAX_PART_LABEL)
+  return label ? label.charAt(0).toUpperCase() + label.slice(1) : ''
 }

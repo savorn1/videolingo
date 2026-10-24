@@ -29,7 +29,7 @@
       </div>
       <div v-if="hasWords" class="flex flex-wrap items-center gap-2">
         <USwitch v-model="byWord" size="sm" label="Cut by word" />
-        <UButton v-if="fillers.length" size="xs" color="neutral" variant="soft" icon="i-lucide-eraser" @click="cutFillers">
+        <UButton v-if="fillers.length" size="xs" color="neutral" variant="soft" :class="TAB_ACCENTS.trim.soft" icon="i-lucide-eraser" @click="cutFillers">
           Cut the filler words ({{ fillers.length }})
         </UButton>
       </div>
@@ -89,6 +89,7 @@
 </template>
 
 <script setup lang="ts">
+import { TAB_ACCENTS } from '#shared/utils/tabAccent'
 // Edit by transcript: the video's transcript as a list of sentences; crossing one out adds its stretch
 // (and the pause to a crossed-out neighbour) to the Cut out ranges, which render as one Cut job.
 import type { Transcript, TranscriptSegment } from '~/composables/useTranscripts'

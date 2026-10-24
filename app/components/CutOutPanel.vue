@@ -19,6 +19,7 @@
         size="xs"
         color="neutral"
         variant="soft"
+        :class="TAB_ACCENTS.trim.soft"
         icon="i-lucide-scissors"
         data-testid="cut-mark-start"
         @click="markStart = Math.round(currentMs)"

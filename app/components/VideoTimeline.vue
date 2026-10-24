@@ -29,12 +29,24 @@
             Add AI chapters as markers
           </UButton>
         </UTooltip>
+        <UTooltip v-if="markers.length" text="The chapter markers (or all markers) as the 0:00 list YouTube reads from a description">
+          <UButton
+            size="sm"
+            color="neutral"
+            variant="soft"
+            icon="i-simple-icons-youtube"
+            :class="canWrite && aiChapters.length ? '' : 'ml-auto'"
+            @click="onCopyYoutubeChapters"
+          >
+            Copy chapters for YouTube
+          </UButton>
+        </UTooltip>
         <USelect
           v-model="selectedAudio"
           :items="audioOptions"
           size="sm"
           class="w-52"
-          :class="canWrite && aiChapters.length ? '' : 'ml-auto'"
+          :class="(canWrite && aiChapters.length) || markers.length ? '' : 'ml-auto'"
           aria-label="Preview audio"
         />
       </div>
@@ -228,6 +240,7 @@ import type { VideoMarker } from '~/composables/useVideoMarkers'
 import type VideoPlayer from '~/components/VideoPlayer.vue'
 import { clampZoom, cueSnapTargets, msToPx, pxToMs, snapMs, ZOOM_STEP } from '#shared/utils/timeline'
 import { aiChaptersToMarkers, pickAiChapters, type AiChapter } from '#shared/utils/aiChapterMarkers'
+import { youtubeChapters } from '#shared/utils/youtubeChapters'
 
 const props = defineProps<{ video: Video; canWrite: boolean }>()
 
@@ -235,6 +248,25 @@ const toast = useToast()
 const { overview: dubOverview, create: createDub, setLocked } = useDubs()
 const { list: listSubtitles, get: getSubtitle } = useSubtitles()
 const { list: listMarkers, create: createMarkerApi, update: updateMarkerApi, remove: removeMarkerApi } = useVideoMarkers()
+
+// ── Markers → YouTube's chapter list ────────────────────────────────────────
+async function onCopyYoutubeChapters() {
+  const { text, count, skipped, problem } = youtubeChapters(markers.value, durationMs.value)
+  if (problem) {
+    toast.add({ title: 'Not enough chapters for YouTube', description: problem, color: 'warning' })
+    return
+  }
+  try {
+    await navigator.clipboard.writeText(text)
+    toast.add({
+      title: `${count} chapters copied`,
+      description: `Paste them into the YouTube description.${skipped ? ` ${skipped} marker${skipped === 1 ? ' was' : 's were'} too close to another and left out.` : ''}`,
+      color: 'success'
+    })
+  } catch {
+    toast.add({ title: 'Could not copy', description: text, color: 'warning' })
+  }
+}
 
 // ── AI chapters → chapter markers ───────────────────────────────────────────
 const { latest: latestAi } = useAi()

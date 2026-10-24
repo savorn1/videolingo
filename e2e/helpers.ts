@@ -1,6 +1,6 @@
 import type { BrowserContext, Page } from '@playwright/test'
 
-const MOCK = 'http://localhost:8089'
+const MOCK = `http://localhost:${process.env.E2E_MOCK_PORT || 8089}`
 
 /** Signs in as an admin the way the app remembers it: the auth cookies (the mock backend accepts any token). */
 export async function signInAsAdmin(context: BrowserContext) {

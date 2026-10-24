@@ -43,7 +43,14 @@
       </template>
       <p v-else class="text-xs text-gray-500 dark:text-gray-400">The file plays from its start; the video's own sound is dropped.</p>
     </template>
-    <UploadButton v-else label="Add audio file" icon="i-lucide-music" :progress="uploading ? progress : null" @pick="onPick" />
+    <UploadButton
+      :button-class="TAB_ACCENTS.trim.soft"
+      v-else
+      label="Add audio file"
+      icon="i-lucide-music"
+      :progress="uploading ? progress : null"
+      @pick="onPick"
+    />
     <p class="text-xs text-gray-500 dark:text-gray-400">It is added to the trimmed result, so times here start at 0:00 of the trim.</p>
   </EditorSection>
 </template>

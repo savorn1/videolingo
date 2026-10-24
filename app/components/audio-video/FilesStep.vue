@@ -5,6 +5,73 @@
         {{ items.length }} files<template v-if="readyItems.length"> → {{ videoCountLabel }} video{{ videoCount === 1 ? '' : 's' }}</template>
       </span>
     </template>
+    <!-- Several files: put them in order and number their titles in one go -->
+    <div v-if="items.length > 1" class="mb-2 flex flex-wrap items-center gap-1 text-xs text-gray-500 dark:text-gray-400" data-testid="batch-tools">
+      <span>Order</span>
+      <UButton
+        v-if="hasTracks"
+        size="xs"
+        color="neutral"
+        variant="ghost"
+        icon="i-lucide-list-ordered"
+        :disabled="saving"
+        title="The track numbers written in the files; ones without go last"
+        @click="orderItems('TRACK')"
+        >By track number</UButton
+      >
+      <UButton size="xs" color="neutral" variant="ghost" icon="i-lucide-arrow-down-a-z" :disabled="saving" @click="orderItems('NAME')">By file name</UButton>
+      <UPopover v-model:open="numberOpen">
+        <UButton size="xs" color="neutral" variant="ghost" icon="i-lucide-hash" :disabled="saving">Number the titles</UButton>
+        <template #content>
+          <div class="w-80 space-y-3 p-3" data-testid="number-titles">
+            <UFormField label="Pattern" :error="patternProblem ?? undefined" description="{n} is the number ({nn} as 01, 02…), {title} the title.">
+              <UInput v-model="pattern" size="sm" class="w-full font-mono" aria-label="Title pattern" />
+            </UFormField>
+            <div class="flex flex-wrap gap-1">
+              <UButton
+                v-for="p in TITLE_PATTERNS"
+                :key="p"
+                size="xs"
+                :color="pattern === p ? 'primary' : 'neutral'"
+                :variant="pattern === p ? 'soft' : 'ghost'"
+                class="font-mono"
+                @click="pattern = p"
+                >{{ p }}</UButton
+              >
+            </div>
+            <UFormField label="Start at">
+              <UInput v-model.number="numberStart" type="number" size="sm" :min="0" :max="9999" class="w-24" aria-label="First number" />
+            </UFormField>
+            <p v-if="example" class="truncate text-xs text-gray-500 dark:text-gray-400" :title="example">
+              First: <span class="text-gray-900 dark:text-white">{{ example }}</span>
+            </p>
+            <div class="flex justify-end">
+              <UButton size="sm" :disabled="!!patternProblem" @click="applyNumbers">Number {{ titled.length }} titles</UButton>
+            </div>
+          </div>
+        </template>
+      </UPopover>
+      <UPopover v-model:open="replaceOpen">
+        <UButton size="xs" color="neutral" variant="ghost" icon="i-lucide-replace" :disabled="saving">Find and replace</UButton>
+        <template #content>
+          <form class="w-72 space-y-3 p-3" data-testid="replace-titles" @submit.prevent="applyReplace">
+            <UFormField label="Find">
+              <UInput v-model="findText" size="sm" class="w-full" aria-label="Find in the titles" autofocus />
+            </UFormField>
+            <UFormField label="Replace with" description="Leave empty to take it out.">
+              <UInput v-model="replaceText" size="sm" class="w-full" aria-label="Replace with" />
+            </UFormField>
+            <UCheckbox v-model="matchCase" size="sm" label="Match case" />
+            <p class="text-xs text-gray-500 dark:text-gray-400">
+              {{ findText ? `In ${matching} of ${titled.length} titles.` : 'Changes every title it is in.' }}
+            </p>
+            <div class="flex justify-end">
+              <UButton type="submit" size="sm" :disabled="!matching">Replace</UButton>
+            </div>
+          </form>
+        </template>
+      </UPopover>
+    </div>
     <ul v-if="items.length" class="mb-3 divide-y divide-gray-100 dark:divide-gray-800 rounded-lg border border-gray-200 dark:border-gray-800">
       <li v-for="(it, idx) in items" :key="it.id" class="space-y-2 px-3 py-2.5">
         <div class="flex items-center gap-3">
@@ -150,6 +217,7 @@
 <script setup lang="ts">
 // Step 1 of "Video from audio": the recordings, each with its title and (optionally) its own picture.
 import { MAX_BATCH } from '#shared/utils/audioVideo'
+import { numberTitles, replaceInTitles, TITLE_PATTERNS, titlePatternProblem } from '#shared/utils/audioVideoExtras'
 const {
   maxUploadMb,
   items,
@@ -162,6 +230,10 @@ const {
   retryItem,
   removeItem,
   moveItem,
+  hasTracks,
+  orderItems,
+  numberItemTitles,
+  replaceItemTitles,
   playingId,
   togglePlay,
   onPickItemPicture,
@@ -170,4 +242,46 @@ const {
 // The recording whose chapters are being edited.
 const chaptersFor = ref<number | null>(null)
 const editing = computed(() => items.value.find((i) => i.id === chaptersFor.value) ?? null)
+
+// "Number the titles": a pattern applied once, in the current order; the titles stay editable after.
+const numberOpen = ref(false)
+const pattern = ref<string>(TITLE_PATTERNS[1])
+const numberStart = ref(1)
+const titled = computed(() => items.value.filter((i) => i.status !== 'error'))
+const start = computed(() => (Number.isFinite(numberStart.value) ? Math.max(0, Math.min(9999, Math.round(numberStart.value))) : 1))
+const patternProblem = computed(() => titlePatternProblem(pattern.value))
+const example = computed(() =>
+  patternProblem.value || !titled.value.length
+    ? ''
+    : numberTitles(
+        titled.value.map((i) => i.title.trim()),
+        pattern.value,
+        start.value
+      )[0]
+)
+function applyNumbers() {
+  numberItemTitles(pattern.value, start.value)
+  numberOpen.value = false
+}
+
+// "Find and replace": across every title at once, counted before it is applied.
+const toast = useToast()
+const replaceOpen = ref(false)
+const findText = ref('')
+const replaceText = ref('')
+const matchCase = ref(false)
+const matching = computed(
+  () =>
+    replaceInTitles(
+      titled.value.map((i) => i.title),
+      findText.value,
+      replaceText.value,
+      matchCase.value
+    ).changed
+)
+function applyReplace() {
+  const n = replaceItemTitles(findText.value, replaceText.value, matchCase.value)
+  replaceOpen.value = false
+  toast.add({ title: `Changed ${n} title${n === 1 ? '' : 's'}`, color: 'success' })
+}
 </script>

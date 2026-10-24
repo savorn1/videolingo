@@ -2,7 +2,10 @@ import { describe, expect, it } from 'vitest'
 import {
   cutMarkers,
   cutsAtPauses,
+  labelFromSpeech,
   labelRowsAt,
+  partsAsList,
+  rowsFromList,
   splitRequestSegments,
   rowsFromCutPoints,
   rowsNearLength,
@@ -270,5 +273,37 @@ describe('names and shapes survive the helpers', () => {
       ['Talk', 1],
       [undefined, 1]
     ])
+  })
+})
+
+describe('a pasted list, the parts as a list, and names from the speech', () => {
+  it('cuts at a pasted list and names each part after its line', () => {
+    const { rows, found, lines, skipped, tooMany } = rowsFromList('Chapters\n0:00 Welcome\n0:20 Greetings\n0:20.2 Too close\n1:10 Numbers', 90_000)
+    expect(rows).toEqual([
+      { startMsSeconds: 0, endMsSeconds: 20, label: 'Welcome' },
+      { startMsSeconds: 20, endMsSeconds: 70, label: 'Greetings' },
+      { startMsSeconds: 70, endMsSeconds: null, label: 'Numbers' }
+    ])
+    expect({ found, lines, skipped, tooMany }).toEqual({ found: 4, lines: 1, skipped: 1, tooMany: false })
+    // Without 0:00 the first part keeps no name; a list past the end gives nothing to split.
+    expect(rowsFromList('0:30 Middle', 60_000).rows).toEqual([
+      { startMsSeconds: 0, endMsSeconds: 30 },
+      { startMsSeconds: 30, endMsSeconds: null, label: 'Middle' }
+    ])
+    expect(rowsFromList('2:00 Later', 60_000).rows).toEqual([])
+  })
+  it('writes the parts as a list in row order, with hours for a long video', () => {
+    const rows = [
+      { startMsSeconds: 0, endMsSeconds: 75.5, label: ' Welcome ' },
+      { startMsSeconds: 75.5, endMsSeconds: null }
+    ]
+    expect(partsAsList(rows, 120_000)).toBe('0:00 Welcome\n1:15 Part 2')
+    expect(partsAsList(rows, 4_000_000)).toBe('0:00:00 Welcome\n0:01:15 Part 2')
+  })
+  it('names a part from the first words it says', () => {
+    expect(labelFromSpeech('so today we will learn the numbers from one to ten')).toBe('So today we will learn the')
+    expect(labelFromSpeech('Hello! Welcome back to the class.')).toBe('Hello')
+    expect(labelFromSpeech('Count with me, one, two…')).toBe('Count with me, one, two')
+    expect(labelFromSpeech('   ')).toBe('')
   })
 })

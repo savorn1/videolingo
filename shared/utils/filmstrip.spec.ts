@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { filmstripTimes, thumbnailFontPx, thumbnailLines } from './filmstrip'
+import { filmstripTimes, peakColumns, thumbnailFontPx, thumbnailLines } from './filmstrip'
 
 describe('filmstripTimes', () => {
   it('takes the middle of each slice', () => {
@@ -15,5 +15,13 @@ describe('thumbnailLines', () => {
   })
   it('makes fewer lines bigger', () => {
     expect(thumbnailFontPx(720, 1)).toBeGreaterThan(thumbnailFontPx(720, 3))
+  })
+})
+
+describe('peakColumns', () => {
+  it('keeps the loudest of each slice', () => {
+    expect(peakColumns([0.1, 0.9, 0.2, 0.3, 0.5, 0.4], 3)).toEqual([0.9, 0.3, 0.5])
+    expect(peakColumns([0.5], 3)).toEqual([0.5, 0.5, 0.5])
+    expect(peakColumns([], 3)).toEqual([])
   })
 })

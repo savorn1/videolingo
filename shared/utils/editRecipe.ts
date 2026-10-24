@@ -129,3 +129,24 @@ export function sanitizeRecipes(raw: unknown): SavedRecipe[] {
   }
   return out
 }
+
+/** What a recipes file says it is. */
+export const RECIPES_FILE_KIND = 'videolingo-edit-recipes'
+
+/** The saved recipes as a JSON file's text, to share with another admin or keep. */
+export function recipesFileJson(list: SavedRecipe[]): string {
+  return JSON.stringify({ kind: RECIPES_FILE_KIND, version: 1, recipes: list }, null, 2)
+}
+
+/** The recipes in a file made by recipesFileJson (or a bare list); throws, saying why, on one that has none. */
+export function recipesFromFile(text: string): SavedRecipe[] {
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(text)
+  } catch {
+    throw new Error('That file is not valid JSON.')
+  }
+  const found = sanitizeRecipes(Array.isArray(parsed) ? parsed : (parsed as { recipes?: unknown } | null)?.recipes)
+  if (!found.length) throw new Error('No edit recipes found in that file.')
+  return found
+}

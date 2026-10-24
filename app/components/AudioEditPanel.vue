@@ -29,7 +29,13 @@
           <span v-if="s.replacement.durationMs" class="text-xs text-gray-500 tabular-nums">{{ formatTimecode(s.replacement.durationMs) }}</span>
           <UButton size="xs" color="neutral" variant="ghost" icon="i-lucide-x" aria-label="Remove replacement audio" @click="s.replacement = null" />
         </div>
-        <UploadButton v-else label="Upload audio" :progress="uploading === 'replacement' ? uploadProgress : null" @pick="(f) => onUpload(f, 'replacement')" />
+        <UploadButton
+          :button-class="TAB_ACCENTS.audio.soft"
+          v-else
+          label="Upload audio"
+          :progress="uploading === 'replacement' ? uploadProgress : null"
+          @pick="(f) => onUpload(f, 'replacement')"
+        />
         <p class="text-xs text-gray-500 dark:text-gray-400">Plays from the start of the video; longer files are cut at its end, shorter ones leave silence.</p>
       </template>
     </EditorSection>
@@ -37,43 +43,75 @@
     <!-- ── Clips ───────────────────────────────────────────────────────── -->
     <EditorSection v-model:open="open.clips" title="Clips" :changed="changed.clips" hint="on the strip under the video">
       <div class="flex flex-wrap gap-1">
-        <UButton size="xs" color="neutral" variant="soft" icon="i-lucide-scissors-line-dashed" :disabled="!splittable" @click="onSplit"
+        <UButton
+          size="xs"
+          color="neutral"
+          variant="soft"
+          :class="TAB_ACCENTS.audio.soft"
+          icon="i-lucide-scissors-line-dashed"
+          :disabled="!splittable"
+          @click="onSplit"
           >Split at playhead</UButton
         >
-        <UButton size="xs" color="neutral" variant="soft" icon="i-lucide-copy" :disabled="!selected || s.clips.length >= MAX_AUDIO_CLIPS" @click="onDuplicate"
+        <UButton
+          size="xs"
+          color="neutral"
+          variant="soft"
+          :class="TAB_ACCENTS.audio.soft"
+          icon="i-lucide-copy"
+          :disabled="!selected || s.clips.length >= MAX_AUDIO_CLIPS"
+          @click="onDuplicate"
           >Duplicate</UButton
         >
-        <UButton size="xs" color="neutral" variant="soft" icon="i-lucide-merge" :disabled="!hasNext" @click="onMerge">Merge with next</UButton>
+        <UButton size="xs" color="neutral" variant="soft" :class="TAB_ACCENTS.audio.soft" icon="i-lucide-merge" :disabled="!hasNext" @click="onMerge"
+          >Merge with next</UButton
+        >
         <UButton size="xs" color="error" variant="ghost" icon="i-lucide-trash-2" :disabled="!selected" @click="onDeleteClip">Delete clip</UButton>
         <UButton size="xs" color="neutral" variant="ghost" icon="i-lucide-rotate-ccw" :disabled="!edit.clipsChanged.value" @click="edit.resetClips()"
           >Reset clips</UButton
         >
       </div>
-      <div v-if="selected" class="grid grid-cols-2 sm:grid-cols-4 gap-2" data-testid="clip-fields">
-        <UFormField label="Starts at (s)">
-          <UInput :model-value="sec(selected.atMs)" type="number" step="0.01" min="0" size="sm" @update:model-value="(v) => patchClip({ atMs: ms(v) })" />
+      <div v-if="selected" class="grid grid-cols-2 gap-x-3 gap-y-2" data-testid="clip-fields">
+        <UFormField label="Starts at" hint="on the video">
+          <UInput
+            :model-value="sec(selected.atMs)"
+            type="number"
+            step="0.01"
+            min="0"
+            size="sm"
+            class="w-full"
+            @update:model-value="(v) => patchClip({ atMs: ms(v) })"
+          >
+            <template #trailing><span class="text-xs text-gray-500 dark:text-gray-400">s</span></template>
+          </UInput>
         </UFormField>
-        <UFormField label="From (s)">
+        <UFormField label="From" hint="in the sound">
           <UInput
             :model-value="sec(selected.srcStartMs)"
             type="number"
             step="0.01"
             min="0"
             size="sm"
+            class="w-full"
             @update:model-value="(v) => patchClip({ srcStartMs: ms(v) })"
-          />
+          >
+            <template #trailing><span class="text-xs text-gray-500 dark:text-gray-400">s</span></template>
+          </UInput>
         </UFormField>
-        <UFormField label="To (s)">
+        <UFormField label="To">
           <UInput
             :model-value="sec(selected.srcEndMs)"
             type="number"
             step="0.01"
             min="0"
             size="sm"
+            class="w-full"
             @update:model-value="(v) => patchClip({ srcEndMs: ms(v) })"
-          />
+          >
+            <template #trailing><span class="text-xs text-gray-500 dark:text-gray-400">s</span></template>
+          </UInput>
         </UFormField>
-        <UFormField label="Volume %">
+        <UFormField label="Volume">
           <UInput
             :model-value="Math.round(selected.gain * 100)"
             type="number"
@@ -81,8 +119,11 @@
             min="0"
             :max="400"
             size="sm"
+            class="w-full"
             @update:model-value="(v) => patchClip({ gain: Number(v) / 100 })"
-          />
+          >
+            <template #trailing><span class="text-xs text-gray-500 dark:text-gray-400">%</span></template>
+          </UInput>
         </UFormField>
       </div>
       <p v-else class="text-xs text-gray-500 dark:text-gray-400">Select a clip on the strip to edit it.</p>
@@ -98,11 +139,36 @@
         <UButton size="xs" color="neutral" variant="ghost" @click="s.range = [s.range[0], Math.max(Math.round(currentMs), s.range[0] + 50)]"
           >End at playhead</UButton
         >
-        <UButton size="xs" color="neutral" variant="soft" icon="i-lucide-volume-x" :disabled="!rangeValid" @click="onMuteRange">Mute range</UButton>
+        <UButton size="xs" color="neutral" variant="soft" :class="TAB_ACCENTS.audio.soft" icon="i-lucide-volume-x" :disabled="!rangeValid" @click="onMuteRange"
+          >Mute range</UButton
+        >
         <UButton size="xs" color="error" variant="ghost" icon="i-lucide-eraser" :disabled="!rangeValid" @click="confirmDeleteRange = true"
           >Delete range</UButton
         >
       </div>
+      <form class="flex flex-wrap items-center gap-1" data-testid="mute-words" @submit.prevent="onMuteWords">
+        <UInput
+          v-model="muteWordsText"
+          size="xs"
+          class="min-w-0 flex-1"
+          icon="i-lucide-message-square-off"
+          placeholder="Words to mute, e.g. darn, heck*"
+          aria-label="Words to mute"
+          :disabled="s.source !== 'ORIGINAL'"
+        />
+        <UButton
+          type="submit"
+          size="xs"
+          color="neutral"
+          variant="soft"
+          :class="TAB_ACCENTS.audio.soft"
+          icon="i-lucide-volume-x"
+          :loading="mutingWords"
+          :disabled="!muteTargets.length || s.source !== 'ORIGINAL'"
+          :title="s.source !== 'ORIGINAL' ? 'The transcript is of the video’s own sound' : 'Mutes every place the transcript hears these words'"
+          >Mute words</UButton
+        >
+      </form>
       <ul v-if="s.mutes.length" class="flex flex-wrap gap-1">
         <li v-for="(m, i) in s.mutes" :key="i">
           <UBadge color="error" variant="subtle" class="gap-1">
@@ -133,11 +199,23 @@
         <USwitch v-model="s.normalize" label="Normalize loudness" />
       </div>
       <div class="grid grid-cols-2 gap-2">
-        <UFormField label="Fade in (s)">
-          <UInput :model-value="sec(s.fadeInMs)" type="number" step="0.1" min="0" max="60" size="sm" @update:model-value="(v) => (s.fadeInMs = clampFade(v))" />
-        </UFormField>
-        <UFormField label="Fade out (s)">
+        <UFormField label="Fade in">
           <UInput
+            aria-label="Fade in (seconds)"
+            :model-value="sec(s.fadeInMs)"
+            type="number"
+            step="0.1"
+            min="0"
+            max="60"
+            size="sm"
+            @update:model-value="(v) => (s.fadeInMs = clampFade(v))"
+          >
+            <template #trailing><span class="text-xs text-gray-500 dark:text-gray-400">s</span></template>
+          </UInput>
+        </UFormField>
+        <UFormField label="Fade out">
+          <UInput
+            aria-label="Fade out (seconds)"
             :model-value="sec(s.fadeOutMs)"
             type="number"
             step="0.1"
@@ -145,7 +223,9 @@
             max="60"
             size="sm"
             @update:model-value="(v) => (s.fadeOutMs = clampFade(v))"
-          />
+          >
+            <template #trailing><span class="text-xs text-gray-500 dark:text-gray-400">s</span></template>
+          </UInput>
         </UFormField>
       </div>
       <!-- Volume curve: drawn on the "Volume" lane of the strip under the video -->
@@ -159,7 +239,15 @@
           }}
         </p>
         <div class="flex flex-wrap items-center gap-2">
-          <UButton size="xs" color="neutral" variant="soft" icon="i-lucide-arrow-down-to-line" :disabled="s.range[1] - s.range[0] < 200" @click="dipRange">
+          <UButton
+            size="xs"
+            color="neutral"
+            variant="soft"
+            :class="TAB_ACCENTS.audio.soft"
+            icon="i-lucide-arrow-down-to-line"
+            :disabled="s.range[1] - s.range[0] < 200"
+            @click="dipRange"
+          >
             Dip under the range to {{ Math.round(dipGain * 100) }}%
           </UButton>
           <USelect v-model="dipGain" :items="DIP_LEVELS" size="xs" class="w-20" aria-label="Dip level" />
@@ -251,6 +339,7 @@
         </p>
       </template>
       <UploadButton
+        :button-class="TAB_ACCENTS.audio.soft"
         v-else
         label="Add music"
         icon="i-lucide-music"
@@ -294,6 +383,7 @@
           </div>
         </div>
         <UploadButton
+          :button-class="TAB_ACCENTS.audio.soft"
           v-if="s.tracks.length < MAX_SOUND_TRACKS"
           label="Add a sound track"
           icon="i-lucide-plus"
@@ -411,6 +501,7 @@
           size="xs"
           color="neutral"
           variant="soft"
+          :class="TAB_ACCENTS.audio.soft"
           icon="i-lucide-file-audio"
           :disabled="!canWrite || busy"
           :loading="extracting === f"
@@ -481,6 +572,8 @@ import type { AudioEdit, Channels, Denoise } from '~/composables/useAudioEdit'
 import { uploadToStorage } from '~/composables/useVideos'
 import {
   addMute,
+  muteWordList,
+  wordMutes,
   clipAt,
   clipEnd,
   deleteRange,
@@ -488,6 +581,7 @@ import {
   duplicate,
   MAX_AUDIO_CLIPS,
   MAX_FADE_MS,
+  MAX_MUTES,
   MAX_SOUND_TRACKS,
   MIN_CLIP_MS,
   mergeWithNext,
@@ -497,7 +591,15 @@ import {
 } from '#shared/utils/audioEdit'
 import { formatTimecode } from '#shared/utils/transport'
 
-const props = defineProps<{ edit: AudioEdit; videoId: number; durationMs: number; currentMs: number; canWrite: boolean; busy: boolean }>()
+const props = defineProps<{
+  edit: AudioEdit
+  videoId: number
+  videoLanguage?: string | null
+  durationMs: number
+  currentMs: number
+  canWrite: boolean
+  busy: boolean
+}>()
 const emit = defineEmits<{ queued: [] }>()
 
 const ACTION_SECTION = `sticky bottom-0 z-10 space-y-2 border-t bg-default pb-3 pt-3 ${TAB_ACCENTS.audio.divider}`
@@ -573,6 +675,49 @@ function patchClip(patch: Partial<AudioClip>) {
 const rangeValid = computed(() => s.range[1] - s.range[0] >= MIN_CLIP_MS)
 function onMuteRange() {
   s.mutes = addMute(s.mutes, { startMs: s.range[0], endMs: s.range[1] })
+}
+
+// "Mute words": every place the transcript's word timings hear one of the words typed (a trailing * = any ending).
+const { list: listTranscripts, get: getTranscript } = useTranscripts()
+const muteWordsText = ref('')
+const muteTargets = computed(() => muteWordList(muteWordsText.value))
+const mutingWords = ref(false)
+let timedWords: { startMs: number; endMs: number; text: string }[] | null = null
+/** The words of the spoken-language transcript (else the first), loaded once. */
+async function loadTimedWords() {
+  if (timedWords) return timedWords
+  const all = (await listTranscripts({ videoId: props.videoId, size: 50 })).data.filter((t) => t.segmentCount > 0)
+  const pick = all.find((t) => t.language === props.videoLanguage) ?? all[0]
+  if (!pick) return []
+  timedWords = ((await getTranscript(pick.id)).segments ?? []).flatMap((seg) => seg.words ?? [])
+  return timedWords
+}
+async function onMuteWords() {
+  if (!muteTargets.value.length) return
+  mutingWords.value = true
+  try {
+    const words = await loadTimedWords()
+    if (!words.length) {
+      toast.add({
+        title: 'No word timings',
+        description: 'Transcribe the video from its page first; a segment edited by hand loses its word timings.',
+        color: 'warning'
+      })
+      return
+    }
+    const { mutes, found, skipped } = wordMutes(words, muteTargets.value, s.mutes, props.durationMs)
+    s.mutes = mutes
+    toast.add({
+      title: found ? `Muted ${found - skipped} word${found - skipped === 1 ? '' : 's'}` : 'None of those words is said',
+      description: skipped ? `${skipped} more left as they are — at most ${MAX_MUTES} muted ranges.` : found ? 'Shown as muted ranges below.' : undefined,
+      color: found ? 'success' : 'neutral'
+    })
+    if (found) muteWordsText.value = ''
+  } catch (err) {
+    toast.add({ title: 'Could not load the transcript', description: apiErrorMessage(err), color: 'error' })
+  } finally {
+    mutingWords.value = false
+  }
 }
 const confirmDeleteRange = ref(false)
 function onConfirmDeleteRange() {

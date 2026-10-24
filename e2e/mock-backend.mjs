@@ -312,6 +312,11 @@ function route(method, path, body, query = new URLSearchParams()) {
     ])
   // A spoken line, for Speak a line.
   if (method === 'POST' && path === '/api/admin/videos/7/edits/narration') return ok({ key: 'audio-uploads/narration-1.wav', durationMs: 1800 })
+  // The sample video's sound as peaks (loud, a quiet middle, loud), for the film strip's waveform.
+  if (method === 'GET' && path === '/api/admin/videos/7/edits/waveform' && !query?.get('key'))
+    return ok({ durationMs: 10_000, peaks: Array.from({ length: 100 }, (_, i) => (i > 40 && i < 60 ? 0.02 : 0.8)) })
+  // Scene changes in the sample video, for Split at scene changes.
+  if (method === 'GET' && path === '/api/admin/videos/7/edits/scenes') return ok({ durationMs: 10_000, cuts: [4000, 7000] })
   // Pauses in the sample video's sound, for Remove the pauses.
   if (method === 'GET' && path === '/api/admin/videos/7/edits/pauses')
     return ok({

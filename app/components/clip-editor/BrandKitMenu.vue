@@ -1,6 +1,12 @@
 <template>
   <UPopover v-model:open="open">
-    <UButton size="xs" color="neutral" variant="soft" icon="i-lucide-badge-check" title="Your logo, card colours and progress bar, in one go"
+    <UButton
+      size="xs"
+      color="neutral"
+      variant="soft"
+      :class="EDITOR_TOOL_TONE"
+      icon="i-lucide-badge-check"
+      title="Your logo, card colours and progress bar, in one go"
       >Brand kit</UButton
     >
     <template #content>
@@ -48,6 +54,7 @@
 // cards' logo.
 import { BRAND_KIT_KEY, MAX_LOGO_DATA, brandKitFrom, cardsFromKit, describeBrandKit, sanitizeBrandKit, type BrandKit } from '#shared/utils/brandKit'
 import { uploadToStorage } from '~/composables/useVideos'
+import { EDITOR_TOOL_TONE } from '#shared/utils/tabAccent'
 
 const { extras, overlayEdit } = useClipEditorContext()
 const { requestUpload } = useVideos()

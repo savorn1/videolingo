@@ -114,10 +114,11 @@
           variant="ghost"
           icon="i-lucide-play-circle"
           title="Play just the trim selection, once"
+          aria-label="Play range"
           data-testid="play-range"
           @click="playRange"
         >
-          Play range
+          <span class="whitespace-nowrap">Play<span class="hidden sm:inline"> range</span></span>
         </UButton>
         <UButton
           v-if="selection"
@@ -127,9 +128,10 @@
           icon="i-lucide-repeat"
           :aria-pressed="loopOn"
           title="Loop the trim selection"
+          aria-label="Loop selection"
           @click="toggleLoop"
         >
-          Loop selection
+          <span class="whitespace-nowrap">Loop<span class="hidden sm:inline"> selection</span></span>
         </UButton>
         <!-- No portal: in full screen only the stage is visible, so the menu must render inside it. -->
         <USelect

@@ -137,6 +137,28 @@ export function batchProblem(count: number): string | null {
   return null
 }
 
+/**
+ * The files not already in the batch (or twice in this pick): the same name and size count as the same recording.
+ * `duplicates` names the ones left out.
+ */
+export function freshFiles<T extends { name: string; size: number }>(
+  files: T[],
+  existing: { name: string; size: number }[]
+): { fresh: T[]; duplicates: string[] } {
+  const seen = new Set(existing.map((f) => `${f.name}\u0000${f.size}`))
+  const fresh: T[] = []
+  const duplicates: string[] = []
+  for (const f of files) {
+    const key = `${f.name}\u0000${f.size}`
+    if (seen.has(key)) duplicates.push(f.name)
+    else {
+      seen.add(key)
+      fresh.push(f)
+    }
+  }
+  return { fresh, duplicates }
+}
+
 /** Titles made distinct for a batch: a repeat becomes "Lesson (2)", "Lesson (3)". Comparison ignores case. */
 export function uniqueTitles(titles: string[]): string[] {
   const seen = new Map<string, number>()

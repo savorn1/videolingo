@@ -1,7 +1,9 @@
 // Video from audio, the later options: chapters (from the file's own tags, shown on the picture and kept as
-// chapter markers), colours taken from the cover, the highlight clip's title, and intro/outro cards. Mirrors the
-// backend (AudioToVideoRules chapters, VideoEditRules cards), which re-checks everything.
+// chapter markers, or pasted as a list), colours taken from the cover, the highlight clip's title, intro/outro cards,
+// and putting a batch in order and numbering its titles. Mirrors the backend (AudioToVideoRules chapters,
+// VideoEditRules cards), which re-checks everything.
 import { MAX_CARD_TEXT } from './trimExtras'
+import { MAX_VIDEO_TITLE } from './videoEdit'
 
 export interface ChapterMark {
   startMs: number
@@ -150,4 +152,126 @@ export function moveRange(range: { startMs: number; endMs: number }, startMs: nu
   const length = range.endMs - range.startMs
   const start = Math.round(Math.max(0, Math.min(startMs, totalMs - length)))
   return { startMs: start, endMs: start + length }
+}
+
+// ── A pasted chapter list ──
+
+/** A time with at least one colon — "1:23", "01:02:03", "12:30.5" — so a line like "3 verbs" isn't read as one. */
+const STAMP = String.raw`(\d{1,2}(?::\d{2}){1,2}(?:\.\d+)?)`
+const STAMP_FIRST = new RegExp(String.raw`^[[(]?${STAMP}[\])]?\s*(?:[-–—:|.]\s*)?(.*)$`)
+const STAMP_LAST = new RegExp(String.raw`^(.*?)\s*(?:[-–—:|]\s*)?[[(]?${STAMP}[\])]?$`)
+
+function stampMs(stamp: string): number | null {
+  const parts = stamp.split(':').map(Number)
+  if (parts.slice(1).some((n) => n >= 60)) return null
+  return Math.round(parts.reduce((total, n) => total * 60 + n, 0) * 1000)
+}
+
+/**
+ * Chapters from a pasted list, one a line, as YouTube descriptions and show notes write them: "0:00 Intro",
+ * "1:02:03 - Practice", "[12:30] Verbs", or with the time last ("Verbs (12:30)"); a leading bullet is fine. Lines
+ * without both a time and a title are left out and counted. In time order, titles cut to MAX_CHAPTER_TITLE.
+ */
+export function parseChapterList(text: string): { chapters: ChapterMark[]; skipped: number } {
+  const chapters: ChapterMark[] = []
+  let skipped = 0
+  for (const raw of text.split(/\r?\n/)) {
+    const line = raw.replace(/^\s*(?:[-*•·]\s+)?/, '').trim()
+    if (!line) continue
+    const first = line.match(STAMP_FIRST)
+    const last = first ? null : line.match(STAMP_LAST)
+    const [stamp, title] = first ? [first[1]!, first[2]!] : last ? [last[2]!, last[1]!] : ['', '']
+    const startMs = stamp ? stampMs(stamp) : null
+    if (startMs === null || !title.trim()) {
+      skipped++
+      continue
+    }
+    chapters.push({ startMs, title: title.trim().slice(0, MAX_CHAPTER_TITLE) })
+  }
+  return { chapters: chapters.sort((a, b) => a.startMs - b.startMs), skipped }
+}
+
+// ── Putting a batch in order, and numbering its titles ──
+
+export type RecordingOrder = 'TRACK' | 'NAME'
+
+/**
+ * The recordings in a new order: by the track number in their tags (disc first; ones without a number keep their
+ * order after the numbered ones), or by file name as a person reads it ("Lesson 2" before "Lesson 10").
+ */
+export function orderRecordings<T extends { name: string; track: number | null; disc: number | null }>(items: T[], by: RecordingOrder): T[] {
+  const names = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' })
+  return items
+    .map((item, i) => ({ item, i }))
+    .sort((a, b) => {
+      if (by === 'NAME') return names.compare(a.item.name, b.item.name) || a.i - b.i
+      const ta = a.item.track
+      const tb = b.item.track
+      if (ta === null || tb === null) return ta === tb ? a.i - b.i : ta === null ? 1 : -1
+      return (a.item.disc ?? 1) - (b.item.disc ?? 1) || ta - tb || a.i - b.i
+    })
+    .map((x) => x.item)
+}
+
+export const TITLE_PATTERNS = ['{n}. {title}', 'Episode {n}: {title}', 'Lesson {nn} — {title}', '{title} (Part {n})'] as const
+
+/** Why the numbering pattern can't be used, or null. */
+export function titlePatternProblem(pattern: string): string | null {
+  if (!/\{nn?\}/.test(pattern)) return 'Put {n} where the number goes'
+  if (!pattern.includes('{title}') && !pattern.replace(/\{nn?\}/g, '').trim()) return 'Add some words or {title}'
+  return null
+}
+
+const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+/** A leading "01 ", "3. " or "12 - ", as file names numbered for sorting have. */
+const LEADING_NUMBER = /^\d{1,3}(?:\s*[-–—.:)_]\s*|\s+)(?=\S)/
+
+/**
+ * The titles numbered from `start` with a pattern: {n} is the number, {nn} the number with leading zeros to the
+ * widest one's width (at least 2), {title} the title. A number the pattern already put there (numbering again after
+ * a reorder) is taken off first, and so is a leading number every title of several has (from "01 intro.mp3"), so none ends up
+ * numbered twice. Each at most MAX_VIDEO_TITLE characters.
+ */
+export function numberTitles(titles: string[], pattern: string, start = 1): string[] {
+  const width = Math.max(2, String(start + titles.length - 1).length)
+  // What the pattern adds around the title, with any number in place of {n}.
+  const [before = '', after = ''] = pattern.includes('{title}') ? pattern.split('{title}') : [pattern, '']
+  const asRegExp = (part: string) => escapeRegExp(part).replace(/\\\{nn?\\\}/g, '\\d+')
+  const own = new RegExp(`^${asRegExp(before)}([\\s\\S]*?)${asRegExp(after)}$`)
+  const plain = titles.map((t) => {
+    const m = before || after ? t.match(own) : null
+    return (m && /\{nn?\}/.test(before + after) ? m[1]! : t).trim()
+  })
+  const allNumbered = plain.length > 1 && plain.every((t) => LEADING_NUMBER.test(t))
+  return plain.map((t, i) => {
+    const n = start + i
+    const title = allNumbered ? t.replace(LEADING_NUMBER, '') : t
+    return pattern
+      .replace(/\{nn\}/g, String(n).padStart(width, '0'))
+      .replace(/\{n\}/g, String(n))
+      .replace(/\{title\}/g, title)
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, MAX_VIDEO_TITLE)
+  })
+}
+
+/**
+ * Every title with `find` replaced (all of it, as written — not a pattern), case-blind unless `matchCase`; spaces
+ * tidied, at most MAX_VIDEO_TITLE characters. `changed` counts the titles it changed.
+ */
+export function replaceInTitles(titles: string[], find: string, replace: string, matchCase = false): { titles: string[]; changed: number } {
+  if (!find) return { titles, changed: 0 }
+  const re = new RegExp(escapeRegExp(find), matchCase ? 'g' : 'gi')
+  let changed = 0
+  const out = titles.map((t) => {
+    const next = t
+      .replace(re, () => replace)
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, MAX_VIDEO_TITLE)
+    if (next !== t) changed++
+    return next
+  })
+  return { titles: out, changed }
 }

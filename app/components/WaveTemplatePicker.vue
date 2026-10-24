@@ -1,5 +1,5 @@
 <template>
-  <div class="space-y-2" role="group" aria-label="Waveform templates">
+  <div class="@container space-y-2" role="group" aria-label="Waveform templates">
     <div class="flex items-center justify-between gap-2">
       <p class="text-xs text-gray-500 dark:text-gray-400">Templates — one click sets the style and colours</p>
       <UPopover v-model:open="saving">
@@ -18,7 +18,7 @@
       </UPopover>
     </div>
 
-    <ul class="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+    <ul class="grid grid-cols-2 gap-2 @md:grid-cols-3 @xl:grid-cols-4 @4xl:grid-cols-5">
       <!-- No waveform: a still picture, the smallest file -->
       <li>
         <button
@@ -37,13 +37,13 @@
           <span class="flex items-center gap-1 px-2 py-1.5">
             <span class="min-w-0 flex-1">
               <span class="block truncate text-xs font-medium text-gray-900 dark:text-white">No waveform</span>
-              <span class="block truncate text-[11px] text-gray-500 dark:text-gray-400">Still picture, smallest file</span>
+              <span class="line-clamp-2 text-[11px] leading-snug text-gray-500 dark:text-gray-400">Still picture, smallest file</span>
             </span>
             <UIcon v-if="!current" name="i-lucide-check" class="size-4 shrink-0 text-primary-600 dark:text-primary-400" />
           </span>
         </button>
       </li>
-      <li v-for="t in shown" :key="t.id" class="group relative">
+      <li v-for="t in visible" :key="t.id" class="group relative">
         <button
           type="button"
           class="block w-full overflow-hidden rounded-lg border text-left transition focus-visible:outline-2 focus-visible:outline-primary-500"
@@ -78,7 +78,7 @@
           <span class="flex items-center gap-1 px-2 py-1.5">
             <span class="min-w-0 flex-1">
               <span class="block truncate text-xs font-medium text-gray-900 dark:text-white">{{ t.name }}</span>
-              <span class="block truncate text-[11px] text-gray-500 dark:text-gray-400">{{ t.hint }}</span>
+              <span class="line-clamp-2 text-[11px] leading-snug text-gray-500 dark:text-gray-400">{{ t.hint }}</span>
             </span>
             <UIcon v-if="isCurrent(t.look)" name="i-lucide-check" class="size-4 shrink-0 text-primary-600 dark:text-primary-400" />
           </span>
@@ -95,6 +95,16 @@
         />
       </li>
     </ul>
+    <UButton
+      v-if="shown.length > FIRST_ROWS"
+      size="xs"
+      color="neutral"
+      variant="ghost"
+      :icon="showAll ? 'i-lucide-chevron-up' : 'i-lucide-chevron-down'"
+      :aria-expanded="showAll"
+      @click="showAll = !showAll"
+      >{{ showAll ? 'Show fewer' : `Show all ${shown.length} templates` }}</UButton
+    >
   </div>
 </template>
 
@@ -121,6 +131,10 @@ const templates = useWaveTemplates()
 const MAX_NAME = 30
 
 const shown = computed(() => (props.styles ? templates.all.value.filter((t) => props.styles!.includes(t.look.waveform)) : templates.all.value))
+// Two rows to start with (with "No waveform", 8 cards: two rows of 4), and the chosen one wherever it is.
+const FIRST_ROWS = 7
+const showAll = ref(false)
+const visible = computed(() => (showAll.value ? shown.value : shown.value.filter((t, i) => i < FIRST_ROWS || isCurrent(t.look))))
 const hovered = ref<string | null>(null)
 const isCurrent = (look: WaveLook) =>
   !!props.current &&

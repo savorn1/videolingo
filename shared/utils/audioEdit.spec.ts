@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
+  MAX_MUTES,
+  muteWordList,
+  wordMutes,
   previewGainAt,
   soundTracksProblem,
   musicPositionAt,
@@ -255,5 +258,33 @@ describe('soundTracksProblem', () => {
     expect(soundTracksProblem([t, t, t, t, t], 10_000)).toBe('At most 4 extra sound tracks')
     expect(soundTracksProblem([t, { startMs: 0, volume: 3 }], 10_000)).toBe('Sound track 2: volume must be between 0% and 200%')
     expect(soundTracksProblem([{ startMs: 12_000, volume: 1 }], 10_000)).toBe('Sound track 1 must start within the video')
+  })
+})
+
+describe('muting words', () => {
+  const words = [
+    { startMs: 1000, endMs: 1300, text: 'What' },
+    { startMs: 1300, endMs: 1600, text: 'the' },
+    { startMs: 1600, endMs: 2000, text: 'Heck!' },
+    { startMs: 5000, endMs: 5400, text: 'darned' },
+    { startMs: 9900, endMs: 10_000, text: 'heck.' }
+  ]
+  it('reads the words typed, case-blind, without punctuation or repeats', () => {
+    expect(muteWordList(' Heck, darn*;heck  * ')).toEqual(['heck', 'darn*'])
+  })
+  it('mutes each matching word with a little padding, merged with the mutes there are and kept inside the video', () => {
+    const { mutes, found, skipped } = wordMutes(words, muteWordList('heck darn*'), [{ startMs: 1900, endMs: 2500 }], 10_000)
+    expect(mutes).toEqual([
+      { startMs: 1540, endMs: 2500 },
+      { startMs: 4940, endMs: 5460 },
+      { startMs: 9840, endMs: 10_000 }
+    ])
+    expect({ found, skipped }).toEqual({ found: 3, skipped: 0 })
+  })
+  it('keeps within the server’s limit of muted ranges, the earliest first', () => {
+    const many = Array.from({ length: MAX_MUTES + 3 }, (_, i) => ({ startMs: i * 1000, endMs: i * 1000 + 200, text: 'heck' }))
+    const { mutes, found, skipped } = wordMutes(many, ['heck'], [], 0)
+    expect(mutes).toHaveLength(MAX_MUTES)
+    expect({ found, skipped }).toEqual({ found: MAX_MUTES + 3, skipped: 3 })
   })
 })

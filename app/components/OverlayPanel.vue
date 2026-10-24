@@ -4,17 +4,27 @@
     <section class="flex flex-wrap items-center gap-1" data-testid="overlay-add">
       <UButton size="xs" color="neutral" :class="TAB_ACCENTS.overlay.button" icon="i-lucide-type" @click="edit.addText(currentMs)">Add text</UButton>
       <UDropdownMenu :items="presetItems">
-        <UButton size="xs" color="neutral" variant="soft" icon="i-lucide-wand-sparkles" trailing-icon="i-lucide-chevron-down">Presets</UButton>
+        <UButton size="xs" color="neutral" variant="soft" :class="TAB_ACCENTS.overlay.soft" icon="i-lucide-wand-sparkles" trailing-icon="i-lucide-chevron-down"
+          >Presets</UButton
+        >
       </UDropdownMenu>
       <UploadButton
         label="Add image"
+        :button-class="TAB_ACCENTS.overlay.soft"
         icon="i-lucide-image-plus"
         accept="image/png,image/jpeg,image/webp"
         :progress="uploading === 'image' ? uploadProgress : null"
         @pick="(f) => onUpload(f, false)"
       />
       <UPopover v-model:open="stickersOpen">
-        <UButton size="xs" color="neutral" variant="soft" icon="i-lucide-smile-plus" :loading="uploading === 'sticker'" data-testid="add-sticker"
+        <UButton
+          size="xs"
+          color="neutral"
+          variant="soft"
+          :class="TAB_ACCENTS.overlay.soft"
+          icon="i-lucide-smile-plus"
+          :loading="uploading === 'sticker'"
+          data-testid="add-sticker"
           >Sticker</UButton
         >
         <template #content>
@@ -77,19 +87,34 @@
             <p v-if="!shownStickerGroups.length" class="px-1 py-2 text-xs text-gray-500">No sticker matches. Paste your own emoji below.</p>
             <form class="flex items-center gap-1 border-t border-gray-200 pt-2 dark:border-gray-800" @submit.prevent="onCustomSticker">
               <UInput v-model="customEmoji" size="xs" placeholder="Your own emoji" class="flex-1" aria-label="Your own emoji" />
-              <UButton type="submit" size="xs" color="neutral" variant="soft" :disabled="!isSingleEmoji(customEmoji)">Add</UButton>
+              <UButton type="submit" size="xs" color="neutral" variant="soft" :class="TAB_ACCENTS.overlay.soft" :disabled="!isSingleEmoji(customEmoji)"
+                >Add</UButton
+              >
             </form>
           </div>
         </template>
       </UPopover>
+      <!-- The less common ones, on a row of their own -->
+      <span class="basis-full pt-1 text-xs text-gray-500 dark:text-gray-400">Also</span>
       <UButton size="xs" color="neutral" variant="ghost" icon="i-lucide-copyright" @click="edit.addTextWatermark()">Text watermark</UButton>
       <UploadButton
         label="Logo watermark"
+        variant="ghost"
         icon="i-lucide-stamp"
         accept="image/png,image/jpeg,image/webp"
         :progress="uploading === 'watermark' ? uploadProgress : null"
         @pick="(f) => onUpload(f, true)"
       />
+      <UButton
+        size="xs"
+        color="neutral"
+        variant="ghost"
+        icon="i-lucide-list-video"
+        :loading="addingChapters"
+        title="A title on the picture as each chapter marker starts"
+        @click="onAddChapterTitles"
+        >Chapter titles</UButton
+      >
       <UPopover v-model:open="subsOpen" @update:open="(v: boolean) => v && loadTracks()">
         <UButton size="xs" color="neutral" variant="ghost" icon="i-lucide-captions">From subtitles</UButton>
         <template #content>
@@ -161,11 +186,13 @@
           >
             <span class="flex w-full min-w-0 items-center gap-2">
               <UIcon :name="l.kind === 'TEXT' ? 'i-lucide-type' : 'i-lucide-image'" class="w-4 h-4 shrink-0" :class="TAB_ACCENTS.overlay.icon" />
-              <span class="flex-1 truncate">{{ l.kind === 'TEXT' ? l.text || '(empty)' : l.imageName }}</span>
-              <span class="text-xs tabular-nums text-gray-500 shrink-0"
-                >{{ formatTimecode(l.startMs) }}–{{ l.endMs == null ? 'end' : formatTimecode(l.endMs) }}</span
-              >
+              <span class="flex-1 truncate" :title="l.kind === 'TEXT' ? l.text || undefined : l.imageName || undefined">{{
+                l.kind === 'TEXT' ? l.text || '(empty)' : l.imageName
+              }}</span>
             </span>
+            <span class="pl-6 text-xs tabular-nums text-gray-500 dark:text-gray-400"
+              >{{ formatTimecode(l.startMs) }} – {{ l.endMs == null ? 'end' : formatTimecode(l.endMs) }}</span
+            >
           </button>
           <UButton
             size="xs"
@@ -220,10 +247,30 @@
         <span class="font-normal text-gray-500">— dragging or the arrow keys move them together; the settings below are for the first one</span>
       </p>
       <div class="flex flex-wrap items-center gap-1">
-        <UButton size="xs" color="neutral" variant="soft" icon="i-lucide-copy" @click="edit.duplicateGroup()">Duplicate</UButton>
-        <UButton size="xs" color="neutral" variant="soft" icon="i-lucide-align-horizontal-justify-center" @click="edit.alignGroup('x')">Same X</UButton>
-        <UButton size="xs" color="neutral" variant="soft" icon="i-lucide-align-vertical-justify-center" @click="edit.alignGroup('y')">Same Y</UButton>
-        <UButton size="xs" color="neutral" variant="soft" icon="i-lucide-paintbrush" @click="onMatchStyle">Same style</UButton>
+        <UButton size="xs" color="neutral" variant="soft" :class="TAB_ACCENTS.overlay.soft" icon="i-lucide-copy" @click="edit.duplicateGroup()"
+          >Duplicate</UButton
+        >
+        <UButton
+          size="xs"
+          color="neutral"
+          variant="soft"
+          :class="TAB_ACCENTS.overlay.soft"
+          icon="i-lucide-align-horizontal-justify-center"
+          @click="edit.alignGroup('x')"
+          >Same X</UButton
+        >
+        <UButton
+          size="xs"
+          color="neutral"
+          variant="soft"
+          :class="TAB_ACCENTS.overlay.soft"
+          icon="i-lucide-align-vertical-justify-center"
+          @click="edit.alignGroup('y')"
+          >Same Y</UButton
+        >
+        <UButton size="xs" color="neutral" variant="soft" :class="TAB_ACCENTS.overlay.soft" icon="i-lucide-paintbrush" @click="onMatchStyle"
+          >Same style</UButton
+        >
         <UButton size="xs" color="error" variant="soft" icon="i-lucide-trash-2" @click="edit.removeGroup()">Delete</UButton>
         <UButton size="xs" color="neutral" variant="ghost" @click="edit.select(s.selectedId)">Only the first</UButton>
       </div>
@@ -339,6 +386,7 @@
           size="xs"
           color="neutral"
           variant="soft"
+          :class="TAB_ACCENTS.overlay.soft"
           icon="i-lucide-paintbrush"
           :disabled="s.layers.filter((l) => l.kind === 'TEXT').length < 2"
           @click="onApplyStyle"
@@ -510,7 +558,13 @@
         <UFormField label="Animation">
           <div class="flex items-center gap-2">
             <USelect v-model="layer.animation" :items="LAYER_ANIMATIONS" class="flex-1" size="sm" aria-label="Animation" />
-            <UButton size="sm" color="neutral" variant="soft" icon="i-lucide-play" @click="emit('preview', Math.max(0, layer.startMs - 300), true)"
+            <UButton
+              size="sm"
+              color="neutral"
+              variant="soft"
+              :class="TAB_ACCENTS.overlay.soft"
+              icon="i-lucide-play"
+              @click="emit('preview', Math.max(0, layer.startMs - 300), true)"
               >Play</UButton
             >
           </div>
@@ -524,7 +578,9 @@
         <p class="text-xs text-gray-500 dark:text-gray-400">The starred ones ship with the editor.</p>
         <div class="flex items-center gap-1">
           <UPopover v-model:open="savingTemplate">
-            <UButton size="xs" color="neutral" variant="soft" icon="i-lucide-save" :disabled="!s.layers.length">Save as template</UButton>
+            <UButton size="xs" color="neutral" variant="soft" :class="TAB_ACCENTS.overlay.soft" icon="i-lucide-save" :disabled="!s.layers.length"
+              >Save as template</UButton
+            >
             <template #content>
               <form class="flex items-center gap-2 p-2" @submit.prevent="onSaveTemplate">
                 <UInput v-model="templateName" size="sm" placeholder="Template name" autofocus class="w-48" />
@@ -773,6 +829,7 @@ import {
 import { LAYER_ANIMATIONS, LAYER_SPOTS, LAYER_WEIGHTS, fontCss, type OverlayEdit } from '~/composables/useOverlayEdit'
 import { uploadToStorage } from '~/composables/useVideos'
 import { formatTimecode } from '#shared/utils/transport'
+import { CHAPTER_TITLE_MS, chapterTitleSpans } from '#shared/utils/chapters'
 import { BURN_STYLES } from '#shared/utils/audioVideo'
 import { captionLookFor, captionSampleStyle } from '#shared/utils/captionLook'
 import { isMovingLayer, MAX_TO_SCALE, MIN_TO_SCALE } from '#shared/utils/layerMotion'
@@ -797,6 +854,28 @@ const open = reactive({ content: true, style: true, position: true, timing: fals
 const SWATCHES = ['#ffffff', '#000000', '#ffd60a', '#ff453a', '#30d158', '#0a84ff']
 
 const s = props.edit.state
+
+// "Chapter titles": a text layer as each chapter marker (else each marker) starts, for a few seconds.
+const { list: listMarkers } = useVideoMarkers()
+const addingChapters = ref(false)
+async function onAddChapterTitles() {
+  addingChapters.value = true
+  try {
+    const spans = chapterTitleSpans(await listMarkers(props.videoId), props.durationMs)
+    const n = props.edit.addChapterTitles(spans)
+    toast.add({
+      title: n ? `${n} chapter title${n === 1 ? '' : 's'} added` : 'No markers to title',
+      description: n
+        ? `Each shows for up to ${CHAPTER_TITLE_MS / 1000} s as its chapter starts.`
+        : 'Add markers (or chapter markers) on the video’s timeline first.',
+      color: n ? 'success' : 'warning'
+    })
+  } catch (err) {
+    toast.add({ title: 'Could not load the markers', description: apiErrorMessage(err), color: 'error' })
+  } finally {
+    addingChapters.value = false
+  }
+}
 
 // Templates are the way in for an empty tab; once there are layers they fold away.
 watch(

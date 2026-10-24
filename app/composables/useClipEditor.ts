@@ -7,6 +7,7 @@
 //
 // Its state and actions live here, shared by VideoClipEditor.vue and its tab components
 // (app/components/clip-editor/*), which inject them with useClipEditorContext().
+import { EDITOR_TOOL_TONE, TAB_ACCENTS } from '#shared/utils/tabAccent'
 import type { BurnedCaptions } from '~/composables/useOverlayEdit'
 import type { InjectionKey } from 'vue'
 import type { EditOverview, PromoteResult, VideoClip } from '~/composables/useVideoEdits'
@@ -67,6 +68,9 @@ import {
   splitLongRows,
   splitRequestSegments,
   labelRowsAt,
+  labelFromSpeech,
+  partsAsList,
+  rowsFromList,
   tightenToSpeech
 } from '#shared/utils/splitPoints'
 import { pickAiChapters, type AiChapter } from '#shared/utils/aiChapterMarkers'
@@ -158,10 +162,8 @@ export function useClipEditor(props: ClipEditorProps, emit: ClipEditorEmit) {
   const mode = ref<'trim' | 'split' | 'audio' | 'overlay' | 'join'>('trim')
 
   // Colours of the buttons in the Edit header: Recipes in amber (like the saved presets), Undo/Redo in blue while there is something to undo or redo.
-  const HEADER_TONES = {
-    recipes: 'bg-amber-50 text-amber-800 hover:bg-amber-100 dark:bg-amber-950/50 dark:text-amber-300 dark:hover:bg-amber-900/60',
-    history: 'bg-sky-50 text-sky-700 hover:bg-sky-100 dark:bg-sky-950/50 dark:text-sky-300 dark:hover:bg-sky-900/60'
-  }
+  // The header: its tools share one tone; undo and redo take the colour of the tab that is open.
+  const HEADER_TONES = computed(() => ({ tools: EDITOR_TOOL_TONE, history: TAB_ACCENTS[mode.value].soft }))
 
   // The keys that matter on the tab that is open.
   const TAB_KEYS: Partial<Record<typeof mode.value, string>> = {
@@ -714,6 +716,32 @@ export function useClipEditor(props: ClipEditorProps, emit: ClipEditorEmit) {
       )
     } catch (err) {
       toast.add({ title: 'Could not import presets', description: err instanceof Error ? err.message : undefined, color: 'error' })
+    }
+  }
+
+  // Share saved recipes as a small JSON file, like the presets.
+  function onExportRecipes() {
+    const url = URL.createObjectURL(new Blob([recipes.exportJson()], { type: 'application/json' }))
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'edit-recipes.json'
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+  async function onImportRecipes(e: Event) {
+    const input = e.target as HTMLInputElement
+    const file = input.files?.[0]
+    input.value = ''
+    if (!file) return
+    try {
+      const added = recipes.importJson(await file.text())
+      toast.add(
+        added
+          ? { title: `Added ${added} recipe${added === 1 ? '' : 's'}`, color: 'success' }
+          : { title: 'Nothing new to add', description: 'You already have every recipe in that file.', color: 'info' }
+      )
+    } catch (err) {
+      toast.add({ title: 'Could not import recipes', description: err instanceof Error ? err.message : undefined, color: 'error' })
     }
   }
 
@@ -1322,6 +1350,63 @@ export function useClipEditor(props: ClipEditorProps, emit: ClipEditorEmit) {
     selectedSegment.value = null
   }
 
+  // "Paste a list": cuts at the times of a "0:00 Intro" list (a YouTube description, show notes), named after its lines.
+  const pastedList = ref('')
+  const listSplit = computed(() => rowsFromList(pastedList.value, durationMs.value))
+  function splitAtList() {
+    const { rows, lines, skipped, tooMany } = listSplit.value
+    if (!rows.length) {
+      toast.add({
+        title: tooMany ? `That makes more than ${MAX_SEGMENTS} parts` : 'No time in the list falls inside the video',
+        description: tooMany ? undefined : 'Write one a line, like “1:23 Greetings”.',
+        color: 'warning'
+      })
+      return
+    }
+    segments.value = rows
+    selectedSegment.value = null
+    pastedList.value = ''
+    const left = [
+      skipped ? `${skipped} time${skipped === 1 ? '' : 's'} too close to another cut or an end` : '',
+      lines ? `${lines} line${lines === 1 ? '' : 's'} without a time` : ''
+    ].filter(Boolean)
+    toast.add({ title: `${rows.length} parts from the list`, description: left.length ? `Left out: ${left.join(', ')}.` : undefined, color: 'success' })
+  }
+
+  // "Copy the parts as a list": "0:00 Name" lines for the original video's description.
+  async function copyPartsList() {
+    const text = partsAsList(segments.value, durationMs.value)
+    try {
+      await navigator.clipboard.writeText(text)
+      toast.add({ title: `${segments.value.length} parts copied`, description: 'One “0:00 Name” line each.', color: 'success' })
+    } catch {
+      toast.add({ title: 'Could not copy', description: text, color: 'warning' })
+    }
+  }
+
+  // "Name the parts from what they say": each part without a name takes the first words of its speech.
+  const naming = ref(false)
+  async function nameFromSpeech() {
+    naming.value = true
+    const cues = spoken.value.length ? spoken.value : await sentencesOrSay('to name the parts from what they say')
+    naming.value = false
+    if (!cues.length) return
+    spoken.value = cues
+    let named = 0
+    segments.value = segments.value.map((seg) => {
+      if (seg.label?.trim()) return seg
+      const label = labelFromSpeech(segmentSpeech(cues, seg.startMsSeconds * 1000, segmentEndSeconds(seg) * 1000, 200))
+      if (!label) return seg
+      named++
+      return { ...seg, label }
+    })
+    toast.add({
+      title: named ? `Named ${named} part${named === 1 ? '' : 's'}` : 'No part to name',
+      description: named ? 'From the first words each says. Ctrl/⌘+Z takes the names off.' : 'Every part has a name already, or says nothing.',
+      color: named ? 'success' : 'neutral'
+    })
+  }
+
   // "Parts of about N seconds": each cut at the nearest break between sentences (at the exact mark without a transcript).
   const nearSeconds = ref<number | null>(null)
   async function splitNearLength() {
@@ -1346,8 +1431,43 @@ export function useClipEditor(props: ClipEditorProps, emit: ClipEditorEmit) {
     if (!cues.length) toast.add({ title: 'Cut at the exact times', description: "There's no transcript, so the cuts don't follow the sentences." })
   }
 
+  // "Split at scene changes": where the server sees the picture change a lot (ffmpeg's scene score).
+  const { pauses: findPauses, scenes: findScenes } = useVideoEdits()
+  const SCENE_SENSITIVITIES = [
+    { label: 'Big changes', value: 'LOW' },
+    { label: 'Most changes', value: 'MEDIUM' },
+    { label: 'Small changes too', value: 'HIGH' }
+  ] as const
+  const sceneSensitivity = ref<'LOW' | 'MEDIUM' | 'HIGH'>('MEDIUM')
+  const sceneSplitting = ref(false)
+  async function splitAtScenes() {
+    sceneSplitting.value = true
+    try {
+      const { cuts } = await findScenes(props.video.id, sceneSensitivity.value)
+      const { rows, skipped, tooMany } = rowsFromCutPoints(durationMs.value, cuts)
+      if (!rows.length) {
+        toast.add({
+          title: tooMany ? `More than ${MAX_SEGMENTS} scenes` : 'No scene change found',
+          description: tooMany ? 'Choose “Big changes”, or split part of the video.' : 'Try “Small changes too”.',
+          color: 'warning'
+        })
+        return
+      }
+      segments.value = rows
+      selectedSegment.value = null
+      toast.add({
+        title: `${rows.length} scenes`,
+        description: skipped ? `${skipped} change${skipped === 1 ? '' : 's'} too close to another left out.` : undefined,
+        color: 'success'
+      })
+    } catch (err) {
+      toast.add({ title: 'Could not look for scene changes', description: apiErrorMessage(err), color: 'error' })
+    } finally {
+      sceneSplitting.value = false
+    }
+  }
+
   // "Split at long pauses": the quiet stretches the server finds in the sound (the same as Remove the pauses).
-  const { pauses: findPauses } = useVideoEdits()
   const PAUSE_SPLIT_SECONDS = [1, 2, 3, 5]
   const pauseSplitSeconds = ref(2)
   const pauseSplitting = ref(false)
@@ -1946,10 +2066,13 @@ export function useClipEditor(props: ClipEditorProps, emit: ClipEditorEmit) {
 
   // ── Promote / discard ────────────────────────────────────────────────────────
   const CLIP_ICONS = CLIP_OPERATION_ICONS
-  /** " 3 markers came along." after a promote, when the server moved any. */
+  /** " 3 markers and 1 transcript came along." after a promote, when the server moved any. */
   function markersNote(result: PromoteResult) {
-    const n = result.markers ?? 0
-    return n ? ` ${n} marker${n === 1 ? '' : 's'} came along to the new timing.` : ''
+    const parts = [
+      result.markers ? `${result.markers} marker${result.markers === 1 ? '' : 's'}` : '',
+      result.transcripts ? `${result.transcripts} transcript${result.transcripts === 1 ? '' : 's'}` : ''
+    ].filter(Boolean)
+    return parts.length ? ` ${parts.join(' and ')} came along to the new timing.` : ''
   }
   function replaces(clip: VideoClip) {
     return clip.operation === 'TRIM' || clip.operation === 'AUDIO' || clip.operation === 'OVERLAY'
@@ -2359,12 +2482,22 @@ export function useClipEditor(props: ClipEditorProps, emit: ClipEditorEmit) {
     aiChapters,
     aiChapterSplit,
     splitAtAiChapters,
+    pastedList,
+    listSplit,
+    splitAtList,
+    copyPartsList,
+    naming,
+    nameFromSpeech,
     nearSeconds,
     splitNearLength,
     PAUSE_SPLIT_SECONDS,
     pauseSplitSeconds,
     pauseSplitting,
     splitAtPauses,
+    SCENE_SENSITIVITIES,
+    sceneSensitivity,
+    sceneSplitting,
+    splitAtScenes,
     segmentSaying,
     playingSegment,
     playSegment,
@@ -2383,6 +2516,8 @@ export function useClipEditor(props: ClipEditorProps, emit: ClipEditorEmit) {
     platformCheckList,
     timingPreview,
     cardShowing,
+    onExportRecipes,
+    onImportRecipes,
     thumbnailSaved: () => emit('updated'),
     splitError,
     onStartSplit,

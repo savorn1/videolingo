@@ -173,6 +173,7 @@
         <ClipEditorFilmStrip
           v-if="mode === 'trim' && durationMs && !stageFullscreen"
           :video-url="video.videoUrl"
+          :video-id="video.id"
           :duration-ms="durationMs"
           :range="range"
           :style="fitStyle"
@@ -199,10 +200,11 @@
           :style="fitStyle"
           @seek="(ms: number) => preview?.seek(ms, false)"
         />
-        <p v-if="!stageFullscreen && tabKeysHint" class="text-xs text-gray-500 dark:text-gray-400" data-testid="tab-keys-hint">
+        <!-- Keyboard and mouse hints: no use on a touch screen -->
+        <p v-if="!stageFullscreen && tabKeysHint" class="text-xs text-gray-500 dark:text-gray-400 [@media(pointer:coarse)]:hidden" data-testid="tab-keys-hint">
           <UIcon name="i-lucide-keyboard" class="w-3 h-3 inline align-text-top" /> {{ tabKeysHint }}
         </p>
-        <p v-if="!stageFullscreen" class="text-xs text-gray-500 dark:text-gray-400">
+        <p v-if="!stageFullscreen" class="text-xs text-gray-500 dark:text-gray-400 [@media(pointer:coarse)]:hidden">
           Drag on the video to crop · scroll over it to zoom · more shortcuts under
           <UIcon name="i-lucide-keyboard" class="w-3 h-3 inline align-text-top" /> above, or press <UKbd value="?" />
         </p>
@@ -211,7 +213,7 @@
       <!-- Controls -->
       <UCard>
         <template #header>
-          <div class="flex items-center justify-between gap-2">
+          <div class="flex flex-wrap items-center justify-between gap-2">
             <h2 class="font-semibold text-gray-900 dark:text-white flex items-center gap-1.5">
               <!-- The tile takes the colour of the tool that is open, so the header says which one it is -->
               <span class="flex size-6 items-center justify-center rounded-md transition-colors" :class="TAB_ACCENTS[mode].soft">
@@ -230,10 +232,10 @@
                 {{ runningCount }} running
               </UBadge>
             </h2>
-            <div class="flex items-center gap-1">
+            <div class="flex flex-wrap items-center justify-end gap-1 [&_button]:whitespace-nowrap">
               <span
                 v-if="history.draftSavedAt.value"
-                class="mr-1 hidden items-center gap-1 text-xs text-gray-500 dark:text-gray-400 sm:flex"
+                class="mr-1 hidden items-center gap-1 whitespace-nowrap text-xs text-gray-500 dark:text-gray-400 sm:flex"
                 data-testid="draft-saved"
                 aria-live="polite"
               >
@@ -243,7 +245,7 @@
               <ClipEditorThumbnailMaker v-if="canWrite && video.videoUrl" />
               <ClipEditorBrandKitMenu />
               <UPopover v-model:open="recipesOpen">
-                <UButton size="xs" color="neutral" variant="soft" :class="HEADER_TONES.recipes" icon="i-lucide-chef-hat" title="Reuse a look on this video"
+                <UButton size="xs" color="neutral" variant="soft" :class="HEADER_TONES.tools" icon="i-lucide-chef-hat" title="Reuse a look on this video"
                   >Recipes</UButton
                 >
                 <template #content>
@@ -273,6 +275,35 @@
                       </li>
                     </ul>
                     <p v-else class="text-xs text-gray-500 dark:text-gray-400">No recipes yet.</p>
+                    <div class="flex items-center gap-1">
+                      <UButton
+                        size="xs"
+                        color="neutral"
+                        variant="ghost"
+                        icon="i-lucide-download"
+                        :disabled="!recipes.saved.value.length"
+                        title="Save your recipes as a file, to share or keep"
+                        @click="onExportRecipes"
+                        >Export</UButton
+                      >
+                      <UButton
+                        size="xs"
+                        color="neutral"
+                        variant="ghost"
+                        icon="i-lucide-upload"
+                        title="Add recipes from a file"
+                        @click="recipeFileInput?.click()"
+                        >Import</UButton
+                      >
+                      <input
+                        ref="recipeFileInput"
+                        type="file"
+                        accept="application/json,.json"
+                        class="hidden"
+                        aria-label="Recipes file"
+                        @change="onImportRecipes"
+                      />
+                    </div>
                     <form class="space-y-1.5 border-t border-gray-100 pt-3 dark:border-gray-800" @submit.prevent="onSaveRecipe">
                       <UFormField label="Save the current settings" :hint="currentRecipe ? describeRecipe(currentRecipe) : undefined">
                         <div class="flex items-center gap-2">
@@ -302,11 +333,10 @@
                 :class="history.undoable.value ? HEADER_TONES.history : ''"
                 icon="i-lucide-undo-2"
                 :disabled="!history.undoable.value"
+                aria-label="Undo"
                 title="Undo (Ctrl/⌘+Z)"
                 @click="history.undo()"
-              >
-                Undo
-              </UButton>
+              />
               <UButton
                 size="xs"
                 color="neutral"
@@ -314,16 +344,21 @@
                 :class="history.redoable.value ? HEADER_TONES.history : ''"
                 icon="i-lucide-redo-2"
                 :disabled="!history.redoable.value"
+                aria-label="Redo"
                 title="Redo (Ctrl/⌘+Shift+Z)"
                 @click="history.redo()"
-              >
-                Redo
-              </UButton>
+              />
               <!-- Every step so far: click one to go back (or forward) to it -->
               <UPopover>
-                <UButton size="xs" color="neutral" variant="ghost" icon="i-lucide-history" :disabled="history.steps.value.length < 2" title="History"
-                  >History</UButton
-                >
+                <UButton
+                  size="xs"
+                  color="neutral"
+                  variant="ghost"
+                  icon="i-lucide-history"
+                  :disabled="history.steps.value.length < 2"
+                  aria-label="History"
+                  title="History — every step so far"
+                />
                 <template #content>
                   <ol class="max-h-80 w-64 overflow-y-auto p-1 text-sm" data-testid="history-list">
                     <li v-for="i in historyOrder" :key="i">
@@ -390,6 +425,7 @@
               :class="TAB_ACCENTS.audio.scope"
               :edit="audioEdit"
               :video-id="video.id"
+              :video-language="video.language"
               :duration-ms="durationMs"
               :current-ms="currentMs"
               :can-write="canWrite"
@@ -516,6 +552,7 @@ import { describeRecipe } from '#shared/utils/editRecipe'
 
 const props = defineProps<{ video: Video; canWrite: boolean }>()
 const emit = defineEmits<{ replaced: []; created: [videoId: number]; updated: [] }>()
+const recipeFileInput = ref<HTMLInputElement | null>(null)
 
 const {
   error,
@@ -540,6 +577,8 @@ const {
   lookCompareShown,
   blursShown,
   cardShowing,
+  onExportRecipes,
+  onImportRecipes,
   extras,
   showGuides,
   guideBox,

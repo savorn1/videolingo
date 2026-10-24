@@ -1,6 +1,6 @@
 <template>
-  <div class="relative h-10 overflow-hidden rounded-md bg-gray-900 sm:h-12" data-testid="film-strip">
-    <div class="flex h-full">
+  <div class="relative overflow-hidden rounded-md bg-gray-900" data-testid="film-strip">
+    <div class="flex h-10 sm:h-12">
       <button
         v-for="(t, i) in times"
         :key="i"
@@ -12,6 +12,8 @@
         <canvas :ref="(el) => (canvases[i] = el as HTMLCanvasElement | null)" class="h-full w-full object-cover" :width="FRAME_W" :height="FRAME_H" />
       </button>
     </div>
+    <!-- The sound under the frames: the gaps are the pauses -->
+    <canvas v-show="hasWave" ref="waveCanvas" class="block h-5 w-full" :width="WAVE_COLUMNS * 3" height="40" data-testid="film-strip-wave" aria-hidden="true" />
     <!-- What the trim leaves out is dimmed -->
     <div class="pointer-events-none absolute inset-y-0 left-0 bg-black/60" :style="{ width: `${pct(range[0])}%` }" />
     <div class="pointer-events-none absolute inset-y-0 right-0 bg-black/60" :style="{ width: `${100 - pct(range[1])}%` }" />
@@ -21,10 +23,10 @@
 <script setup lang="ts">
 // A row of frames along the Trim tab's timeline, to find a scene change by eye; a click goes there. The frames are
 // drawn in the browser from a second, hidden copy of the video (only shown, never read back, so no CORS is needed).
-import { filmstripTimes } from '#shared/utils/filmstrip'
+import { filmstripTimes, peakColumns } from '#shared/utils/filmstrip'
 import { formatTimecode } from '#shared/utils/transport'
 
-const props = defineProps<{ videoUrl: string; durationMs: number; range: [number, number] }>()
+const props = defineProps<{ videoUrl: string; videoId: number; durationMs: number; range: [number, number] }>()
 const emit = defineEmits<{ seek: [ms: number] }>()
 
 const FRAMES = 12
@@ -63,7 +65,35 @@ async function draw() {
   video.removeAttribute('src')
   video.load()
 }
-onMounted(draw)
+// ── The waveform: the server's peaks (the same as the Audio tab's), as columns ──
+const WAVE_COLUMNS = 240
+const waveCanvas = ref<HTMLCanvasElement | null>(null)
+const hasWave = ref(false)
+const { waveform } = useVideoEdits()
+async function drawWave() {
+  try {
+    const { peaks } = await waveform(props.videoId, { points: 1200 })
+    const canvas = waveCanvas.value
+    const columns = peakColumns(peaks, WAVE_COLUMNS)
+    if (!canvas || !columns.length) return
+    const ctx = canvas.getContext('2d')!
+    ctx.clearRect(0, 0, canvas.width, canvas.height)
+    ctx.fillStyle = '#38bdf8'
+    columns.forEach((v, i) => {
+      const h = Math.max(1, Math.round(v * canvas.height))
+      ctx.fillRect(i * 3, (canvas.height - h) / 2, 2, h)
+    })
+    hasWave.value = true
+  } catch {
+    // No sound (or no file to read): the frames are enough.
+    hasWave.value = false
+  }
+}
+
+onMounted(() => {
+  draw()
+  drawWave()
+})
 watch(() => [props.videoUrl, props.durationMs], draw)
 onBeforeUnmount(() => run++)
 </script>

@@ -144,3 +144,54 @@ test('A thumbnail made from a frame is uploaded and set on the video', async ({ 
     thumbnailUrl: expect.stringMatching(/^\/uploads\//)
   })
 })
+
+test('Split at scene changes cuts where the picture changes', async ({ page }) => {
+  await openEditor(page)
+  await page.getByRole('tab', { name: /Split/ }).click()
+  await page.getByRole('button', { name: 'Split at scenes' }).click()
+  await expect(page.getByText('3 scenes', { exact: true })).toBeVisible()
+  await expect(page.getByLabel('Segment 2 start')).toHaveValue('0:04.00')
+  await expect(page.getByLabel('Segment 3 start')).toHaveValue('0:07.00')
+  expect((await mockRequests()).some((r) => r.path === '/api/admin/videos/7/edits/scenes')).toBe(true)
+})
+
+test('The film strip draws the sound under the frames', async ({ page }) => {
+  await openEditor(page)
+  await expect(page.getByTestId('film-strip-wave')).toBeVisible()
+})
+
+test('Edit recipes go out as a file and come back in', async ({ page }) => {
+  await openEditor(page)
+  await page
+    .getByRole('button', { name: /Shorts \/ Reels \/ TikTok/ })
+    .first()
+    .click()
+  await page.getByRole('button', { name: 'Recipes' }).click()
+  await page.getByLabel('Recipe name').fill('Reel look')
+  await page.getByRole('button', { name: 'Save', exact: true }).click()
+  const download = page.waitForEvent('download')
+  await page.getByTitle('Save your recipes as a file, to share or keep').click()
+  const file = await (await download).path()
+
+  await page.getByRole('button', { name: 'Delete recipe Reel look' }).click()
+  await expect(page.getByText('No recipes yet.')).toBeVisible()
+  await page.getByLabel('Recipes file').setInputFiles(file)
+  await expect(page.getByText('Added 1 recipe', { exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Delete recipe Reel look' })).toBeVisible()
+})
+
+test('The chapter markers are copied as YouTube chapters', async ({ page, context }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write'])
+  const marker = { color: null, createdBy: 'admin', createdAt: '2026-10-13T09:00:00' }
+  // The sample clip is 10 s, too short for YouTube's 10 s chapters, so the mock says the video is longer.
+  await resetMock({
+    markers: [
+      { ...marker, id: 1, atMs: 0, label: 'Welcome', chapter: true },
+      { ...marker, id: 2, atMs: 2000, label: 'Too soon', chapter: true },
+      { ...marker, id: 3, atMs: 5000, label: 'Practice', chapter: true }
+    ]
+  })
+  await openReady(page, '/videos/7?tab=timeline')
+  await page.getByRole('button', { name: 'Copy chapters for YouTube' }).click()
+  await expect(page.getByText('Not enough chapters for YouTube', { exact: true })).toBeVisible()
+})

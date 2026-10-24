@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   audioFileProblem,
+  freshFiles,
   clampPartMinutes,
   defaultWaveHeight,
   estimatedParts,
@@ -356,5 +357,22 @@ describe('waveform height', () => {
     expect(sanitizeLook({ waveHeightPct: 60 }).waveHeightPct).toBe(60)
     expect(sanitizeLook({ waveHeightPct: 95 }).waveHeightPct).toBeNull()
     expect(sanitizeLook({ waveHeightPct: '60' }).waveHeightPct).toBeNull()
+  })
+})
+
+describe('freshFiles', () => {
+  it('leaves out a recording already in the batch or picked twice (same name and size)', () => {
+    const picked = [
+      { name: 'a.mp3', size: 10 },
+      { name: 'b.mp3', size: 20 },
+      { name: 'b.mp3', size: 20 },
+      { name: 'a.mp3', size: 11 }
+    ]
+    const { fresh, duplicates } = freshFiles(picked, [{ name: 'a.mp3', size: 10 }])
+    expect(fresh).toEqual([
+      { name: 'b.mp3', size: 20 },
+      { name: 'a.mp3', size: 11 }
+    ])
+    expect(duplicates).toEqual(['a.mp3', 'b.mp3'])
   })
 })

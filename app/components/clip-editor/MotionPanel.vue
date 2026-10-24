@@ -6,8 +6,9 @@
         <USelect v-model="motion.effect" :items="TRIM_EFFECTS.map((e) => ({ label: e.label, value: e.value }))" size="sm" class="w-full" aria-label="Effect" />
       </UFormField>
       <div class="flex items-end gap-2">
-        <UFormField label="Fade in (s)" class="w-24">
+        <UFormField label="Fade in" class="w-28">
           <UInput
+            aria-label="Fade in (seconds)"
             :model-value="sec(motion.fadeInMs)"
             type="number"
             step="0.1"
@@ -15,10 +16,13 @@
             max="5"
             size="sm"
             @update:model-value="(v) => (motion.fadeInMs = ms(v))"
-          />
+          >
+            <template #trailing><span class="text-xs text-gray-500 dark:text-gray-400">s</span></template>
+          </UInput>
         </UFormField>
-        <UFormField label="Fade out (s)" class="w-24">
+        <UFormField label="Fade out" class="w-28">
           <UInput
+            aria-label="Fade out (seconds)"
             :model-value="sec(motion.fadeOutMs)"
             type="number"
             step="0.1"
@@ -26,7 +30,9 @@
             max="5"
             size="sm"
             @update:model-value="(v) => (motion.fadeOutMs = ms(v))"
-          />
+          >
+            <template #trailing><span class="text-xs text-gray-500 dark:text-gray-400">s</span></template>
+          </UInput>
         </UFormField>
         <USelect
           v-if="motion.fadeInMs || motion.fadeOutMs"
@@ -86,7 +92,15 @@
           </p>
         </div>
         <USelect v-model="pauseMs" :items="PAUSE_LENGTHS" size="xs" class="w-24" aria-label="Pause length" />
-        <UButton size="xs" color="neutral" variant="soft" icon="i-lucide-pause" :loading="pausesLoading" @click="addSentencePauses">
+        <UButton
+          size="xs"
+          color="neutral"
+          variant="soft"
+          :class="TAB_ACCENTS.trim.soft"
+          icon="i-lucide-pause"
+          :loading="pausesLoading"
+          @click="addSentencePauses"
+        >
           {{ motion.holds.length ? 'Place again' : 'Add the pauses' }}
         </UButton>
         <UButton v-if="motion.holds.length" size="xs" color="neutral" variant="ghost" icon="i-lucide-x" @click="motion.holds = []">Remove</UButton>
@@ -104,7 +118,7 @@
           </p>
         </div>
         <USelect v-model="punchScale" :items="PUNCH_SCALES" size="xs" class="w-36" aria-label="Punch-in zoom" />
-        <UButton size="xs" color="neutral" variant="soft" icon="i-lucide-zoom-in" :loading="punchLoading" @click="addPunchIns">
+        <UButton size="xs" color="neutral" variant="soft" :class="TAB_ACCENTS.trim.soft" icon="i-lucide-zoom-in" :loading="punchLoading" @click="addPunchIns">
           {{ motion.punchIn ? 'Place again' : 'Add the punch-ins' }}
         </UButton>
         <UButton v-if="motion.punchIn" size="xs" color="neutral" variant="ghost" icon="i-lucide-x" @click="motion.punchIn = null">Remove</UButton>
@@ -119,7 +133,15 @@
           <p class="text-sm font-medium text-gray-900 dark:text-white">Slow motion or speed up parts</p>
           <p class="text-xs text-gray-500 dark:text-gray-400">Each part plays at its own speed; the sound keeps its pitch. Parts mustn't overlap.</p>
         </div>
-        <UButton size="xs" color="neutral" variant="soft" icon="i-lucide-plus" :disabled="!canAddSpeedPart" @click="addSpeedPart">
+        <UButton
+          size="xs"
+          color="neutral"
+          variant="soft"
+          :class="TAB_ACCENTS.trim.soft"
+          icon="i-lucide-plus"
+          :disabled="!canAddSpeedPart"
+          @click="addSpeedPart"
+        >
           {{ motion.speeds.length ? 'Add another part' : 'Add a part' }}
         </UButton>
       </div>
@@ -258,6 +280,7 @@
 </template>
 
 <script setup lang="ts">
+import { TAB_ACCENTS } from '#shared/utils/tabAccent'
 // Motion & effects on a trim: effect, fades, a held frame, part at another speed, backwards, steadied, zoom into an
 // area, green screen. The settings live in useClipEditor (motion, in undo and drafts); rules in videoMotion.ts.
 import {

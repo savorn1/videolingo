@@ -49,17 +49,22 @@
           }"
         >
           <template #left>
-            <UBreadcrumb :items="breadcrumbItems" />
+            <!-- On a phone the page title says where you are, and the tools need the room -->
+            <UBreadcrumb :items="breadcrumbItems" class="hidden min-w-0 sm:flex" />
           </template>
 
           <template #right>
             <div class="flex items-center gap-0.5 rounded-lg bg-white/80 p-0.5 ring-1 ring-primary-100 dark:bg-gray-900/70 dark:ring-primary-900/60">
-              <UDashboardSearchButton class="text-sky-600 hover:bg-sky-50 dark:text-sky-400 dark:hover:bg-sky-950/40" />
-              <ShortcutsHelp
-                :items="globalShortcuts"
-                global
-                button-class="text-emerald-600 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-950/40"
-              />
+              <UDashboardSearchButton class="hidden text-sky-600 hover:bg-sky-50 sm:inline-flex dark:text-sky-400 dark:hover:bg-sky-950/40" />
+              <UDashboardSearchButton collapsed class="text-sky-600 hover:bg-sky-50 sm:hidden dark:text-sky-400 dark:hover:bg-sky-950/40" />
+              <!-- Keyboard shortcuts: no use on a touch screen -->
+              <span class="hidden sm:contents">
+                <ShortcutsHelp
+                  :items="globalShortcuts"
+                  global
+                  button-class="text-emerald-600 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-950/40"
+                />
+              </span>
               <WhatsNewButton />
               <JobsIndicator />
               <InboxBell />
@@ -72,9 +77,10 @@
                 variant="soft"
                 class="bg-primary-100 text-primary-800 hover:bg-primary-200 dark:bg-primary-900/50 dark:text-primary-200 dark:hover:bg-primary-900"
                 trailing-icon="i-lucide-chevron-down"
+                :aria-label="`Account: ${username}`"
               >
                 <UserAvatar :name="username" size="2xs" />
-                {{ username }}
+                <span class="hidden sm:inline">{{ username }}</span>
               </UButton>
             </UDropdownMenu>
           </template>

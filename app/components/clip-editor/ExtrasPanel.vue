@@ -16,6 +16,7 @@
           size="xs"
           color="neutral"
           variant="soft"
+          :class="TAB_ACCENTS.trim.soft"
           icon="i-lucide-square-dashed"
           :disabled="extras.blurs.length >= MAX_BLURS || !naturalWidth"
           @click="extras.blurs = [...extras.blurs, newBlurBox(naturalWidth, naturalHeight)]"
@@ -175,7 +176,14 @@
               @click="Object.assign(extras.cards, { logoKey: null, logoName: null })"
             />
           </template>
-          <UploadButton v-else label="Add a logo" accept="image/png,image/jpeg,image/webp" :progress="logoProgress" @pick="onLogo" />
+          <UploadButton
+            :button-class="TAB_ACCENTS.trim.soft"
+            v-else
+            label="Add a logo"
+            accept="image/png,image/jpeg,image/webp"
+            :progress="logoProgress"
+            @pick="onLogo"
+          />
         </div>
       </div>
     </div>
@@ -201,6 +209,7 @@
 </template>
 
 <script setup lang="ts">
+import { TAB_ACCENTS } from '#shared/utils/tabAccent'
 // Blur areas, picture in picture and title cards on a trim (trimExtras.ts). The settings live in useClipEditor
 // (extras, in undo and drafts); blurEditing shows the blur boxes on the preview while this section is open.
 import { describeExtras, isPlainExtras, MAX_BLURS, MAX_CARD_TEXT, MAX_PIP_PCT, MIN_PIP_PCT, newBlurBox, PIP_CORNERS } from '#shared/utils/trimExtras'

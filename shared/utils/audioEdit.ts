@@ -375,3 +375,50 @@ export const SOUND_PRESETS = [
   { value: 'RADIO', label: 'Radio', hint: 'Narrow and punchy, like a broadcast' }
 ] as const
 export type SoundPreset = (typeof SOUND_PRESETS)[number]['value']
+
+// ── Muting words (from the transcript's word timings) ──
+
+/** Muted ranges the server takes (AudioEditRules.MAX_MUTES). */
+export const MAX_MUTES = 50
+/** Kept quiet either side of a muted word, so its edges don't slip through. */
+export const WORD_MUTE_PAD_MS = 60
+
+const bareWord = (w: string) => w.toLowerCase().replace(/[^\p{L}\p{N}*]/gu, '')
+
+/** The words typed to mute ("darn, heck*"): split on commas or spaces, case-blind; a trailing * matches any ending. */
+export function muteWordList(text: string): string[] {
+  return [
+    ...new Set(
+      text
+        .split(/[\s,;]+/)
+        .map(bareWord)
+        .filter((w) => w.replace(/\*/g, ''))
+    )
+  ]
+}
+
+/**
+ * The mutes with every timed word matching `targets` (as muteWordList gives them) muted too, padded by
+ * WORD_MUTE_PAD_MS and kept inside the video. `found` counts the words heard; `skipped` those left out to stay
+ * within MAX_MUTES (the earliest are kept).
+ */
+export function wordMutes(
+  words: { startMs: number; endMs: number; text: string }[],
+  targets: string[],
+  mutes: TimeRange[],
+  durationMs: number
+): { mutes: TimeRange[]; found: number; skipped: number } {
+  const matches = (w: string) => targets.some((t) => (t.endsWith('*') ? w.startsWith(t.slice(0, -1)) : w === t))
+  const hits = words.filter((w) => w.endMs > w.startMs && matches(bareWord(w.text).replace(/\*/g, ''))).sort((a, b) => a.startMs - b.startMs)
+  let out = mutes
+  let skipped = 0
+  for (const w of hits) {
+    const next = addMute(out, {
+      startMs: Math.max(0, w.startMs - WORD_MUTE_PAD_MS),
+      endMs: durationMs ? Math.min(durationMs, w.endMs + WORD_MUTE_PAD_MS) : w.endMs + WORD_MUTE_PAD_MS
+    })
+    if (next.length > MAX_MUTES) skipped++
+    else out = next
+  }
+  return { mutes: out, found: hits.length, skipped }
+}

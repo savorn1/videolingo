@@ -2,8 +2,9 @@ import { defineConfig, devices } from '@playwright/test'
 
 // Browser tests for the flows in docs/editor-scenarios.md. They run the real app (nuxt dev) against
 // a mock backend (e2e/mock-backend.mjs), so no Java service or database is needed.
-const MOCK_PORT = 8089
-const APP_PORT = 3100
+// Either port can be moved when something else holds it (E2E_APP_PORT=3101 npm run test:e2e); the helpers follow.
+const MOCK_PORT = Number(process.env.E2E_MOCK_PORT || 8089)
+const APP_PORT = Number(process.env.E2E_APP_PORT || 3100)
 
 export default defineConfig({
   testDir: 'e2e',
