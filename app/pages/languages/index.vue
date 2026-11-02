@@ -25,7 +25,7 @@
           <div class="flex items-center gap-2 min-w-0">
             <div class="min-w-0">
               <p class="font-semibold text-gray-900 dark:text-white truncate">{{ row.name }}</p>
-              <p v-if="row.nativeName && row.nativeName !== row.name" class="text-xs text-gray-500 truncate">{{ row.nativeName }}</p>
+              <p v-if="row.nativeName && row.nativeName !== row.name" class="text-xs text-muted truncate">{{ row.nativeName }}</p>
             </div>
             <UBadge v-if="row.isDefault" color="primary" variant="subtle" icon="i-lucide-star" size="sm">Default</UBadge>
           </div>

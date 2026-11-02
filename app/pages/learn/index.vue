@@ -49,7 +49,7 @@
           </CollectionCover>
           <div class="p-3">
             <h3 class="font-semibold text-gray-900 dark:text-white line-clamp-2">{{ c.title }}</h3>
-            <p v-if="c.description" class="mt-1 text-xs text-gray-500 line-clamp-2">{{ c.description }}</p>
+            <p v-if="c.description" class="mt-1 text-xs text-muted line-clamp-2">{{ c.description }}</p>
           </div>
         </NuxtLink>
       </div>
@@ -97,7 +97,7 @@
           :duration-seconds="v.durationSeconds"
           :progress="progress.get(v.id)"
         >
-          <p class="text-xs text-gray-500">
+          <p class="text-xs text-muted">
             {{ languageLabel(v.language) }}<template v-if="v.sourceAuthor"> · {{ v.sourceAuthor }}</template>
           </p>
         </VideoCard>

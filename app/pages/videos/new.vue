@@ -81,7 +81,7 @@
             >
               <UIcon name="i-lucide-cloud-upload" class="w-10 h-10 text-sky-600 dark:text-sky-400" />
               <span class="font-medium text-gray-900 dark:text-white">Drag &amp; drop a video here, or click to choose</span>
-              <span class="text-xs text-gray-500">MP4, WebM, MOV, M4V, OGV or MKV · up to {{ maxUploadMb.toLocaleString() }} MB</span>
+              <span class="text-xs text-muted">MP4, WebM, MOV, M4V, OGV or MKV · up to {{ maxUploadMb.toLocaleString() }} MB</span>
               <input type="file" class="sr-only" :accept="accept" aria-label="Choose a video file" @change="onFilePicked" />
             </label>
             <div v-else class="rounded-lg border border-gray-200 dark:border-gray-800 p-3">
@@ -89,7 +89,7 @@
                 <UIcon name="i-lucide-file-video" class="w-8 h-8 text-violet-600 dark:text-violet-400 shrink-0" />
                 <div class="min-w-0 flex-1">
                   <p class="font-medium text-gray-900 dark:text-white truncate">{{ file.name }}</p>
-                  <p class="text-xs text-gray-500">
+                  <p class="text-xs text-muted">
                     {{ formatFileSize(file.size) }}
                     <template v-if="uploadedKey"> · <span class="text-success-700 dark:text-success-400">Uploaded</span></template>
                     <template v-else-if="uploading"> · Uploading {{ Math.round(uploadProgress * 100) }}%</template>
@@ -277,7 +277,7 @@
 
         <dl v-if="facts.length" class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
           <template v-for="f in facts" :key="f.label">
-            <dt class="text-gray-500">{{ f.label }}</dt>
+            <dt class="text-muted">{{ f.label }}</dt>
             <dd class="text-gray-900 dark:text-white min-w-0 truncate" :title="f.value">
               <span class="inline-flex items-center gap-1.5"><UIcon v-if="f.icon" :name="f.icon" class="w-4 h-4" :class="f.iconClass" />{{ f.value }}</span>
             </dd>

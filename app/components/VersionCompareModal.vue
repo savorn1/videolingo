@@ -33,7 +33,7 @@
             aria-label="Seek"
             @update:model-value="(v) => seek(v?.[0] ?? 0)"
           />
-          <span class="text-xs tabular-nums text-gray-500 w-28 text-right">{{ formatTimecode(timeMs) }} / {{ formatTimecode(durationMs) }}</span>
+          <span class="text-xs tabular-nums text-muted w-28 text-right">{{ formatTimecode(timeMs) }} / {{ formatTimecode(durationMs) }}</span>
         </div>
         <p class="text-xs text-gray-500 dark:text-gray-400">Drag the handle (or the video) to reveal more of either side — both play in sync.</p>
       </div>

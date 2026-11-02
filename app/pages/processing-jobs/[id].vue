@@ -101,13 +101,13 @@
         </template>
 
         <div ref="logBox" class="h-[28rem] overflow-auto bg-gray-950 font-mono text-xs leading-5 rounded-b-lg" @scroll="onLogScroll">
-          <div v-if="logsLoading && !logLines.length" class="p-4 text-gray-500">Loading logs…</div>
-          <div v-else-if="!logLines.length" class="p-4 text-gray-500">No log output yet.</div>
-          <div v-else-if="!visibleLines.length" class="p-4 text-gray-500">No lines match the current filter.</div>
+          <div v-if="logsLoading && !logLines.length" class="p-4 text-muted">Loading logs…</div>
+          <div v-else-if="!logLines.length" class="p-4 text-muted">No log output yet.</div>
+          <div v-else-if="!visibleLines.length" class="p-4 text-muted">No lines match the current filter.</div>
           <table v-else class="w-full">
             <tbody>
               <tr v-for="line in visibleLines" :key="line.id" class="align-top hover:bg-white/5">
-                <td class="w-px pl-4 pr-3 text-gray-500 whitespace-nowrap select-none" :title="formatDateTime(line.createdAt)">
+                <td class="w-px pl-4 pr-3 text-muted whitespace-nowrap select-none" :title="formatDateTime(line.createdAt)">
                   {{ logTime(line.createdAt) }}
                 </td>
                 <td class="w-px pr-3 whitespace-nowrap font-semibold" :class="LEVEL_CLASS[line.level]">{{ line.level }}</td>
@@ -309,7 +309,7 @@ async function poll() {
 
 onMounted(async () => {
   await Promise.all([loadJob(), fetchNewLogs()])
-  if (route.hash === '#logs') nextTick(() => document.getElementById('logs')?.scrollIntoView({ behavior: 'smooth' }))
+  if (route.hash === '#logs') nextTick(() => document.getElementById('logs')?.scrollIntoView({ behavior: scrollMotion() }))
   pollTimer = setInterval(poll, POLL_MS)
 })
 onBeforeUnmount(() => clearInterval(pollTimer))

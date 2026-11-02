@@ -136,7 +136,7 @@
               </tr>
             </tbody>
           </table>
-          <p v-if="termSearch && !visibleTerms.length" class="px-4 py-6 text-sm text-center text-gray-500">No term matches “{{ termSearch }}”.</p>
+          <p v-if="termSearch && !visibleTerms.length" class="px-4 py-6 text-sm text-center text-muted">No term matches “{{ termSearch }}”.</p>
         </div>
       </UCard>
     </div>
@@ -155,7 +155,7 @@
             class="w-full font-mono text-xs"
             placeholder="dashboard,ផ្ទាំងគ្រប់គ្រង&#10;VideoLingo,=&#10;invoice,វិក្កយបត្រ,accounting"
           />
-          <p class="text-xs text-gray-500">
+          <p class="text-xs text-muted">
             {{ pasted.length }} term(s) found<span v-if="pastedDuplicates">, {{ pastedDuplicates }} already in the list (they'll be updated)</span>.
           </p>
           <div class="flex justify-end gap-2">

@@ -215,7 +215,7 @@ watch([() => ({ ...filter }), debouncedSearch, pageSize], () => {
 })
 watch([() => ({ ...filter }), debouncedSearch, page, pageSize], load)
 // Back to the top when paging, so the new page starts at its first card.
-watch(page, () => import.meta.client && window.scrollTo({ top: 0, behavior: 'smooth' }))
+watch(page, () => import.meta.client && window.scrollTo({ top: 0, behavior: scrollMotion() }))
 
 const hasActiveFilter = computed(() => search.value !== '' || filter.categoryId !== undefined || filter.language !== undefined)
 function clearFilters() {

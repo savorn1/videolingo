@@ -37,7 +37,7 @@
         <template #name-data="{ row }">
           <div class="min-w-0 max-w-sm">
             <TagChip :name="row.name" />
-            <p v-if="row.description" class="text-xs text-gray-500 mt-1 truncate" :title="row.description">{{ row.description }}</p>
+            <p v-if="row.description" class="text-xs text-muted mt-1 truncate" :title="row.description">{{ row.description }}</p>
           </div>
         </template>
         <template #slug-data="{ row }">

@@ -50,7 +50,7 @@
               <p class="font-semibold text-gray-900 dark:text-white truncate" :title="row.videoTitle ?? undefined">
                 {{ row.videoTitle ?? `Video #${row.videoId}` }}
               </p>
-              <p class="text-xs text-gray-500">#{{ row.id }}</p>
+              <p class="text-xs text-muted">#{{ row.id }}</p>
             </div>
           </template>
 
@@ -151,7 +151,7 @@
                       <template v-else>{{ part.text }}</template>
                     </template>
                   </span>
-                  <span class="block text-xs text-gray-500 mt-0.5 truncate">{{ hit.videoTitle }} · {{ languageLabel(hit.language) }}</span>
+                  <span class="block text-xs text-muted mt-0.5 truncate">{{ hit.videoTitle }} · {{ languageLabel(hit.language) }}</span>
                 </span>
               </NuxtLink>
             </li>

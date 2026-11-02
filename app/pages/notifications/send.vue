@@ -46,7 +46,7 @@
             <UFormField label="Message" required :hint="`${form.body.length}/10000`">
               <UTextarea v-model="form.body" :rows="8" autoresize :maxrows="18" maxlength="10000" class="w-full" />
             </UFormField>
-            <p class="text-xs text-gray-500">
+            <p class="text-xs text-muted">
               Placeholders filled per recipient:
               <code v-for="v in BUILT_IN_VARIABLES" :key="v.name" class="mr-1.5" :title="v.description">&#123;&#123;{{ v.name }}&#125;&#125;</code>
             </p>
@@ -86,7 +86,7 @@
                 class="w-full"
               />
               <USelect v-else-if="form.audience === 'role'" v-model="form.role" :items="roleOptions" class="w-48" aria-label="Role" />
-              <p v-else class="text-sm text-gray-500">Every enabled account.</p>
+              <p v-else class="text-sm text-muted">Every enabled account.</p>
             </UFormField>
           </div>
         </UCard>
@@ -102,7 +102,7 @@
         </template>
         <div class="space-y-4">
           <div v-if="preview" class="rounded-md border border-gray-200 dark:border-gray-800 p-3">
-            <p class="text-xs text-gray-500 mb-1">
+            <p class="text-xs text-muted mb-1">
               As {{ preview.sampleRecipient ?? 'a recipient' }} will see it
               <template v-if="!preview.recipientCount"> (you — nobody selected yet)</template>
             </p>
@@ -116,7 +116,7 @@
             <li class="flex items-center gap-2">
               <UIcon name="i-lucide-users" class="w-4 h-4 text-sky-600 dark:text-sky-400" />
               <strong>{{ preview.recipientCount }}</strong> recipient{{ preview.recipientCount === 1 ? '' : 's' }}
-              <span v-if="form.channels.length" class="text-gray-500">× {{ form.channels.length }} channel{{ form.channels.length === 1 ? '' : 's' }}</span>
+              <span v-if="form.channels.length" class="text-muted">× {{ form.channels.length }} channel{{ form.channels.length === 1 ? '' : 's' }}</span>
             </li>
             <li v-if="preview.disabledSkipped" class="flex items-center gap-2 text-warning-700 dark:text-warning-400">
               <UIcon name="i-lucide-user-x" class="w-4 h-4" /> {{ preview.disabledSkipped }} disabled account(s) will be skipped

@@ -45,7 +45,7 @@
         <template #name-data="{ row }">
           <div class="min-w-0 max-w-sm">
             <NuxtLink :to="`/glossaries/${row.id}`" class="font-medium text-primary-600 dark:text-primary-400 hover:underline">{{ row.name }}</NuxtLink>
-            <p v-if="row.description" class="text-xs text-gray-500 mt-0.5 truncate" :title="row.description">{{ row.description }}</p>
+            <p v-if="row.description" class="text-xs text-muted mt-0.5 truncate" :title="row.description">{{ row.description }}</p>
           </div>
         </template>
         <template #languages-data="{ row }">

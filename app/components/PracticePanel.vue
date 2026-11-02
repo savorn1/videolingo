@@ -23,7 +23,7 @@
 
     <div v-else class="space-y-3">
       <!-- The line -->
-      <div class="flex items-center gap-2 text-xs text-gray-500">
+      <div class="flex items-center gap-2 text-xs text-muted">
         <UButton
           size="xs"
           color="neutral"
@@ -80,7 +80,7 @@
         <audio v-if="recordingUrl" ref="mine" :src="recordingUrl" class="hidden" />
         <p v-if="heardError" class="text-xs text-error-600 dark:text-error-400">{{ heardError }}</p>
         <div v-if="heard !== null" class="space-y-1" data-testid="pronunciation-result">
-          <p class="text-xs text-gray-500">
+          <p class="text-xs text-muted">
             Heard: <span class="text-gray-800 dark:text-gray-200">“{{ heard || '(nothing)' }}”</span>
           </p>
           <DiffLine :result="result!" />

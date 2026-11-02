@@ -20,27 +20,27 @@
 
         <dl class="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-2 text-sm">
           <div>
-            <dt class="text-gray-500">Duration</dt>
+            <dt class="text-muted">Duration</dt>
             <dd class="font-medium text-gray-900 dark:text-white">{{ video.durationSeconds != null ? formatDuration(video.durationSeconds) : '—' }}</dd>
           </div>
           <div>
-            <dt class="text-gray-500">Language</dt>
+            <dt class="text-muted">Language</dt>
             <dd class="font-medium text-gray-900 dark:text-white">{{ video.language ? languageLabel(video.language) : '—' }}</dd>
           </div>
           <div>
-            <dt class="text-gray-500">Owner</dt>
+            <dt class="text-muted">Owner</dt>
             <dd class="font-medium text-gray-900 dark:text-white truncate">{{ video.ownerUsername ?? '—' }}</dd>
           </div>
           <div>
-            <dt class="text-gray-500">Source</dt>
+            <dt class="text-muted">Source</dt>
             <dd class="font-medium text-gray-900 dark:text-white">{{ videoSourceMeta(video.source).label }}</dd>
           </div>
           <div>
-            <dt class="text-gray-500">Views</dt>
+            <dt class="text-muted">Views</dt>
             <dd class="font-medium text-gray-900 dark:text-white tabular-nums">{{ video.viewCount.toLocaleString() }}</dd>
           </div>
           <div>
-            <dt class="text-gray-500">Uploaded</dt>
+            <dt class="text-muted">Uploaded</dt>
             <dd class="font-medium text-gray-900 dark:text-white" :title="formatDateTime(video.createdAt)">{{ formatRelativeTime(video.createdAt) }}</dd>
           </div>
         </dl>

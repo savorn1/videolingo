@@ -24,15 +24,15 @@
             />
             {{ !status.configured ? 'Not configured' : status.enabled ? 'Connected' : 'Turned off in Settings' }}
           </p>
-          <p v-if="!status.configured" class="text-xs text-gray-500 mt-1">Set ANTHROPIC_API_KEY on the backend and restart it.</p>
+          <p v-if="!status.configured" class="text-xs text-muted mt-1">Set ANTHROPIC_API_KEY on the backend and restart it.</p>
           <dl class="mt-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
-            <dt class="text-gray-500">Model</dt>
+            <dt class="text-muted">Model</dt>
             <dd class="font-mono text-gray-800 dark:text-gray-200">{{ status.model }}</dd>
             <template v-if="status.fallbackModel">
-              <dt class="text-gray-500">If declined</dt>
+              <dt class="text-muted">If declined</dt>
               <dd class="font-mono text-gray-800 dark:text-gray-200">{{ status.fallbackModel }}</dd>
             </template>
-            <dt class="text-gray-500">Effort</dt>
+            <dt class="text-muted">Effort</dt>
             <dd class="text-gray-800 dark:text-gray-200">{{ status.generationEffort }} (generate) · {{ status.chatEffort }} (chat)</dd>
           </dl>
         </template>
@@ -49,13 +49,13 @@
         </div>
         <template v-if="status?.monthlyBudgetUsd">
           <UProgress :model-value="budgetPercent" :color="budgetColor" size="sm" class="mt-3" :aria-label="`${budgetPercent}% of the monthly budget used`" />
-          <p class="text-xs text-gray-500 mt-1.5">
+          <p class="text-xs text-muted mt-1.5">
             {{ budgetPercent }}% of the {{ formatUsd(status.monthlyBudgetUsd) }} monthly budget
             <template v-if="status.budgetEnforced"> · requests stop when it's used up</template>
             <template v-else> · soft limit (not enforced)</template>
           </p>
         </template>
-        <p v-else-if="status" class="text-xs text-gray-500 mt-3">No monthly budget set (AI_MONTHLY_BUDGET_USD).</p>
+        <p v-else-if="status" class="text-xs text-muted mt-3">No monthly budget set (AI_MONTHLY_BUDGET_USD).</p>
       </UCard>
     </div>
 
@@ -84,7 +84,7 @@
             </span>
             <div class="min-w-0 flex-1">
               <p class="font-medium text-gray-900 dark:text-white truncate group-hover:underline">{{ v.title }}</p>
-              <p class="text-xs text-gray-500">{{ languageLabel(v.language) }} · {{ formatDuration(v.durationSeconds) }}</p>
+              <p class="text-xs text-muted">{{ languageLabel(v.language) }} · {{ formatDuration(v.durationSeconds) }}</p>
             </div>
             <UIcon name="i-lucide-sparkles" class="w-4 h-4 text-primary-500 opacity-0 group-hover:opacity-100" />
           </NuxtLink>
@@ -97,7 +97,7 @@
       <template #header>
         <h2 class="font-semibold text-gray-900 dark:text-white">Recent AI activity</h2>
       </template>
-      <p v-if="!recent.length" class="text-sm text-gray-500">No AI requests yet.</p>
+      <p v-if="!recent.length" class="text-sm text-muted">No AI requests yet.</p>
       <ul v-else class="divide-y divide-gray-100 dark:divide-gray-800 text-sm">
         <li v-for="u in recent" :key="u.id" class="flex items-center gap-3 py-2">
           <UIcon :name="aiFeatureIcon(u.feature)" class="w-4 h-4 text-gray-400 shrink-0" />
@@ -110,7 +110,7 @@
           >
             Video #{{ u.videoId }}
           </NuxtLink>
-          <span class="text-gray-500 truncate flex-1">{{ u.username ?? '—' }}</span>
+          <span class="text-muted truncate flex-1">{{ u.username ?? '—' }}</span>
           <span class="font-medium tabular-nums">{{ formatUsd(u.costUsd) }}</span>
           <span class="text-xs text-gray-500 w-20 text-right dark:text-gray-400" :title="formatDateTime(u.createdAt)">{{
             formatRelativeTime(u.createdAt)

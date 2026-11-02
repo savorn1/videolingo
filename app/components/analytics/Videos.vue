@@ -58,7 +58,7 @@
           </li>
         </ul>
         <USkeleton v-else class="h-32" />
-        <p class="text-xs text-gray-500 mt-3">Out of {{ data?.totalVideos ?? '…' }} live videos.</p>
+        <p class="text-xs text-muted mt-3">Out of {{ data?.totalVideos ?? '…' }} live videos.</p>
       </UCard>
     </div>
 
@@ -75,7 +75,7 @@
           :rows="(data?.byCategory ?? []).map((r) => ({ key: r.key, label: r.label, value: r.count, to: `/videos?categoryId=${r.key}` }))"
           empty="No categorised videos."
         />
-        <p class="text-xs text-gray-500 mt-3">A video can be in several categories.</p>
+        <p class="text-xs text-muted mt-3">A video can be in several categories.</p>
       </UCard>
       <UCard>
         <USkeleton v-if="!data" class="h-52" />

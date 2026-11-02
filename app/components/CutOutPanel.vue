@@ -52,7 +52,7 @@
 
     <ul v-if="cuts.length" class="space-y-1">
       <li v-for="(c, i) in cuts" :key="i" class="flex items-center gap-1" data-testid="cut-row">
-        <span class="w-5 text-xs text-gray-500">{{ i + 1 }}</span>
+        <span class="w-5 text-xs text-muted">{{ i + 1 }}</span>
         <UInput
           :model-value="formatTimecode(c.startMs)"
           size="xs"
@@ -60,7 +60,7 @@
           :aria-label="`Cut ${i + 1} start`"
           @change="(e: Event) => setTime(i, 'startMs', e.target as HTMLInputElement)"
         />
-        <span class="text-xs text-gray-500">→</span>
+        <span class="text-xs text-muted">→</span>
         <UInput
           :model-value="formatTimecode(c.endMs)"
           size="xs"

@@ -1,8 +1,8 @@
 <template>
-  <p v-if="!videos.length" class="text-sm text-gray-500">No views in this period.</p>
+  <p v-if="!videos.length" class="text-sm text-muted">No views in this period.</p>
   <div v-else class="overflow-x-auto">
     <table class="w-full text-sm">
-      <thead class="text-xs text-gray-500 text-left">
+      <thead class="text-xs text-muted text-left">
         <tr>
           <th class="pb-2 font-medium">Video</th>
           <th class="pb-2 font-medium text-right">Views</th>

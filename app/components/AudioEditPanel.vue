@@ -26,7 +26,7 @@
         <div v-if="s.replacement" class="flex items-center gap-2 rounded-md bg-gray-50 dark:bg-gray-800 px-2 py-1.5">
           <UIcon name="i-lucide-file-audio" class="w-4 h-4 shrink-0" :class="TAB_ACCENTS.audio.icon" />
           <span class="truncate flex-1" :title="s.replacement.name">{{ s.replacement.name }}</span>
-          <span v-if="s.replacement.durationMs" class="text-xs text-gray-500 tabular-nums">{{ formatTimecode(s.replacement.durationMs) }}</span>
+          <span v-if="s.replacement.durationMs" class="text-xs text-muted tabular-nums">{{ formatTimecode(s.replacement.durationMs) }}</span>
           <UButton size="xs" color="neutral" variant="ghost" icon="i-lucide-x" aria-label="Remove replacement audio" @click="s.replacement = null" />
         </div>
         <UploadButton
@@ -259,7 +259,7 @@
     <!-- ── Clean-up ────────────────────────────────────────────────────── -->
     <EditorSection v-model:open="open.cleanup" title="Clean-up" :changed="changed.cleanup">
       <div class="flex flex-wrap items-center gap-1">
-        <span class="w-28 text-xs text-gray-500">Noise reduction</span>
+        <span class="w-28 text-xs text-muted">Noise reduction</span>
         <UButton
           v-for="d in DENOISE"
           :key="d.value"
@@ -274,7 +274,7 @@
       <USwitch v-model="s.enhanceVoice" label="Enhance voice" description="Cuts rumble and hiss, brings speech forward, evens out the level." />
       <USwitch v-model="s.deEss" label="Soften the “s” sounds" description="A de-esser: tames sharp, hissing s and sh sounds." />
       <div class="space-y-1" role="radiogroup" aria-label="Sound preset">
-        <span class="text-xs text-gray-500">Sound like</span>
+        <span class="text-xs text-muted">Sound like</span>
         <div class="flex flex-wrap gap-1">
           <UButton
             v-for="p in SOUND_PRESETS"
@@ -349,7 +349,7 @@
 
       <!-- More sound beds besides the music: effects, a second bed — each mixed the same way -->
       <div class="space-y-2 border-t border-gray-100 pt-3 dark:border-gray-800" data-testid="sound-tracks">
-        <p class="text-xs font-medium text-gray-700 dark:text-gray-300">Sound tracks <span class="font-normal text-gray-500">(effects, a second bed)</span></p>
+        <p class="text-xs font-medium text-gray-700 dark:text-gray-300">Sound tracks <span class="font-normal text-muted">(effects, a second bed)</span></p>
         <div v-for="(t, i) in s.tracks" :key="t.key + i" class="space-y-2 rounded-md border border-gray-200 p-2 dark:border-gray-800">
           <div class="flex items-center gap-2">
             <UIcon name="i-lucide-audio-lines" class="w-4 h-4 shrink-0" :class="TAB_ACCENTS.audio.icon" />
@@ -477,7 +477,7 @@
       />
       <p class="text-xs text-gray-500 dark:text-gray-400 -mt-1">{{ balanceLabel }} — negative is left, positive is right.</p>
       <div class="flex flex-wrap items-center gap-1">
-        <span class="w-16 text-xs text-gray-500">Output</span>
+        <span class="w-16 text-xs text-muted">Output</span>
         <UButton
           v-for="c in CHANNELS"
           :key="c.value"

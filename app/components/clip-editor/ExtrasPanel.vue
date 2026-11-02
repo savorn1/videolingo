@@ -9,9 +9,7 @@
     <!-- Blurred areas -->
     <div class="space-y-2">
       <div class="flex flex-wrap items-center justify-between gap-2">
-        <p class="text-sm font-medium text-gray-700 dark:text-gray-300">
-          Blur areas <span class="font-normal text-gray-500">— faces, names, number plates</span>
-        </p>
+        <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Blur areas <span class="font-normal text-muted">— faces, names, number plates</span></p>
         <UButton
           size="xs"
           color="neutral"

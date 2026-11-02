@@ -297,3 +297,21 @@ export function titleTwins(titles: string[]): (number | null)[] {
     return j === -1 ? null : j
   })
 }
+
+/**
+ * What is set in The look's two optional groups, by name (empty = nothing): they are folded away until
+ * something in them is used, and the folded heading lists what is.
+ */
+export function extrasInUse(s: { strip: string; logo: boolean; progressBar: boolean; chapters: number; useChapters: boolean; intro: string; outro: string }): {
+  branding: string[]
+  onPicture: string[]
+} {
+  const branding = [s.strip.trim() && 'strip', s.logo && 'logo'].filter((x): x is string => !!x)
+  const onPicture = [
+    s.progressBar && 'progress bar',
+    s.chapters > 0 && s.useChapters && 'chapters',
+    s.intro.trim() && 'intro card',
+    s.outro.trim() && 'outro card'
+  ].filter((x): x is string => !!x)
+  return { branding, onPicture }
+}

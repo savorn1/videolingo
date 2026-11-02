@@ -30,13 +30,13 @@
         <template #name-data="{ row }">
           <div class="min-w-0 max-w-sm">
             <button type="button" class="font-medium text-gray-900 dark:text-white hover:underline text-left" @click="openForm(row)">{{ row.name }}</button>
-            <p class="text-xs font-mono text-gray-500">{{ row.code }}</p>
+            <p class="text-xs font-mono text-muted">{{ row.code }}</p>
           </div>
         </template>
         <template #subject-data="{ row }">
           <div class="min-w-0 max-w-md">
             <p class="truncate" :title="row.subject">{{ row.subject }}</p>
-            <p v-if="row.description" class="text-xs text-gray-500 truncate" :title="row.description">{{ row.description }}</p>
+            <p v-if="row.description" class="text-xs text-muted truncate" :title="row.description">{{ row.description }}</p>
           </div>
         </template>
         <template #defaultChannels-data="{ row }">

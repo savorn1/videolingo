@@ -128,7 +128,7 @@
                 <!-- Search within this transcript -->
                 <UInput v-model="find" size="sm" placeholder="Find in transcript" icon="i-lucide-search" class="w-48" @keydown.enter.prevent="gotoMatch(1)" />
                 <template v-if="find.trim()">
-                  <span class="text-xs text-gray-500 tabular-nums whitespace-nowrap">{{
+                  <span class="text-xs text-muted tabular-nums whitespace-nowrap">{{
                     matches.length ? `${matchCursor + 1} / ${matches.length}` : '0 found'
                   }}</span>
                   <UButton
@@ -419,7 +419,7 @@ function seek(ms: number, play = false) {
 }
 
 function scrollToSegment(index: number) {
-  nextTick(() => document.getElementById(`seg-${index}`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }))
+  nextTick(() => document.getElementById(`seg-${index}`)?.scrollIntoView({ block: 'nearest', behavior: scrollMotion() }))
 }
 
 // ── Find in transcript ─────────────────────────────────────────────────────

@@ -11,6 +11,7 @@ import type { WaveLook } from '#shared/utils/waveTemplates'
 
 import {
   audioFileProblem,
+  MAX_BATCH,
   clampPartMinutes,
   estimatedParts,
   estimatedPartSeconds,
@@ -282,7 +283,7 @@ export function useAudioToVideoForm() {
   /** Brings a step's card into view (instantly when the user prefers less motion); returns it. */
   function scrollToStep(step: number): HTMLElement | null {
     const card = document.getElementById(`step-${step}`)
-    card?.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' })
+    card?.scrollIntoView({ behavior: scrollMotion(), block: 'start' })
     return card
   }
   const canSubmit = computed(() => !blocker.value && !saving.value && readyItems.value.length > 0)
@@ -665,8 +666,30 @@ export function useAudioToVideoForm() {
     // The preview was drawn from the first file; with it gone, it is only a sketch again.
     if (i === 0) previewFile.value = null
     if (playingId.value === id) stopPlaying()
-    URL.revokeObjectURL(items.value[i]!.previewUrl)
-    items.value.splice(i, 1)
+    const [item] = items.value.splice(i, 1)
+    // One that was still uploading or failed simply goes. An uploaded one can be put back, upload and all:
+    // its preview link is let go only once the toast (and the chance to undo) has gone.
+    if (item!.status !== 'ready') return URL.revokeObjectURL(item!.previewUrl)
+    let restored = false
+    toast.add({
+      title: `Removed “${item!.title.trim() || item!.name}”`,
+      actions: [
+        {
+          label: 'Undo',
+          icon: 'i-lucide-undo-2',
+          color: 'neutral',
+          variant: 'outline',
+          onClick: () => {
+            if (restored || items.value.length >= MAX_BATCH) return
+            restored = true
+            items.value.splice(Math.min(i, items.value.length), 0, item!)
+          }
+        }
+      ],
+      'onUpdate:open': (open: boolean) => {
+        if (!open && !restored) URL.revokeObjectURL(item!.previewUrl)
+      }
+    })
   }
   function moveItem(index: number, by: -1 | 1) {
     const j = index + by

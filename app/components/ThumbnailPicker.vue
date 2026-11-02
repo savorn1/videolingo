@@ -37,7 +37,7 @@
         />
         <UButton size="xs" color="neutral" variant="ghost" icon="i-lucide-chevron-left" aria-label="Back one second" @click="nudge(-1)" />
         <UButton size="xs" color="neutral" variant="ghost" icon="i-lucide-chevron-right" aria-label="Forward one second" @click="nudge(1)" />
-        <span class="text-xs text-gray-500">of {{ formatDuration(duration) }}</span>
+        <span class="text-xs text-muted">of {{ formatDuration(duration) }}</span>
         <UButton class="ms-auto" size="xs" icon="i-lucide-camera" :loading="saving" :disabled="seeking" @click="useFrame"> Use this frame </UButton>
       </div>
     </template>

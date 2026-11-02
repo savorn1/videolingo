@@ -15,7 +15,7 @@
     <UFormField label="Chars / second" :error="err('maxCps')">
       <UInputNumber v-model="rules.maxCps" :min="5" :max="40" :step="0.5" :format-options="{ maximumFractionDigits: 1 }" class="w-full" />
     </UFormField>
-    <p class="col-span-full text-xs text-gray-500">
+    <p class="col-span-full text-xs text-muted">
       Defaults: {{ defaults.maxCharsPerLine }} characters × {{ defaults.maxLines }} lines, {{ defaults.minDurationMs / 1000 }}–{{
         defaults.maxDurationMs / 1000
       }}

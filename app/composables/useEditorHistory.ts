@@ -4,7 +4,8 @@
 // after they settle, so dragging a slider is one step, not hundreds.
 
 import { canRedo, canUndo, createHistory, current, jumpTo, record, redo, undo, type History } from '#shared/utils/history'
-import { historySteps } from '#shared/utils/historySteps'
+import { historySteps, stepTab } from '#shared/utils/historySteps'
+import type { EditorTab } from '#shared/utils/tabAccent'
 
 export interface EditorDraft {
   /** The video file the draft was made against — a replaced file makes it stale. */
@@ -20,6 +21,8 @@ export function useEditorHistory(options: {
   apply: (state: any) => void | Promise<void>
   draftKey: () => string
   videoUrl: () => string | null
+  /** After an undo, redo or jump: what it did ("Undid Crop") and the tab that changed, so the editor can show it. */
+  revealed?: (message: string, tab: EditorTab | null) => void
 }) {
   const snapshot = computed(() => JSON.stringify(options.take()))
   const history = shallowRef<History>(createHistory(snapshot.value))
@@ -77,24 +80,34 @@ export function useEditorHistory(options: {
     writeDraft(state)
   }
 
-  async function doUndo() {
-    if (!undoable.value) return
-    history.value = undo(history.value)
-    await show(current(history.value))
-  }
-  async function doRedo() {
-    if (!redoable.value) return
-    history.value = redo(history.value)
-    await show(current(history.value))
+  /** Moves to another snapshot, then says what that did and which tab changed. */
+  async function moveTo(next: History, message: string) {
+    const before = current(history.value)
+    history.value = next
+    const after = current(history.value)
+    await show(after)
+    options.revealed?.(message, stepTab(before, after))
   }
 
   /** The History list: each step's name, oldest first, and which one is shown (worked out only when looked at). */
   const steps = computed(() => historySteps(history.value.entries))
   const position = computed(() => history.value.index)
+  /** What Undo and Redo would do ("Crop"), for their labels — HIG: help people predict the result. */
+  const undoStep = computed(() => (undoable.value ? steps.value[history.value.index] : undefined))
+  const redoStep = computed(() => (redoable.value ? steps.value[history.value.index + 1] : undefined))
+  async function doUndo() {
+    if (!undoable.value) return
+    const step = undoStep.value
+    await moveTo(undo(history.value), `Undid ${step}`)
+  }
+  async function doRedo() {
+    if (!redoable.value) return
+    const step = redoStep.value
+    await moveTo(redo(history.value), `Redid ${step}`)
+  }
   async function goTo(index: number) {
     if (index === history.value.index) return
-    history.value = jumpTo(history.value, index)
-    await show(current(history.value))
+    await moveTo(jumpTo(history.value, index), `Went to step ${index}: ${steps.value[index]}`)
   }
 
   /** Starts over from the editor's current state (after loading or reset): no history, no draft. */
@@ -141,5 +154,20 @@ export function useEditorHistory(options: {
   onMounted(() => window.addEventListener('keydown', onKey))
   onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 
-  return { undo: doUndo, redo: doRedo, undoable, redoable, draftSavedAt, start, pendingDraft, restoreDraft, discardDraft, steps, position, goTo }
+  return {
+    undo: doUndo,
+    redo: doRedo,
+    undoable,
+    redoable,
+    undoStep,
+    redoStep,
+    draftSavedAt,
+    start,
+    pendingDraft,
+    restoreDraft,
+    discardDraft,
+    steps,
+    position,
+    goTo
+  }
 }

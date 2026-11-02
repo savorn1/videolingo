@@ -9,7 +9,7 @@
     <UCard class="mb-4">
       <div class="flex flex-wrap items-center gap-3">
         <USelect v-model="range" :items="rangeOptions" class="w-44" aria-label="Date range" />
-        <span class="text-sm text-gray-500">{{ formatDate(summary?.from) }} – {{ formatDate(summary?.to) }}</span>
+        <span class="text-sm text-muted">{{ formatDate(summary?.from) }} – {{ formatDate(summary?.to) }}</span>
         <UButton class="ml-auto" size="sm" color="neutral" variant="ghost" icon="i-lucide-refresh-cw" :loading="loadingSummary" @click="refreshAll"
           >Refresh</UButton
         >
@@ -129,7 +129,7 @@
           <span v-else>—</span>
         </template>
         <template #errorMessage-data="{ row }">
-          <span class="text-xs text-gray-500 line-clamp-2 max-w-xs" :title="row.errorMessage ?? undefined">{{ row.errorMessage ?? '' }}</span>
+          <span class="text-xs text-muted line-clamp-2 max-w-xs" :title="row.errorMessage ?? undefined">{{ row.errorMessage ?? '' }}</span>
         </template>
       </DataTable>
       <DataPagination v-model:page="page" v-model:page-size="pageSize" :total="total" class="mt-3" />

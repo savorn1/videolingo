@@ -99,6 +99,9 @@ test('V18: an older server that cannot draw Stereo is not offered it', async ({ 
 test('Saved looks: a whole look is saved under a name and put back', async ({ page }) => {
   await openReady(page, '/videos/from-audio')
   await page.getByRole('radio', { name: /Tall/ }).click()
+  // Folded away until used
+  await expect(page.getByLabel('Strip text')).toBeHidden()
+  await page.getByText('Title strip and logo').click()
   await page.getByLabel('Strip text').fill('Weekly show')
   await page.getByRole('button', { name: /Saved looks/ }).click()
   await page.getByLabel('Name for this look').fill('Weekly')
@@ -394,4 +397,69 @@ test('V43: on a phone, the look and the preview are a tap apart', async ({ page 
   await expect(page.locator('#preview')).toBeInViewport()
   await page.getByRole('button', { name: 'Back to the look' }).click()
   await expect(page.locator('#step-2').getByRole('heading', { name: /The look/ })).toBeInViewport()
+})
+
+test('V44: a removed recording can be put back, upload and all', async ({ page }) => {
+  await openReady(page, '/videos/from-audio')
+  await page.getByLabel('Choose audio files').setInputFiles([wavFile('a.wav'), wavFile('b.wav')])
+  await expect(page.getByText('Uploaded')).toHaveCount(2)
+  await page.getByLabel('Title for a.wav').fill('First lesson')
+  await page.getByRole('button', { name: 'Remove a.wav' }).click()
+  await expect(page.getByLabel('Title for a.wav')).toHaveCount(0)
+  await page.getByRole('button', { name: 'Undo' }).click()
+  // Back in its place, with its title, and still uploaded
+  await expect(page.getByTestId('recording-0')).toContainText('a.wav')
+  await expect(page.getByLabel('Title for a.wav')).toHaveValue('First lesson')
+  await page.getByRole('button', { name: 'Make 2 videos' }).click()
+  await expect(page).toHaveURL(/\/videos\/made/)
+  const titles = (await mockRequests()).filter((r) => r.path === '/api/admin/videos/from-audio').map((r) => r.body.title)
+  expect(titles).toEqual(['First lesson', 'B'])
+})
+
+test('V45: Ctrl/⌘+Enter makes the videos; the optional look groups fold away until used', async ({ page }) => {
+  await openReady(page, '/videos/from-audio')
+  const branding = page.getByTestId('branding')
+  await expect(branding).toContainText('optional')
+  await expect(page.getByLabel('Strip text')).toBeHidden()
+  await expect(page.getByLabel('Intro card text')).toBeHidden()
+  await page.getByText('Progress, chapters and cards').click()
+  await page.getByLabel('Intro card text').fill('Lesson 1')
+  await expect(page.getByTestId('on-picture')).toContainText('· intro card')
+
+  // Nothing to make yet: the keys do nothing
+  await page.keyboard.press('ControlOrMeta+Enter')
+  await page.getByLabel('Choose audio files').setInputFiles(wavFile('lesson.wav'))
+  await expect(page.getByText('Uploaded')).toBeVisible()
+  await page.getByLabel('Title for lesson.wav').press('ControlOrMeta+Enter')
+  await expect(page).toHaveURL(/\/videos\/42$/) // one video: straight to its page
+  const sent = (await mockRequests()).filter((r) => r.path === '/api/admin/videos/from-audio')
+  expect(sent).toHaveLength(1)
+  expect(sent[0]!.body.intro).toMatchObject({ text: 'Lesson 1' })
+})
+
+test.describe('V46: on a phone', () => {
+  test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true })
+
+  test('every control is at least 44 px to tap, and each switch has a 44 px hit area', async ({ page }) => {
+    await openReady(page, '/videos/from-audio')
+    await page.getByLabel('Choose audio files').setInputFiles([wavFile('lesson-one.wav'), wavFile('lesson-two.wav')])
+    await expect(page.getByText('Uploaded').first()).toBeAttached()
+    await page.evaluate(() => document.querySelectorAll('form details').forEach((d) => ((d as HTMLDetailsElement).open = true)))
+    const small = await page.evaluate(() =>
+      [...document.querySelectorAll('form :is(button, a[href], summary, select, input[type=color]):not([role=switch])')]
+        .map((el) => ({ el, r: el.getBoundingClientRect() }))
+        .filter(({ r }) => r.width && Math.min(r.width, r.height) < 44)
+        .map(({ el }) => el.getAttribute('aria-label') || (el as HTMLElement).innerText.trim())
+    )
+    expect(small).toEqual([])
+    const misses = await page.evaluate(() =>
+      [...document.querySelectorAll('form [role=switch]')].flatMap((el) => {
+        el.scrollIntoView({ block: 'center' })
+        const r = el.getBoundingClientRect()
+        const [cx, cy] = [r.left + r.width / 2, r.top + r.height / 2]
+        return [-20, 20].filter((dy) => !el.contains(document.elementFromPoint(cx, cy + dy))).map((dy) => `${el.id} ${dy}`)
+      })
+    )
+    expect(misses).toEqual([])
+  })
 })

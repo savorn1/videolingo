@@ -6,7 +6,7 @@
       <div v-if="loadingList" class="space-y-2 p-1">
         <USkeleton v-for="i in 3" :key="i" class="h-10" />
       </div>
-      <p v-else-if="!chats.length" class="text-xs text-gray-500 p-2">No conversations yet.</p>
+      <p v-else-if="!chats.length" class="text-xs text-muted p-2">No conversations yet.</p>
       <ul v-else class="space-y-0.5">
         <li v-for="c in chats" :key="c.id" class="group flex items-center gap-1">
           <button
@@ -49,7 +49,7 @@
           <USkeleton v-for="i in 3" :key="i" class="h-12" />
         </div>
         <template v-else>
-          <p v-if="!messages.length && !pending" class="text-sm text-gray-500 text-center py-8">Ask your first question below.</p>
+          <p v-if="!messages.length && !pending" class="text-sm text-muted text-center py-8">Ask your first question below.</p>
           <div v-for="m in messages" :key="m.id" class="flex" :class="m.role === 'USER' ? 'justify-end' : 'justify-start'">
             <div class="max-w-[85%]">
               <div
@@ -66,7 +66,7 @@
               <div class="max-w-[85%] rounded-lg px-3 py-2 text-sm whitespace-pre-wrap break-words bg-primary-500/70 text-white">{{ pending }}</div>
             </div>
             <div class="flex justify-start">
-              <div class="rounded-lg px-3 py-2 bg-gray-100 dark:bg-gray-800 text-sm text-gray-500 flex items-center gap-2">
+              <div class="rounded-lg px-3 py-2 bg-gray-100 dark:bg-gray-800 text-sm text-muted flex items-center gap-2">
                 <UIcon name="i-lucide-loader-circle" class="w-4 h-4 animate-spin" /> Thinking…
               </div>
             </div>

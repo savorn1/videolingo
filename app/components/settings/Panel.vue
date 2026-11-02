@@ -6,7 +6,7 @@
           <h2 class="font-semibold text-gray-900 dark:text-white">{{ title }}</h2>
           <p class="text-sm text-gray-500 dark:text-gray-400">{{ description }}</p>
         </div>
-        <div v-if="view" class="text-xs text-gray-500 text-right">
+        <div v-if="view" class="text-xs text-muted text-right">
           <template v-if="view.customized && view.updatedAt"> Changed {{ formatRelativeTime(view.updatedAt) }} by {{ view.updatedBy ?? '—' }} </template>
           <UBadge v-else color="neutral" variant="subtle" size="sm">Using defaults</UBadge>
         </div>

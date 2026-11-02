@@ -153,7 +153,7 @@ export function useClipEditor(props: ClipEditorProps, emit: ClipEditorEmit) {
   // Bound by `ref="resultsCard"` in a tab component (a template ref can't reach into a child).
   const resultsCard = shallowRef<{ $el: HTMLElement } | null>(null)
   function scrollToResults() {
-    resultsCard.value?.$el?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    resultsCard.value?.$el?.scrollIntoView({ behavior: scrollMotion(), block: 'nearest' })
   }
   function onQueued() {
     load()
@@ -2048,11 +2048,19 @@ export function useClipEditor(props: ClipEditorProps, emit: ClipEditorEmit) {
   const draftSavedLabel = computed(() =>
     history.draftSavedAt.value ? new Date(history.draftSavedAt.value).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''
   )
+  // What the last undo, redo or History jump did, read out by screen readers ("Undid Crop").
+  const historyNote = ref('')
   const history = useEditorHistory({
     take: takeState,
     apply: applyState,
     draftKey: () => `videolingo:editor-draft:${props.video.id}`,
-    videoUrl: () => props.video.videoUrl ?? null
+    videoUrl: () => props.video.videoUrl ?? null,
+    // HIG Undo and redo: show the result — a change made in another tab opens that tab, so undo never seems to do nothing.
+    revealed: (message, tab) => {
+      if (tab && tab !== mode.value) mode.value = tab
+      historyNote.value = ''
+      nextTick(() => (historyNote.value = message))
+    }
   })
 
   // Once the state is loaded (and again when the real duration arrives, which
@@ -2571,6 +2579,7 @@ export function useClipEditor(props: ClipEditorProps, emit: ClipEditorEmit) {
     takeState,
     applyState,
     draftSavedLabel,
+    historyNote,
     history,
     draft,
     settle,

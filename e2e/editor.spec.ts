@@ -638,3 +638,21 @@ test('Number keys open the tabs', async ({ page }) => {
   await page.keyboard.press('1')
   await expect(page.getByRole('tab', { name: /Trim/ })).toHaveAttribute('aria-selected', 'true')
 })
+
+test('Undo says what it undoes, and opens the tab where it happened', async ({ page }) => {
+  await openEditor(page)
+  const crop = page.getByRole('switch', { name: 'Also crop' })
+  await crop.click()
+  await expect(crop).toBeChecked()
+  const undo = page.getByRole('button', { name: 'Undo Crop' }) // named once the change settles
+  await expect(undo).toBeEnabled()
+  await page.keyboard.press('2')
+  await expect(page.getByRole('tab', { name: /Split/ })).toHaveAttribute('aria-selected', 'true')
+  await undo.click()
+  await expect(page.getByRole('tab', { name: /Trim/ })).toHaveAttribute('aria-selected', 'true')
+  await expect(crop).not.toBeChecked()
+  await expect(page.getByTestId('history-note')).toHaveText('Undid Crop')
+  await page.getByRole('button', { name: 'Redo Crop' }).click()
+  await expect(crop).toBeChecked()
+  await expect(page.getByTestId('history-note')).toHaveText('Redid Crop')
+})

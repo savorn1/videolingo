@@ -44,7 +44,7 @@
         <div class="p-4 space-y-4">
           <div class="flex flex-wrap gap-2">
             <UBadge :color="visibility.color" variant="subtle" :icon="visibility.icon">{{ visibility.label }}</UBadge>
-            <span class="text-xs text-gray-500 self-center">{{ visibility.description }}</span>
+            <span class="text-xs text-muted self-center">{{ visibility.description }}</span>
           </div>
           <p class="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-line">{{ collection.description || 'No description.' }}</p>
           <dl class="space-y-2 text-sm">
@@ -133,7 +133,7 @@
                   <NuxtLink :to="`/videos/${item.videoId}`" class="block font-semibold text-sm text-gray-900 dark:text-white truncate hover:underline">
                     {{ item.title ?? `Video #${item.videoId}` }}
                   </NuxtLink>
-                  <p class="text-xs text-gray-500 truncate">
+                  <p class="text-xs text-muted truncate">
                     {{ languageLabel(item.language) }} · added {{ formatRelativeTime(item.addedAt) }}{{ item.addedBy ? ` by ${item.addedBy}` : '' }}
                   </p>
                 </div>

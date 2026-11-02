@@ -13,9 +13,10 @@
         <h3 id="look-frame" class="flex items-center gap-1.5 text-sm font-medium text-gray-900 dark:text-white">
           <UIcon name="i-lucide-frame" class="size-4 text-gray-400" />Frame
         </h3>
-        <div class="grid grid-cols-[auto_1fr] items-center gap-x-3 gap-y-2">
+        <!-- Segmented choices: on a phone each label sits above equal-width segments (HIG Segmented controls) -->
+        <div class="grid grid-cols-1 gap-y-2 sm:grid-cols-[auto_1fr] sm:items-center sm:gap-x-3">
           <span class="text-xs text-gray-500 dark:text-gray-400">Shape</span>
-          <div class="flex flex-wrap gap-2" role="radiogroup" aria-label="Shape">
+          <div class="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap" role="radiogroup" aria-label="Shape">
             <UButton
               v-for="sh in VIDEO_SHAPES"
               :key="sh.value"
@@ -26,23 +27,26 @@
               :color="shape === sh.value ? 'primary' : 'neutral'"
               :variant="shape === sh.value ? 'soft' : 'ghost'"
               :aria-checked="shape === sh.value"
+              class="max-sm:justify-center"
               @click="shape = sh.value"
             >
-              {{ sh.label }} <span class="text-xs opacity-70">{{ sh.hint.split(' — ')[0] }}</span>
+              {{ sh.label }} <span class="text-xs font-normal">{{ sh.hint.split(' — ')[0] }}</span>
             </UButton>
           </div>
           <span class="text-xs text-gray-500 dark:text-gray-400">Size</span>
-          <div class="flex flex-wrap gap-2" role="group" aria-label="Video size">
+          <div class="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap" role="radiogroup" aria-label="Video size">
             <UButton
               v-for="r in VIDEO_RESOLUTIONS"
               :key="r.value"
               size="sm"
               :color="resolution === r.value ? 'primary' : 'neutral'"
               :variant="resolution === r.value ? 'soft' : 'ghost'"
-              :aria-pressed="resolution === r.value"
+              role="radio"
+              :aria-checked="resolution === r.value"
+              class="max-sm:justify-center"
               @click="resolution = r.value"
             >
-              {{ r.label }} <span class="text-xs opacity-70 tabular-nums">{{ frameSizeLabel(r.value, shape) }}</span>
+              {{ r.label }} <span class="text-xs font-normal tabular-nums">{{ frameSizeLabel(r.value, shape) }}</span>
             </UButton>
           </div>
         </div>
@@ -343,82 +347,104 @@
         </p>
       </section>
 
-      <!-- A strip of text and a logo over the picture -->
-      <section class="space-y-2 pt-5 first:pt-0" data-testid="branding" aria-labelledby="look-branding">
-        <h3 id="look-branding" class="flex items-center gap-1.5 text-sm font-medium text-gray-900 dark:text-white">
-          <UIcon name="i-lucide-type" class="size-4 text-gray-400" />Title strip and logo
-        </h3>
-        <UInput
-          v-model="stripText"
-          :maxlength="MAX_STRIP"
-          size="sm"
-          class="w-full"
-          placeholder="e.g. Episode 4 · with Dara — shown the whole time"
-          aria-label="Strip text"
-        />
-        <div class="flex flex-wrap items-center gap-2">
-          <img v-if="logoUrl" :src="logoUrl" alt="" class="h-8 max-w-24 rounded object-contain ring-1 ring-gray-200 dark:ring-gray-700" />
-          <UploadButton
-            v-if="!logoKey"
-            label="Add a logo"
-            accept="image/png,image/jpeg,image/webp"
-            :progress="logoUploading ? logoProgress : null"
-            @pick="onPickLogo"
+      <!-- A strip of text and a logo over the picture. Optional, so folded away until used; the heading says what's set. -->
+      <details
+        :open="brandingOpen"
+        class="group/fold pt-5 first:pt-0"
+        data-testid="branding"
+        @toggle="brandingOpen = ($event.target as HTMLDetailsElement).open"
+      >
+        <summary :class="FOLD_SUMMARY">
+          <h3 class="flex items-center gap-1.5 text-sm font-medium text-gray-900 dark:text-white">
+            <UIcon name="i-lucide-type" class="size-4 text-gray-400" />Title strip and logo
+          </h3>
+          <span class="min-w-0 truncate text-sm text-gray-500 dark:text-gray-400">· {{ inUse.branding.join(', ') || 'optional' }}</span>
+          <UIcon name="i-lucide-chevron-down" :class="FOLD_CHEVRON" />
+        </summary>
+        <div class="space-y-2 pt-3">
+          <UInput
+            v-model="stripText"
+            :maxlength="MAX_STRIP"
+            size="sm"
+            class="w-full"
+            placeholder="e.g. Episode 4 · with Dara — shown the whole time"
+            aria-label="Strip text"
           />
-          <UButton v-else size="xs" color="neutral" variant="ghost" icon="i-lucide-x" @click="clearLogo">Remove logo</UButton>
-          <span class="text-xs text-gray-500 dark:text-gray-400"
-            >The logo sits in the top-right corner; the strip at the bottom (at the top when a waveform runs along the bottom).</span
-          >
-        </div>
-      </section>
-
-      <!-- Progress, chapters and cards -->
-      <section class="space-y-3 pt-5 first:pt-0" data-testid="on-picture" aria-labelledby="look-more">
-        <h3 id="look-more" class="flex items-center gap-1.5 text-sm font-medium text-gray-900 dark:text-white">
-          <UIcon name="i-lucide-layers" class="size-4 text-gray-400" />Progress, chapters and cards
-        </h3>
-        <USwitch
-          v-model="progressBar"
-          label="Progress bar"
-          description="A thin bar along the bottom fills up as the recording plays, so viewers see how much is left."
-        />
-        <USwitch
-          v-if="chapterCount"
-          v-model="useChapters"
-          :label="`Use the chapters (${chapterCount})`"
-          description="Each chapter's title shows top left for a few seconds as it starts, and learners can jump between them under Chapters."
-        />
-        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <div v-for="c in cards" :key="c.name" class="space-y-1">
-            <UFormField :label="`${c.name} card`">
-              <div class="flex items-center gap-2">
-                <UInput
-                  v-model="c.card.text"
-                  :maxlength="MAX_CARD_TEXT"
-                  size="sm"
-                  class="min-w-0 flex-1"
-                  :placeholder="c.placeholder"
-                  :aria-label="`${c.name} card text`"
-                />
-                <UInput
-                  v-model.number="c.card.seconds"
-                  type="number"
-                  :min="MIN_CARD_SECONDS"
-                  :max="MAX_CARD_SECONDS"
-                  step="0.5"
-                  size="sm"
-                  class="w-20"
-                  :aria-label="`${c.name} card seconds`"
-                />
-                <span class="text-xs text-gray-500 dark:text-gray-400">s</span>
-              </div>
-              <!-- Under the boxes, so the intro's and outro's boxes line up whatever the length of their notes -->
-              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ c.hint }}</p>
-            </UFormField>
+          <div class="flex flex-wrap items-center gap-2">
+            <img v-if="logoUrl" :src="logoUrl" alt="" class="h-8 max-w-24 rounded object-contain ring-1 ring-gray-200 dark:ring-gray-700" />
+            <UploadButton
+              v-if="!logoKey"
+              label="Add a logo"
+              accept="image/png,image/jpeg,image/webp"
+              :progress="logoUploading ? logoProgress : null"
+              @pick="onPickLogo"
+            />
+            <UButton v-else size="xs" color="neutral" variant="ghost" icon="i-lucide-x" @click="clearLogo">Remove logo</UButton>
+            <span class="text-xs text-gray-500 dark:text-gray-400"
+              >The logo sits in the top-right corner; the strip at the bottom (at the top when a waveform runs along the bottom).</span
+            >
           </div>
         </div>
-        <p v-if="cardsError" class="text-xs text-error-600 dark:text-error-400" role="alert">{{ cardsError }}</p>
-      </section>
+      </details>
+
+      <!-- Progress, chapters and cards: folded the same way -->
+      <details
+        :open="onPictureOpen"
+        class="group/fold pt-5 first:pt-0"
+        data-testid="on-picture"
+        @toggle="onPictureOpen = ($event.target as HTMLDetailsElement).open"
+      >
+        <summary :class="FOLD_SUMMARY">
+          <h3 class="flex items-center gap-1.5 text-sm font-medium text-gray-900 dark:text-white">
+            <UIcon name="i-lucide-layers" class="size-4 text-gray-400" />Progress, chapters and cards
+          </h3>
+          <span class="min-w-0 truncate text-sm text-gray-500 dark:text-gray-400">· {{ inUse.onPicture.join(', ') || 'optional' }}</span>
+          <UIcon name="i-lucide-chevron-down" :class="FOLD_CHEVRON" />
+        </summary>
+        <div class="space-y-3 pt-3">
+          <USwitch
+            v-model="progressBar"
+            label="Progress bar"
+            description="A thin bar along the bottom fills up as the recording plays, so viewers see how much is left."
+          />
+          <USwitch
+            v-if="chapterCount"
+            v-model="useChapters"
+            :label="`Use the chapters (${chapterCount})`"
+            description="Each chapter's title shows top left for a few seconds as it starts, and learners can jump between them under Chapters."
+          />
+          <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div v-for="c in cards" :key="c.name" class="space-y-1">
+              <UFormField :label="`${c.name} card`">
+                <div class="flex items-center gap-2">
+                  <UInput
+                    v-model="c.card.text"
+                    :maxlength="MAX_CARD_TEXT"
+                    size="sm"
+                    class="min-w-0 flex-1"
+                    :placeholder="c.placeholder"
+                    :aria-label="`${c.name} card text`"
+                  />
+                  <UInput
+                    v-model.number="c.card.seconds"
+                    type="number"
+                    :min="MIN_CARD_SECONDS"
+                    :max="MAX_CARD_SECONDS"
+                    step="0.5"
+                    size="sm"
+                    class="w-20"
+                    :aria-label="`${c.name} card seconds`"
+                  />
+                  <span class="text-xs text-gray-500 dark:text-gray-400">s</span>
+                </div>
+                <!-- Under the boxes, so the intro's and outro's boxes line up whatever the length of their notes -->
+                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ c.hint }}</p>
+              </UFormField>
+            </div>
+          </div>
+          <p v-if="cardsError" class="text-xs text-error-600 dark:text-error-400" role="alert">{{ cardsError }}</p>
+        </div>
+      </details>
     </div>
   </AudioVideoStepCard>
 </template>
@@ -439,7 +465,7 @@ import {
 } from '#shared/utils/audioVideo'
 import { formatTimecode } from '#shared/utils/transport'
 import { MAX_SLIDES } from '#shared/utils/slides'
-import { MAX_CARD_SECONDS, MIN_CARD_SECONDS } from '#shared/utils/audioVideoExtras'
+import { extrasInUse, MAX_CARD_SECONDS, MIN_CARD_SECONDS } from '#shared/utils/audioVideoExtras'
 import { MAX_CARD_TEXT } from '#shared/utils/trimExtras'
 const picInput = useTemplateRef<HTMLInputElement>('picInput')
 const {
@@ -508,10 +534,39 @@ const {
 } = useAudioToVideoFormContext()
 /** Brings the preview into view (instantly when the user prefers less motion). */
 function showPreview() {
-  document.getElementById('preview')?.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' })
+  document.getElementById('preview')?.scrollIntoView({ behavior: scrollMotion(), block: 'start' })
 }
 const cards = [
   { name: 'Intro', card: intro, hint: 'Before the recording, on the background with the logo.', placeholder: 'e.g. Lesson 4 — Greetings' },
   { name: 'Outro', card: outro, hint: 'After it. Leave empty for none.', placeholder: 'e.g. Thanks for listening!' }
 ]
+
+// The two optional groups fold away until used: each opens by itself once something in it is set (typed, put back
+// with a saved look, or chapters found in a file), and can be folded again by hand.
+const FOLD_SUMMARY =
+  'flex cursor-pointer list-none items-center gap-1.5 rounded select-none focus-visible:outline-2 focus-visible:outline-primary-500 [&::-webkit-details-marker]:hidden'
+const FOLD_CHEVRON = 'ml-auto size-4 shrink-0 text-gray-400 transition-transform group-open/fold:rotate-180 motion-reduce:transition-none'
+const inUse = computed(() =>
+  extrasInUse({
+    strip: stripText.value,
+    logo: !!logoKey.value,
+    progressBar: progressBar.value,
+    chapters: chapterCount.value,
+    useChapters: useChapters.value,
+    intro: intro.text,
+    outro: outro.text
+  })
+)
+const brandingOpen = ref(false)
+const onPictureOpen = ref(false)
+watch(
+  () => inUse.value.branding.length > 0,
+  (used) => used && (brandingOpen.value = true),
+  { immediate: true }
+)
+watch(
+  () => inUse.value.onPicture.length > 0 || chapterCount.value > 0,
+  (used) => used && (onPictureOpen.value = true),
+  { immediate: true }
+)
 </script>

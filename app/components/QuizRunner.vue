@@ -43,7 +43,7 @@
     </ol>
 
     <div v-if="!result" class="flex items-center justify-between gap-2">
-      <span class="text-xs text-gray-500">{{ answered }} of {{ questions.length }} answered</span>
+      <span class="text-xs text-muted">{{ answered }} of {{ questions.length }} answered</span>
       <UButton icon="i-lucide-check" :loading="submitting" :disabled="!answered" @click="submit">Check my answers</UButton>
     </div>
   </div>

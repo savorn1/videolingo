@@ -74,7 +74,7 @@
                 >Default</UBadge
               >
             </div>
-            <p class="text-xs text-gray-500 truncate" :title="row.videoTitle ?? undefined">{{ row.videoTitle ?? `Video #${row.videoId}` }}</p>
+            <p class="text-xs text-muted truncate" :title="row.videoTitle ?? undefined">{{ row.videoTitle ?? `Video #${row.videoId}` }}</p>
           </div>
         </template>
 

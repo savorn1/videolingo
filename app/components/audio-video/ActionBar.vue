@@ -4,6 +4,7 @@
 
     <!-- Stays in view while scrolling the long form, and says what is still missing -->
     <div
+      ref="bar"
       class="sticky bottom-0 z-10 -mx-1 flex flex-wrap items-center justify-end gap-x-3 gap-y-2 rounded-lg border border-gray-200 bg-white/95 px-3 py-3 shadow-sm backdrop-blur dark:border-gray-800 dark:bg-gray-900/95"
       data-testid="action-bar"
     >
@@ -24,9 +25,22 @@
         <p class="text-xs text-gray-500 dark:text-gray-400">Videos are created hidden. Review each one, then enable it for learners.</p>
       </div>
       <UButton color="neutral" variant="ghost" to="/videos" :disabled="saving">Cancel</UButton>
-      <UButton type="submit" color="neutral" :class="TAB_ACCENTS.audio.button" icon="i-lucide-clapperboard" :loading="saving" :disabled="!canSubmit">{{
-        submitLabel
-      }}</UButton>
+      <UButton
+        type="submit"
+        color="neutral"
+        :class="TAB_ACCENTS.audio.button"
+        icon="i-lucide-clapperboard"
+        :loading="saving"
+        :disabled="!canSubmit"
+        aria-keyshortcuts="Control+Enter Meta+Enter"
+        >{{ submitLabel }}
+        <!-- The keys, where there's a keyboard to press them on -->
+        <template #trailing>
+          <span class="ml-1 hidden items-center gap-0.5 opacity-85 [@media(pointer:fine)]:inline-flex" aria-hidden="true">
+            <UKbd value="meta" size="sm" /><UKbd value="enter" size="sm" />
+          </span>
+        </template>
+      </UButton>
     </div>
   </div>
 </template>
@@ -35,6 +49,18 @@
 // The bottom of "Video from audio": the save error and the bar that stays in view, saying what is still missing.
 import { TAB_ACCENTS } from '#shared/utils/tabAccent'
 const { saveError, saving, uploadingAny, blocker, blockerStep, scrollToStep, canSubmit, submitLabel, readySummary } = useAudioToVideoFormContext()
+
+// Ctrl/⌘+Enter makes the videos from anywhere on the page, as a form's main action usually can — not from a dialog
+// or popover (their own forms), and only when the button could be pressed.
+const bar = useTemplateRef<HTMLElement>('bar')
+function onKeyDown(e: KeyboardEvent) {
+  if (e.key !== 'Enter' || !(e.metaKey || e.ctrlKey) || e.defaultPrevented) return
+  if ((e.target as HTMLElement | null)?.closest?.('[role="dialog"]')) return
+  e.preventDefault()
+  if (canSubmit.value) bar.value?.closest('form')?.requestSubmit()
+}
+onMounted(() => window.addEventListener('keydown', onKeyDown))
+onBeforeUnmount(() => window.removeEventListener('keydown', onKeyDown))
 
 // Scrolls to the step holding the problem, and puts the cursor in the first missing title when that is it.
 function showBlocker() {

@@ -67,7 +67,7 @@
         <template #header><h3 class="font-semibold text-gray-900 dark:text-white">By role</h3></template>
         <RankedBarList :rows="(data?.byRole ?? []).map((r) => ({ key: r.key, label: r.key === 'ADMIN' ? 'Admins' : 'Users', value: r.count }))" />
         <template v-if="data?.byCustomRole.length">
-          <p class="text-xs font-medium text-gray-500 mt-5 mb-2">Custom roles (role USER)</p>
+          <p class="text-xs font-medium text-muted mt-5 mb-2">Custom roles (role USER)</p>
           <RankedBarList :rows="data.byCustomRole.map((r) => ({ key: r.key, label: r.label, value: r.count }))" />
         </template>
       </UCard>
@@ -76,12 +76,12 @@
         <div v-if="!data" class="space-y-2">
           <USkeleton v-for="n in 5" :key="n" class="h-8" />
         </div>
-        <div v-else-if="!data.topViewers.length" class="flex flex-col items-center gap-2 py-8 text-center text-sm text-gray-500">
+        <div v-else-if="!data.topViewers.length" class="flex flex-col items-center gap-2 py-8 text-center text-sm text-muted">
           <UIcon name="i-lucide-users-round" class="w-8 h-8 text-gray-300 dark:text-gray-600" />
           Nobody signed in watched anything in this period.
         </div>
         <table v-else class="w-full text-sm">
-          <thead class="text-xs text-gray-500 text-left">
+          <thead class="text-xs text-muted text-left">
             <tr>
               <th class="pb-2 font-medium">User</th>
               <th class="pb-2 font-medium text-right">Views</th>

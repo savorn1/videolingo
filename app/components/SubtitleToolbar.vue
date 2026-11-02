@@ -121,7 +121,7 @@
           <UFormField label="Details" hint="optional">
             <UTextarea v-model="report.note" :rows="3" maxlength="1000" class="w-full" placeholder="e.g. “bank” should be “river bank” here" />
           </UFormField>
-          <p v-if="report.kind === 'TIMING' && offsetMs" class="text-xs text-gray-500">
+          <p v-if="report.kind === 'TIMING' && offsetMs" class="text-xs text-muted">
             Your correction ({{ (offsetMs / 1000).toFixed(2) }} s) is included, so the team can fix it for everyone.
           </p>
           <div class="flex justify-end gap-2">

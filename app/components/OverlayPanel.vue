@@ -84,7 +84,7 @@
                 </button>
               </div>
             </div>
-            <p v-if="!shownStickerGroups.length" class="px-1 py-2 text-xs text-gray-500">No sticker matches. Paste your own emoji below.</p>
+            <p v-if="!shownStickerGroups.length" class="px-1 py-2 text-xs text-muted">No sticker matches. Paste your own emoji below.</p>
             <form class="flex items-center gap-1 border-t border-gray-200 pt-2 dark:border-gray-800" @submit.prevent="onCustomSticker">
               <UInput v-model="customEmoji" size="xs" placeholder="Your own emoji" class="flex-1" aria-label="Your own emoji" />
               <UButton type="submit" size="xs" color="neutral" variant="soft" :class="TAB_ACCENTS.overlay.soft" :disabled="!isSingleEmoji(customEmoji)"
@@ -120,8 +120,8 @@
         <template #content>
           <div class="w-64 p-2 space-y-1 text-sm">
             <p class="px-1 text-xs text-gray-500 dark:text-gray-400">One text layer per cue of a subtitle track of this video.</p>
-            <p v-if="tracksLoading" class="px-1 py-2 text-xs text-gray-500">Loading…</p>
-            <p v-else-if="!tracks.length" class="px-1 py-2 text-xs text-gray-500">This video has no subtitle tracks yet.</p>
+            <p v-if="tracksLoading" class="px-1 py-2 text-xs text-muted">Loading…</p>
+            <p v-else-if="!tracks.length" class="px-1 py-2 text-xs text-muted">This video has no subtitle tracks yet.</p>
             <button
               v-for="t in tracks"
               :key="t.id"
@@ -244,7 +244,7 @@
     >
       <p class="text-xs font-medium">
         {{ s.multi.length + 1 }} layers picked
-        <span class="font-normal text-gray-500">— dragging or the arrow keys move them together; the settings below are for the first one</span>
+        <span class="font-normal text-muted">— dragging or the arrow keys move them together; the settings below are for the first one</span>
       </p>
       <div class="flex flex-wrap items-center gap-1">
         <UButton size="xs" color="neutral" variant="soft" :class="TAB_ACCENTS.overlay.soft" icon="i-lucide-copy" @click="edit.duplicateGroup()"
@@ -313,7 +313,7 @@
         </div>
         <SliderRow v-model="layer.sizePct" label="Size" :min="1" :max="30" :step="0.5" :default-value="6" unit="%" />
         <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
-          <label class="flex items-center gap-2 text-xs text-gray-500">
+          <label class="flex items-center gap-2 text-xs text-muted">
             Colour
             <input
               v-model="layer.color"
@@ -370,7 +370,7 @@
           @update:model-value="(v) => layer && (layer.backgroundOpacity = v / 100)"
         />
         <div class="flex items-center gap-1">
-          <span class="w-16 text-xs text-gray-500">Align</span>
+          <span class="w-16 text-xs text-muted">Align</span>
           <UButton
             v-for="a in ALIGNS"
             :key="a.value"

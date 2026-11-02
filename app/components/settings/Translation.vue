@@ -26,7 +26,7 @@
       <div class="rounded-lg border border-gray-200 dark:border-gray-800 p-4 space-y-3">
         <div>
           <p class="font-medium text-gray-900 dark:text-white">Subtitle rules — most languages</p>
-          <p class="text-xs text-gray-500">What a new subtitle track is built to and checked against. Each track can still change its own rules.</p>
+          <p class="text-xs text-muted">What a new subtitle track is built to and checked against. Each track can still change its own rules.</p>
         </div>
         <SettingsRuleFields v-model="form.standardRules" :defaults="defaults.standardRules" :errors="errors" prefix="standardRules" />
       </div>
@@ -34,7 +34,7 @@
       <div class="rounded-lg border border-gray-200 dark:border-gray-800 p-4 space-y-3">
         <div>
           <p class="font-medium text-gray-900 dark:text-white">Subtitle rules — compact scripts</p>
-          <p class="text-xs text-gray-500">
+          <p class="text-xs text-muted">
             For languages that pack more meaning per character, such as Japanese and Chinese: shorter lines, slower reading speed.
           </p>
         </div>

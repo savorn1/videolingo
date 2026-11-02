@@ -14,11 +14,11 @@
         </p>
         <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5 text-sm">
           <div v-for="row in infoRows(info)" :key="row.label" class="flex justify-between gap-3 min-w-0">
-            <dt class="text-gray-500 shrink-0">{{ row.label }}</dt>
+            <dt class="text-muted shrink-0">{{ row.label }}</dt>
             <dd class="font-mono text-xs text-gray-800 dark:text-gray-200 truncate" :title="row.value">{{ row.value }}</dd>
           </div>
         </dl>
-        <p class="text-xs text-gray-500 mt-2">Change these with the S3_* / AWS_* environment variables and spring.servlet.multipart.max-file-size.</p>
+        <p class="text-xs text-muted mt-2">Change these with the S3_* / AWS_* environment variables and spring.servlet.multipart.max-file-size.</p>
       </div>
 
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">

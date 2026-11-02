@@ -16,7 +16,7 @@
         :ui="{ indicator: ANALYTICS_ACCENTS[tab].indicator }"
       />
       <div class="flex items-center gap-3 w-full lg:w-auto justify-between lg:justify-end">
-        <p class="text-xs text-gray-500 leading-tight">
+        <p class="text-xs text-muted leading-tight">
           <span class="font-medium text-gray-700 dark:text-gray-300">{{ formatDate(range.from) }} – {{ formatDate(range.to) }}</span>
           <br />
           <span class="text-gray-500 dark:text-gray-400">vs the {{ days }} days before</span>

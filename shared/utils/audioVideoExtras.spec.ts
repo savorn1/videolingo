@@ -14,6 +14,7 @@ import {
   titlePatternProblem,
   sanitizeTitleNumbering,
   titleTwins,
+  extrasInUse,
   paletteFromPixels,
   tidyChapters
 } from './audioVideoExtras'
@@ -191,5 +192,21 @@ describe('a remembered numbering', () => {
     expect(sanitizeTitleNumbering('Episode {n}')).toBeNull()
     expect(sanitizeTitleNumbering({ pattern: 'no number {title}' })).toBeNull()
     expect(sanitizeTitleNumbering({ pattern: 7 })).toBeNull()
+  })
+})
+
+describe('what the optional groups hold', () => {
+  const none = { strip: ' ', logo: false, progressBar: false, chapters: 0, useChapters: true, intro: '', outro: '' }
+  it('is nothing by default', () => {
+    expect(extrasInUse(none)).toEqual({ branding: [], onPicture: [] })
+  })
+  it('names what is set, in order', () => {
+    expect(extrasInUse({ ...none, strip: 'Ep. 4', logo: true, progressBar: true, chapters: 2, intro: 'Hi', outro: 'Bye' })).toEqual({
+      branding: ['strip', 'logo'],
+      onPicture: ['progress bar', 'chapters', 'intro card', 'outro card']
+    })
+  })
+  it('leaves out chapters that are found but not used', () => {
+    expect(extrasInUse({ ...none, chapters: 2, useChapters: false }).onPicture).toEqual([])
   })
 })

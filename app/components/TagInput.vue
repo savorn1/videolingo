@@ -22,7 +22,7 @@
         @keydown.enter.prevent="choose(highlighted)"
         @keydown.escape="open = false"
       />
-      <p v-if="atLimit" class="mt-1 text-xs text-gray-500">This video has the maximum of {{ MAX_TAGS }} tags.</p>
+      <p v-if="atLimit" class="mt-1 text-xs text-muted">This video has the maximum of {{ MAX_TAGS }} tags.</p>
       <ul
         v-if="open && options.length"
         class="absolute z-20 mt-1 w-full max-h-60 overflow-auto rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 py-1 shadow-lg text-sm"

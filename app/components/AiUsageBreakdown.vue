@@ -3,7 +3,7 @@
     <template #header>
       <h2 class="font-semibold text-gray-900 dark:text-white">{{ title }}</h2>
     </template>
-    <p v-if="!rows.length" class="text-sm text-gray-500">No usage in this range.</p>
+    <p v-if="!rows.length" class="text-sm text-muted">No usage in this range.</p>
     <div v-for="r in rows" :key="r.key" class="text-sm">
       <div class="flex items-baseline justify-between gap-2">
         <span class="flex items-center gap-1.5 min-w-0 text-gray-800 dark:text-gray-200">
@@ -15,7 +15,7 @@
       <div class="h-1.5 rounded-full bg-gray-100 dark:bg-gray-800 mt-1 overflow-hidden" aria-hidden="true">
         <div class="h-full rounded-full bg-primary-500 dark:bg-primary-400" :style="{ width: `${share(r.costUsd)}%` }" />
       </div>
-      <p class="text-xs text-gray-500 mt-0.5 tabular-nums">
+      <p class="text-xs text-muted mt-0.5 tabular-nums">
         {{ r.requests }} request{{ r.requests === 1 ? '' : 's' }} · {{ formatTokens(r.inputTokens + r.cacheWriteTokens + r.cacheReadTokens) }} in /
         {{ formatTokens(r.outputTokens) }} out · {{ share(r.costUsd) }}%
       </p>

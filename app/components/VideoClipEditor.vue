@@ -233,7 +233,7 @@
                 {{ runningCount }} running
               </UBadge>
             </h2>
-            <div class="flex flex-wrap items-center justify-end gap-1 [&_button]:whitespace-nowrap">
+            <div class="flex flex-wrap items-center justify-end gap-x-3 gap-y-1 [&_button]:whitespace-nowrap">
               <span
                 v-if="history.draftSavedAt.value"
                 class="mr-1 hidden items-center gap-1 whitespace-nowrap text-xs text-gray-500 dark:text-gray-400 sm:flex"
@@ -243,150 +243,156 @@
                 <UIcon name="i-lucide-cloud-check" class="size-3.5" />
                 Draft saved {{ draftSavedLabel }}
               </span>
-              <ClipEditorThumbnailMaker v-if="canWrite && video.videoUrl" />
-              <ClipEditorBrandKitMenu />
-              <UPopover v-model:open="recipesOpen">
-                <UButton size="xs" color="neutral" variant="soft" :class="HEADER_TONES.tools" icon="i-lucide-chef-hat" title="Reuse a look on this video"
-                  >Recipes</UButton
-                >
-                <template #content>
-                  <div class="w-80 space-y-3 p-3">
-                    <p class="text-xs text-gray-500 dark:text-gray-400">
-                      A recipe keeps the crop shape and size, the sound settings and the text layers — not the trim, splits or sound clips, which belong to one
-                      video.
-                    </p>
-                    <ul
-                      v-if="recipes.saved.value.length"
-                      class="max-h-56 divide-y divide-gray-100 overflow-y-auto rounded-lg border border-gray-200 dark:divide-gray-800 dark:border-gray-800"
-                    >
-                      <li v-for="r in recipes.saved.value" :key="r.id" class="flex items-center gap-2 px-2.5 py-2">
-                        <div class="min-w-0 flex-1">
-                          <p class="truncate text-sm font-medium text-gray-900 dark:text-white">{{ r.name }}</p>
-                          <p class="truncate text-xs text-gray-500 dark:text-gray-400">{{ describeRecipe(r.data) }}</p>
-                        </div>
-                        <UButton size="xs" color="neutral" :class="TAB_ACCENTS.trim.button" @click="applyRecipe(r.data, r.name)">Apply</UButton>
+              <!-- Grouped by function, each group kept on one line (HIG Toolbars): making things, then undo, history and help -->
+              <div class="flex items-center gap-1" role="group" aria-label="Thumbnail, brand kit and recipes">
+                <ClipEditorThumbnailMaker v-if="canWrite && video.videoUrl" />
+                <ClipEditorBrandKitMenu />
+                <UPopover v-model:open="recipesOpen">
+                  <UButton size="xs" color="neutral" variant="soft" :class="HEADER_TONES.tools" icon="i-lucide-chef-hat" title="Reuse a look on this video"
+                    >Recipes</UButton
+                  >
+                  <template #content>
+                    <div class="w-80 space-y-3 p-3">
+                      <p class="text-xs text-gray-500 dark:text-gray-400">
+                        A recipe keeps the crop shape and size, the sound settings and the text layers — not the trim, splits or sound clips, which belong to
+                        one video.
+                      </p>
+                      <ul
+                        v-if="recipes.saved.value.length"
+                        class="max-h-56 divide-y divide-gray-100 overflow-y-auto rounded-lg border border-gray-200 dark:divide-gray-800 dark:border-gray-800"
+                      >
+                        <li v-for="r in recipes.saved.value" :key="r.id" class="flex items-center gap-2 px-2.5 py-2">
+                          <div class="min-w-0 flex-1">
+                            <p class="truncate text-sm font-medium text-gray-900 dark:text-white">{{ r.name }}</p>
+                            <p class="truncate text-xs text-gray-500 dark:text-gray-400">{{ describeRecipe(r.data) }}</p>
+                          </div>
+                          <UButton size="xs" color="neutral" :class="TAB_ACCENTS.trim.button" @click="applyRecipe(r.data, r.name)">Apply</UButton>
+                          <UButton
+                            size="xs"
+                            color="error"
+                            variant="ghost"
+                            icon="i-lucide-x"
+                            :aria-label="`Delete recipe ${r.name}`"
+                            @click="recipes.remove(r.id)"
+                          />
+                        </li>
+                      </ul>
+                      <p v-else class="text-xs text-gray-500 dark:text-gray-400">No recipes yet.</p>
+                      <div class="flex items-center gap-1">
                         <UButton
                           size="xs"
-                          color="error"
+                          color="neutral"
                           variant="ghost"
-                          icon="i-lucide-x"
-                          :aria-label="`Delete recipe ${r.name}`"
-                          @click="recipes.remove(r.id)"
+                          icon="i-lucide-download"
+                          :disabled="!recipes.saved.value.length"
+                          title="Save your recipes as a file, to share or keep"
+                          @click="onExportRecipes"
+                          >Export</UButton
+                        >
+                        <UButton
+                          size="xs"
+                          color="neutral"
+                          variant="ghost"
+                          icon="i-lucide-upload"
+                          title="Add recipes from a file"
+                          @click="recipeFileInput?.click()"
+                          >Import</UButton
+                        >
+                        <input
+                          ref="recipeFileInput"
+                          type="file"
+                          accept="application/json,.json"
+                          class="hidden"
+                          aria-label="Recipes file"
+                          @change="onImportRecipes"
                         />
-                      </li>
-                    </ul>
-                    <p v-else class="text-xs text-gray-500 dark:text-gray-400">No recipes yet.</p>
-                    <div class="flex items-center gap-1">
-                      <UButton
-                        size="xs"
-                        color="neutral"
-                        variant="ghost"
-                        icon="i-lucide-download"
-                        :disabled="!recipes.saved.value.length"
-                        title="Save your recipes as a file, to share or keep"
-                        @click="onExportRecipes"
-                        >Export</UButton
-                      >
-                      <UButton
-                        size="xs"
-                        color="neutral"
-                        variant="ghost"
-                        icon="i-lucide-upload"
-                        title="Add recipes from a file"
-                        @click="recipeFileInput?.click()"
-                        >Import</UButton
-                      >
-                      <input
-                        ref="recipeFileInput"
-                        type="file"
-                        accept="application/json,.json"
-                        class="hidden"
-                        aria-label="Recipes file"
-                        @change="onImportRecipes"
-                      />
+                      </div>
+                      <form class="space-y-1.5 border-t border-gray-100 pt-3 dark:border-gray-800" @submit.prevent="onSaveRecipe">
+                        <UFormField label="Save the current settings" :hint="currentRecipe ? describeRecipe(currentRecipe) : undefined">
+                          <div class="flex items-center gap-2">
+                            <UInput
+                              v-model="recipeName"
+                              size="sm"
+                              class="min-w-0 flex-1"
+                              placeholder="e.g. Reel look"
+                              :maxlength="40"
+                              :disabled="!currentRecipe"
+                              aria-label="Recipe name"
+                            />
+                            <UButton type="submit" size="sm" icon="i-lucide-bookmark-plus" :disabled="!currentRecipe || !recipeName.trim()">Save</UButton>
+                          </div>
+                        </UFormField>
+                        <p v-if="!currentRecipe" class="text-xs text-gray-500 dark:text-gray-400">
+                          Set a crop and size, change the sound or add a text layer first.
+                        </p>
+                      </form>
                     </div>
-                    <form class="space-y-1.5 border-t border-gray-100 pt-3 dark:border-gray-800" @submit.prevent="onSaveRecipe">
-                      <UFormField label="Save the current settings" :hint="currentRecipe ? describeRecipe(currentRecipe) : undefined">
-                        <div class="flex items-center gap-2">
-                          <UInput
-                            v-model="recipeName"
-                            size="sm"
-                            class="min-w-0 flex-1"
-                            placeholder="e.g. Reel look"
-                            :maxlength="40"
-                            :disabled="!currentRecipe"
-                            aria-label="Recipe name"
-                          />
-                          <UButton type="submit" size="sm" icon="i-lucide-bookmark-plus" :disabled="!currentRecipe || !recipeName.trim()">Save</UButton>
-                        </div>
-                      </UFormField>
-                      <p v-if="!currentRecipe" class="text-xs text-gray-500 dark:text-gray-400">
-                        Set a crop and size, change the sound or add a text layer first.
-                      </p>
-                    </form>
-                  </div>
-                </template>
-              </UPopover>
-              <UButton
-                size="xs"
-                color="neutral"
-                :variant="history.undoable.value ? 'soft' : 'ghost'"
-                :class="history.undoable.value ? HEADER_TONES.history : ''"
-                icon="i-lucide-undo-2"
-                :disabled="!history.undoable.value"
-                aria-label="Undo"
-                title="Undo (Ctrl/⌘+Z)"
-                @click="history.undo()"
-              />
-              <UButton
-                size="xs"
-                color="neutral"
-                :variant="history.redoable.value ? 'soft' : 'ghost'"
-                :class="history.redoable.value ? HEADER_TONES.history : ''"
-                icon="i-lucide-redo-2"
-                :disabled="!history.redoable.value"
-                aria-label="Redo"
-                title="Redo (Ctrl/⌘+Shift+Z)"
-                @click="history.redo()"
-              />
-              <!-- Every step so far: click one to go back (or forward) to it -->
-              <UPopover>
+                  </template>
+                </UPopover>
+              </div>
+              <div class="flex items-center gap-1" role="group" aria-label="Undo and history">
                 <UButton
                   size="xs"
                   color="neutral"
-                  variant="ghost"
-                  icon="i-lucide-history"
-                  :disabled="history.steps.value.length < 2"
-                  aria-label="History"
-                  title="History — every step so far"
+                  :variant="history.undoable.value ? 'soft' : 'ghost'"
+                  :class="history.undoable.value ? HEADER_TONES.history : ''"
+                  icon="i-lucide-undo-2"
+                  :disabled="!history.undoable.value"
+                  :aria-label="history.undoStep.value ? `Undo ${history.undoStep.value}` : 'Undo'"
+                  :title="`${history.undoStep.value ? `Undo ${history.undoStep.value}` : 'Undo'} (Ctrl/⌘+Z)`"
+                  @click="history.undo()"
                 />
-                <template #content>
-                  <ol class="max-h-80 w-64 overflow-y-auto p-1 text-sm" data-testid="history-list">
-                    <li v-for="i in historyOrder" :key="i">
-                      <button
-                        type="button"
-                        class="flex w-full items-center gap-2 rounded px-2 py-1 text-left hover:bg-gray-100 dark:hover:bg-gray-800"
-                        :class="
-                          i === history.position.value
-                            ? 'bg-primary-50 font-medium text-primary-800 dark:bg-primary-950/40 dark:text-primary-200'
-                            : i > history.position.value
-                              ? 'italic text-gray-500 dark:text-gray-400'
-                              : 'text-gray-700 dark:text-gray-300'
-                        "
-                        :aria-current="i === history.position.value ? 'step' : undefined"
-                        @click="history.goTo(i)"
-                      >
-                        <span class="w-5 shrink-0 text-right text-xs tabular-nums text-gray-500 dark:text-gray-400">{{ i }}</span>
-                        <span class="truncate">{{ history.steps.value[i] }}</span>
-                      </button>
-                    </li>
-                  </ol>
-                  <p class="border-t border-gray-100 px-3 py-1.5 text-xs text-gray-500 dark:border-gray-800 dark:text-gray-400">
-                    Greyed steps were undone — doing something new drops them.
-                  </p>
-                </template>
-              </UPopover>
-              <ShortcutsHelp :items="EDITOR_SHORTCUTS" />
+                <UButton
+                  size="xs"
+                  color="neutral"
+                  :variant="history.redoable.value ? 'soft' : 'ghost'"
+                  :class="history.redoable.value ? HEADER_TONES.history : ''"
+                  icon="i-lucide-redo-2"
+                  :disabled="!history.redoable.value"
+                  :aria-label="history.redoStep.value ? `Redo ${history.redoStep.value}` : 'Redo'"
+                  :title="`${history.redoStep.value ? `Redo ${history.redoStep.value}` : 'Redo'} (Ctrl/⌘+Shift+Z)`"
+                  @click="history.redo()"
+                />
+                <!-- Every step so far: click one to go back (or forward) to it -->
+                <UPopover>
+                  <UButton
+                    size="xs"
+                    color="neutral"
+                    variant="ghost"
+                    icon="i-lucide-history"
+                    :disabled="history.steps.value.length < 2"
+                    aria-label="History"
+                    title="History — every step so far"
+                  />
+                  <template #content>
+                    <ol class="max-h-80 w-64 overflow-y-auto p-1 text-sm" data-testid="history-list">
+                      <li v-for="i in historyOrder" :key="i">
+                        <button
+                          type="button"
+                          class="flex w-full items-center gap-2 rounded px-2 py-1 text-left hover:bg-gray-100 dark:hover:bg-gray-800"
+                          :class="
+                            i === history.position.value
+                              ? 'bg-primary-50 font-medium text-primary-800 dark:bg-primary-950/40 dark:text-primary-200'
+                              : i > history.position.value
+                                ? 'italic text-gray-500 dark:text-gray-400'
+                                : 'text-gray-700 dark:text-gray-300'
+                          "
+                          :aria-current="i === history.position.value ? 'step' : undefined"
+                          @click="history.goTo(i)"
+                        >
+                          <span class="w-5 shrink-0 text-right text-xs tabular-nums text-gray-500 dark:text-gray-400">{{ i }}</span>
+                          <span class="truncate">{{ history.steps.value[i] }}</span>
+                        </button>
+                      </li>
+                    </ol>
+                    <p class="border-t border-gray-100 px-3 py-1.5 text-xs text-gray-500 dark:border-gray-800 dark:text-gray-400">
+                      Greyed steps were undone — doing something new drops them.
+                    </p>
+                  </template>
+                </UPopover>
+                <ShortcutsHelp :items="EDITOR_SHORTCUTS" />
+              </div>
+              <p class="sr-only" aria-live="polite" data-testid="history-note">{{ historyNote }}</p>
             </div>
           </div>
         </template>
@@ -606,6 +612,7 @@ const {
   runningCount,
   tabItems,
   draftSavedLabel,
+  historyNote,
   history,
   draft,
   onRestoreDraft,

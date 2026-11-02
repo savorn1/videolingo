@@ -114,7 +114,7 @@
               </span>
               <span class="min-w-0" :class="p.customId ? 'pr-14' : ''">
                 <span class="line-clamp-2 break-words text-sm font-medium leading-snug" :title="p.label">{{ p.label }}</span>
-                <span class="block whitespace-nowrap text-xs opacity-70 tabular-nums">{{ p.ratio }} · {{ p.w }}×{{ p.h }}</span>
+                <span class="block whitespace-nowrap text-xs font-normal tabular-nums">{{ p.ratio }} · {{ p.w }}×{{ p.h }}</span>
               </span>
             </button>
             <div
@@ -251,7 +251,7 @@
           trim handles above) to check other frames.
         </p>
         <div class="flex flex-wrap items-center gap-1">
-          <span class="text-xs text-gray-500 mr-1">Shape</span>
+          <span class="text-xs text-muted mr-1">Shape</span>
           <UButton
             v-for="a in ASPECTS"
             :key="a.label"
@@ -320,7 +320,7 @@
             :aria-pressed="scale.w === c.w && scale.h === c.h"
             @click="pickScale(c)"
           >
-            {{ c.label }} <span class="tabular-nums opacity-70">{{ c.w }}×{{ c.h }}</span>
+            {{ c.label }} <span class="font-normal tabular-nums">{{ c.w }}×{{ c.h }}</span>
           </UButton>
         </div>
         <div class="flex items-end gap-2">

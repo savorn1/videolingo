@@ -259,7 +259,7 @@
         <div ref="studyPanelEl">
           <StudyPanel :video-id="page.video.id" :items="studyItems" :preferred-language="secondTrack?.language ?? primaryTrack?.language" @seek="seek" />
           <UCard v-if="!studyItems.length">
-            <p class="text-sm text-gray-500">No summary or quiz for this video yet.</p>
+            <p class="text-sm text-muted">No summary or quiz for this video yet.</p>
           </UCard>
         </div>
       </div>
@@ -268,7 +268,7 @@
         <template #header>
           <div class="flex items-center justify-between gap-2">
             <h2 class="font-semibold text-gray-900 dark:text-white">Transcript</h2>
-            <span class="text-xs text-gray-500">Click a word to look it up</span>
+            <span class="text-xs text-muted">Click a word to look it up</span>
           </div>
         </template>
         <InteractiveTranscript
@@ -398,7 +398,7 @@ function watchAgain() {
 const studyPanelEl = ref<HTMLElement | null>(null)
 function goToQuiz() {
   finished.value = false
-  nextTick(() => studyPanelEl.value?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
+  nextTick(() => studyPanelEl.value?.scrollIntoView({ behavior: scrollMotion(), block: 'start' }))
 }
 
 // ── Sentence controls ──────────────────────────────────────────────────────

@@ -78,8 +78,8 @@
       <UCard>
         <template #header><h3 class="font-semibold text-gray-900 dark:text-white">How they were made</h3></template>
         <RankedBarList :rows="(data?.bySource ?? []).map((r) => ({ key: r.key, label: r.label, value: r.count }))" empty="No translations yet." />
-        <p class="text-xs font-medium text-gray-500 mt-5 mb-2">Translate jobs started in this period</p>
-        <p v-if="data && !data.jobsByStatus.length" class="text-sm text-gray-500">None.</p>
+        <p class="text-xs font-medium text-muted mt-5 mb-2">Translate jobs started in this period</p>
+        <p v-if="data && !data.jobsByStatus.length" class="text-sm text-muted">None.</p>
         <ul v-else class="space-y-1.5 text-sm">
           <li v-for="s in data?.jobsByStatus ?? []" :key="s.key" class="flex items-center justify-between">
             <StatusBadge :status="s.key" />

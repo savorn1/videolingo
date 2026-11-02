@@ -445,7 +445,7 @@
         </UButton>
       </div>
       <div class="flex flex-wrap items-center gap-2">
-        <span class="text-xs text-gray-500">Longest part</span>
+        <span class="text-xs text-muted">Longest part</span>
         <USelect
           v-model="lengthLimitMs"
           size="xs"

@@ -55,8 +55,8 @@
 
           <template #right>
             <div class="flex items-center gap-0.5 rounded-lg bg-white/80 p-0.5 ring-1 ring-primary-100 dark:bg-gray-900/70 dark:ring-primary-900/60">
-              <UDashboardSearchButton class="hidden text-sky-600 hover:bg-sky-50 sm:inline-flex dark:text-sky-400 dark:hover:bg-sky-950/40" />
-              <UDashboardSearchButton collapsed class="text-sky-600 hover:bg-sky-50 sm:hidden dark:text-sky-400 dark:hover:bg-sky-950/40" />
+              <UDashboardSearchButton class="hidden text-sky-700 hover:bg-sky-50 sm:inline-flex dark:text-sky-400 dark:hover:bg-sky-950/40" />
+              <UDashboardSearchButton collapsed class="text-sky-700 hover:bg-sky-50 sm:hidden dark:text-sky-400 dark:hover:bg-sky-950/40" />
               <!-- Keyboard shortcuts: no use on a touch screen -->
               <span class="hidden sm:contents">
                 <ShortcutsHelp

@@ -18,7 +18,7 @@
         {{ ' ' }}
       </template>
     </p>
-    <p class="text-xs text-gray-500">
+    <p class="text-xs text-muted">
       {{ result.correct }} of {{ result.total }} right · <span class="text-success-600 dark:text-success-400">right</span> ·
       <span class="text-error-600 dark:text-error-400 line-through">wrong</span> (with the right word under it) ·
       <span class="text-gray-500 underline decoration-dotted dark:text-gray-400">missing</span>

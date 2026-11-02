@@ -38,7 +38,7 @@
 
         <UCard>
           <template #header>
-            <p class="text-xs text-gray-500">Subject</p>
+            <p class="text-xs text-muted">Subject</p>
             <h2 class="font-semibold text-gray-900 dark:text-white break-words">{{ n.subject }}</h2>
           </template>
           <p class="text-sm text-gray-800 dark:text-gray-200 whitespace-pre-wrap break-words">{{ n.body }}</p>
@@ -58,13 +58,13 @@
               </span>
               <p class="text-sm font-medium text-gray-900 dark:text-white">
                 {{ eventMeta(e.type).label }}
-                <span class="font-normal text-gray-500" :title="formatDateTime(e.createdAt)">· {{ formatRelativeTime(e.createdAt) }}</span>
-                <span v-if="e.actor" class="font-normal text-gray-500"> · {{ e.actor }}</span>
+                <span class="font-normal text-muted" :title="formatDateTime(e.createdAt)">· {{ formatRelativeTime(e.createdAt) }}</span>
+                <span v-if="e.actor" class="font-normal text-muted"> · {{ e.actor }}</span>
               </p>
               <p v-if="e.detail" class="text-xs text-gray-600 dark:text-gray-400 whitespace-pre-wrap break-words">{{ e.detail }}</p>
             </li>
           </ol>
-          <p v-if="!n.events?.length" class="text-sm text-gray-500">No events recorded.</p>
+          <p v-if="!n.events?.length" class="text-sm text-muted">No events recorded.</p>
         </UCard>
       </div>
 
@@ -113,7 +113,7 @@
               >
                 {{ n.templateCode }}
               </NuxtLink>
-              <span v-else class="text-gray-500">None (written directly)</span>
+              <span v-else class="text-muted">None (written directly)</span>
             </dd>
           </div>
           <div>

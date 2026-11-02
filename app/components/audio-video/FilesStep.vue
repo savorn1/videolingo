@@ -89,7 +89,8 @@
         @dragover="onRowDragOver($event, idx)"
         @drop.prevent.stop="onRowDrop"
       >
-        <div class="flex items-center gap-3">
+        <!-- On a phone, several files put the name on its own line, so the buttons (44 px on touch) don't squeeze it -->
+        <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
           <!-- Drag by the grip (the arrows do the same from the keyboard); only the grip drags, so the title stays selectable. Not on touch screens, which don't drag this way. -->
           <span
             v-if="items.length > 1 && !saving"
@@ -115,7 +116,7 @@
             @click="togglePlay(it)"
           />
           <UIcon v-else name="i-lucide-file-audio" class="h-5 w-5 shrink-0 text-primary-500" />
-          <div class="min-w-0 flex-1">
+          <div class="min-w-0 flex-1" :class="items.length > 1 ? 'max-sm:order-first max-sm:basis-full' : ''">
             <p class="truncate text-sm font-medium text-gray-900 dark:text-white" :title="it.name">{{ it.name }}</p>
             <p class="text-xs text-gray-500 dark:text-gray-400 tabular-nums">
               {{ formatFileSize(it.size) }}<template v-if="it.durationSeconds"> · {{ formatDuration(it.durationSeconds) }}</template>
@@ -148,7 +149,7 @@
             :ui="{ label: 'max-sm:sr-only' }"
           />
           <!-- The order is the order the videos are made (and added to a collection) -->
-          <div v-if="items.length > 1" class="flex shrink-0 items-center">
+          <div v-if="items.length > 1" class="ml-auto flex shrink-0 items-center">
             <UButton
               size="xs"
               color="neutral"
@@ -215,7 +216,7 @@
           </template>
           <!-- Styled like the Chapters link beside it; the focus ring shows on the label when its hidden input has focus -->
           <label
-            class="inline-flex cursor-pointer items-center gap-1 rounded font-medium text-gray-600 hover:text-gray-900 focus-within:outline-2 focus-within:outline-primary-500 dark:text-gray-300 dark:hover:text-white"
+            class="inline-flex min-h-6 cursor-pointer items-center gap-1 rounded font-medium text-gray-600 hover:text-gray-900 focus-within:outline-2 focus-within:outline-primary-500 dark:text-gray-300 dark:hover:text-white"
           >
             <UIcon :name="it.coverUploading ? 'i-lucide-loader' : 'i-lucide-image-plus'" class="size-3.5" :class="it.coverUploading ? 'animate-spin' : ''" />
             {{ it.coverUploading ? 'Uploading the picture…' : it.coverKey ? 'Change the picture' : 'Give it its own picture' }}

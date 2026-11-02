@@ -20,7 +20,7 @@
       <UCard class="mb-4">
         <div class="flex flex-wrap items-center justify-between gap-2 mb-2 text-sm">
           <span class="font-medium text-gray-900 dark:text-white">{{ watchedCount }} of {{ videos.length }} watched</span>
-          <span class="text-gray-500"
+          <span class="text-muted"
             >{{ formatDuration(totalSeconds) }} in total<template v-if="leftSeconds"> · {{ formatDuration(leftSeconds) }} to go</template></span
           >
         </div>
@@ -70,7 +70,7 @@
                   </span>
                   <span class="min-w-0 flex-1">
                     <span class="block font-medium text-gray-900 dark:text-white truncate">{{ v.title ?? `Video #${v.videoId}` }}</span>
-                    <span class="block text-xs text-gray-500">
+                    <span class="block text-xs text-muted">
                       {{ languageLabel(v.language) }}<template v-if="v.durationSeconds"> · {{ formatDuration(v.durationSeconds) }}</template>
                       <template v-if="v === nextUp && watchedCount"> · up next</template>
                     </span>
@@ -88,7 +88,7 @@
         <h2 class="mt-6 mb-3 font-semibold text-gray-900 dark:text-white">More courses</h2>
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <VideoCard v-for="c in moreCourses" :key="c.id" :to="`/learn/collections/${c.id}`" :title="c.title" :thumbnail-url="c.coverUrl">
-            <p class="text-xs text-gray-500">{{ c.videoCount }} video{{ c.videoCount === 1 ? '' : 's' }}</p>
+            <p class="text-xs text-muted">{{ c.videoCount }} video{{ c.videoCount === 1 ? '' : 's' }}</p>
           </VideoCard>
         </div>
       </template>

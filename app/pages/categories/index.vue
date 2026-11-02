@@ -48,7 +48,7 @@
         <template #name-data="{ row }">
           <div class="min-w-0 max-w-sm">
             <CategoryBadge :name="row.name" :color="row.color" :enabled="row.enabled" />
-            <p v-if="row.description" class="text-xs text-gray-500 mt-1 truncate" :title="row.description">{{ row.description }}</p>
+            <p v-if="row.description" class="text-xs text-muted mt-1 truncate" :title="row.description">{{ row.description }}</p>
           </div>
         </template>
 

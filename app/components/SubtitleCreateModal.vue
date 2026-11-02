@@ -39,7 +39,7 @@
           >
             <UIcon name="i-lucide-file-up" class="w-6 h-6 text-gray-400" />
             <span class="text-sm font-semibold text-gray-700 dark:text-gray-200">{{ file?.name ?? 'Choose a .srt or .vtt file' }}</span>
-            <span class="text-xs text-gray-500">UTF-8, up to {{ maxFileMb }} MB</span>
+            <span class="text-xs text-muted">UTF-8, up to {{ maxFileMb }} MB</span>
             <input type="file" accept=".srt,.vtt,text/vtt,application/x-subrip" class="sr-only" @change="onFile" />
           </label>
           <UFormField label="Language" required>

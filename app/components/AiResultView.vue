@@ -97,7 +97,7 @@
       </div>
     </div>
 
-    <p v-else class="text-gray-500">This result has no content.</p>
+    <p v-else class="text-muted">This result has no content.</p>
   </div>
 </template>
 

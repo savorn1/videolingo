@@ -37,8 +37,8 @@
         <template #what-data="{ row }">
           <div class="min-w-0 max-w-md">
             <p class="text-sm text-gray-900 dark:text-white">{{ describeAuditEntry(row) }}</p>
-            <p class="text-xs text-gray-500 truncate font-mono" :title="`${row.method} ${row.path}`">{{ row.method }} {{ row.path }}</p>
-            <p v-if="row.detail" class="text-xs text-gray-500 truncate">{{ row.detail }}</p>
+            <p class="text-xs text-muted truncate font-mono" :title="`${row.method} ${row.path}`">{{ row.method }} {{ row.path }}</p>
+            <p v-if="row.detail" class="text-xs text-muted truncate">{{ row.detail }}</p>
           </div>
         </template>
         <template #status-data="{ row }">
@@ -47,7 +47,7 @@
           >
         </template>
         <template #ipAddress-data="{ row }">
-          <span class="text-xs font-mono text-gray-500" :title="row.userAgent ?? undefined">{{ row.ipAddress ?? '—' }}</span>
+          <span class="text-xs font-mono text-muted" :title="row.userAgent ?? undefined">{{ row.ipAddress ?? '—' }}</span>
         </template>
         <template #empty-state>
           <EmptyState

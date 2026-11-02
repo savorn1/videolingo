@@ -17,7 +17,7 @@
         <template v-else>
           <button
             type="button"
-            class="w-full flex items-center justify-between px-3 py-1.5 mb-1 rounded-lg text-xs font-semibold uppercase tracking-wide text-gray-500 transition-colors hover:bg-gray-800/60"
+            class="w-full flex items-center justify-between px-3 py-1.5 mb-1 rounded-lg text-xs font-semibold uppercase tracking-wide text-gray-400 transition-colors hover:bg-gray-800/60"
             :class="accent(item.color).headerHover"
             @click="toggle(item.label)"
           >

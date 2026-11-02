@@ -19,7 +19,7 @@
         <UTooltip text="Zoom out"
           ><UButton size="sm" color="neutral" variant="soft" icon="i-lucide-zoom-out" aria-label="Zoom out" @click="zoomOut"
         /></UTooltip>
-        <span class="text-xs text-gray-500 w-20 text-center tabular-nums">{{ Math.round(pxPerSec) }} px/s</span>
+        <span class="text-xs text-muted w-20 text-center tabular-nums">{{ Math.round(pxPerSec) }} px/s</span>
         <UTooltip text="Zoom in"><UButton size="sm" color="neutral" variant="soft" icon="i-lucide-zoom-in" aria-label="Zoom in" @click="zoomIn" /></UTooltip>
         <span class="text-sm font-medium tabular-nums text-gray-900 dark:text-white ml-2">
           {{ formatTimestamp(playheadMs) }} <span class="text-gray-500 dark:text-gray-400">/ {{ formatTimestamp(durationMs) }}</span>
@@ -215,7 +215,7 @@
           <UFormField label="Label">
             <UInput v-model="newMarkerLabel" autofocus maxlength="200" class="w-full" placeholder="e.g. Intro ends" />
           </UFormField>
-          <p class="text-xs text-gray-500">At {{ formatTimestamp(pendingMarkerMs) }}</p>
+          <p class="text-xs text-muted">At {{ formatTimestamp(pendingMarkerMs) }}</p>
           <USwitch v-model="newMarkerChapter" label="Show to learners as a chapter" description="They see it in the Chapters list on the watch page." />
           <div class="flex justify-end gap-2">
             <UButton color="neutral" variant="ghost" @click="showMarkerForm = false">Cancel</UButton>

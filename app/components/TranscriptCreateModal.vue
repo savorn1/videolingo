@@ -30,7 +30,7 @@
           >
             <UIcon name="i-lucide-file-up" class="w-6 h-6 text-gray-400" />
             <span class="text-sm font-semibold text-gray-700 dark:text-gray-200">{{ fileName ?? 'Choose a .srt, .vtt or .txt file' }}</span>
-            <span class="text-xs text-gray-500">UTF-8, up to 5 MB</span>
+            <span class="text-xs text-muted">UTF-8, up to 5 MB</span>
             <input type="file" accept=".srt,.vtt,.txt,text/vtt,text/plain,application/x-subrip" class="sr-only" @change="onFile" />
           </label>
         </div>
@@ -48,7 +48,7 @@
           <div class="flex flex-wrap items-center gap-2 text-sm">
             <UBadge color="neutral" variant="subtle">{{ FORMAT_LABEL[parsed.format] }}</UBadge>
             <span class="font-semibold text-gray-900 dark:text-white">{{ parsed.segments.length }} segment{{ parsed.segments.length === 1 ? '' : 's' }}</span>
-            <span v-if="parsed.segments.length" class="text-gray-500">· ends at {{ formatTimestamp(parsed.segments.at(-1)!.endMs) }}</span>
+            <span v-if="parsed.segments.length" class="text-muted">· ends at {{ formatTimestamp(parsed.segments.at(-1)!.endMs) }}</span>
           </div>
           <ol v-if="parsed.segments.length" class="text-xs font-mono space-y-1 text-gray-700 dark:text-gray-300">
             <li v-for="(s, i) in parsed.segments.slice(0, 3)" :key="i" class="truncate">

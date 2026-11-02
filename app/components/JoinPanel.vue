@@ -70,7 +70,7 @@
             <div v-else class="h-8 w-14 rounded bg-gray-100 dark:bg-gray-800" />
             <span class="flex-1 min-w-0">
               <span class="block truncate">{{ c.title }}</span>
-              <span class="flex items-center gap-1.5 text-xs text-gray-500">
+              <span class="flex items-center gap-1.5 text-xs text-muted">
                 <span>{{ c.id === video.id ? 'This video · ' : '' }}{{ formatDuration(c.durationSeconds) }}</span>
                 <span v-if="c.blocked" class="text-error-600 dark:text-error-400">{{ c.blocked }}</span>
                 <UBadge
@@ -133,8 +133,8 @@
     <section class="sticky bottom-0 z-10 space-y-2 border-t bg-default pb-3 pt-3" :class="TAB_ACCENTS.join.divider">
       <h3 :class="HEADING">Add a video</h3>
       <UInput v-model="search" size="sm" icon="i-lucide-search" placeholder="Search your videos" class="w-full" aria-label="Search videos" />
-      <p v-if="loading" class="text-xs text-gray-500">Loading…</p>
-      <p v-else-if="!choices.length" class="text-xs text-gray-500">No matching videos. Only videos stored in your library can be joined.</p>
+      <p v-if="loading" class="text-xs text-muted">Loading…</p>
+      <p v-else-if="!choices.length" class="text-xs text-muted">No matching videos. Only videos stored in your library can be joined.</p>
       <ul v-else class="max-h-64 overflow-y-auto divide-y divide-gray-100 dark:divide-gray-800 rounded-md border border-gray-200 dark:border-gray-800">
         <li v-for="v in choices" :key="v.id">
           <button
@@ -146,7 +146,7 @@
             <img v-if="v.thumbnailUrl" :src="v.thumbnailUrl" alt="" class="h-8 w-14 rounded object-cover bg-gray-100 dark:bg-gray-800" />
             <div v-else class="h-8 w-14 rounded bg-gray-100 dark:bg-gray-800" />
             <span class="flex-1 min-w-0 truncate">{{ v.title }}</span>
-            <span class="text-xs text-gray-500 tabular-nums shrink-0">{{ formatDuration(v.durationSeconds) }}</span>
+            <span class="text-xs text-muted tabular-nums shrink-0">{{ formatDuration(v.durationSeconds) }}</span>
             <UBadge v-if="isAdded(v.id)" color="neutral" variant="subtle" size="sm">added</UBadge>
             <UIcon v-else name="i-lucide-plus" class="w-4 h-4 shrink-0" :class="TAB_ACCENTS.join.icon" />
           </button>

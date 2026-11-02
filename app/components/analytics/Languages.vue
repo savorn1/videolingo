@@ -27,7 +27,7 @@
       <UCard>
         <template #header>
           <h3 class="font-semibold text-gray-900 dark:text-white">Views by spoken language</h3>
-          <p class="text-xs text-gray-500">In this period</p>
+          <p class="text-xs text-muted">In this period</p>
         </template>
         <RankedBarList
           :rows="
@@ -45,7 +45,7 @@
         <USkeleton v-if="!data" class="h-64" />
         <div v-else class="overflow-x-auto">
           <table class="w-full text-sm">
-            <thead class="text-xs text-gray-500 text-left">
+            <thead class="text-xs text-muted text-left">
               <tr>
                 <th class="pb-2 font-medium">Language</th>
                 <th class="pb-2 font-medium text-right" title="Live videos spoken in it">Videos</th>
@@ -60,7 +60,7 @@
               <tr v-for="r in shown" :key="r.code">
                 <td class="py-1.5">
                   <span class="font-medium text-gray-900 dark:text-white">{{ r.name }}</span>
-                  <code class="ml-1.5 text-xs text-gray-500">{{ r.code }}</code>
+                  <code class="ml-1.5 text-xs text-muted">{{ r.code }}</code>
                   <UBadge v-if="r.isDefault" color="primary" variant="subtle" size="sm" class="ml-1.5">Default</UBadge>
                   <UBadge v-else-if="!r.inCatalog" color="warning" variant="subtle" size="sm" class="ml-1.5" icon="i-lucide-circle-help">Not in catalog</UBadge>
                   <UBadge v-else-if="!r.enabled" color="neutral" variant="subtle" size="sm" class="ml-1.5">Disabled</UBadge>

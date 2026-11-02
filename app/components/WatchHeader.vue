@@ -26,7 +26,7 @@
             >
           </UTooltip>
           <CategoryBadge v-for="c in video.categories.slice(0, 3)" :key="c.id" :name="c.name" :color="c.color" :enabled="c.enabled" />
-          <span v-if="video.sourceAuthor" class="text-gray-500">by {{ video.sourceAuthor }}</span>
+          <span v-if="video.sourceAuthor" class="text-muted">by {{ video.sourceAuthor }}</span>
         </div>
       </div>
 
@@ -69,7 +69,7 @@
         <NuxtLink :to="`/learn/collections/${course.collection.id}`" class="font-medium text-gray-700 dark:text-gray-200 hover:underline truncate max-w-56">
           {{ course.collection.title }}
         </NuxtLink>
-        <span class="text-gray-500 tabular-nums">· {{ courseIndex + 1 }} of {{ course.videos.length }}</span>
+        <span class="text-muted tabular-nums">· {{ courseIndex + 1 }} of {{ course.videos.length }}</span>
         <UTooltip :text="prevItem ? `Previous: ${prevItem.title ?? ''}` : 'This is the first video'">
           <UButton
             size="xs"

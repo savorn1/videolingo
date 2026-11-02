@@ -3,7 +3,7 @@
     <template #body>
       <div class="space-y-4">
         <div class="flex items-center gap-2">
-          <span class="text-sm text-gray-500">{{ languageLabel(language) }} →</span>
+          <span class="text-sm text-muted">{{ languageLabel(language) }} →</span>
           <USelect v-model="target" :items="targetOptions" size="sm" class="w-44" aria-label="Translate into" />
         </div>
 
@@ -15,14 +15,14 @@
         <div v-else-if="result" class="space-y-2">
           <p class="text-xl font-semibold text-gray-900 dark:text-white">
             {{ result.translation }}
-            <span v-if="result.partOfSpeech" class="ml-1 text-sm font-normal text-gray-500">{{ result.partOfSpeech }}</span>
+            <span v-if="result.partOfSpeech" class="ml-1 text-sm font-normal text-muted">{{ result.partOfSpeech }}</span>
           </p>
           <p v-if="result.meaning" class="text-sm text-gray-700 dark:text-gray-300">{{ result.meaning }}</p>
-          <p v-if="result.example" class="text-sm italic text-gray-500">“{{ result.example }}”</p>
+          <p v-if="result.example" class="text-sm italic text-muted">“{{ result.example }}”</p>
           <UBadge v-if="result.source === 'glossary'" size="sm" color="info" variant="subtle" icon="i-lucide-book-a">From your organisation's glossary</UBadge>
         </div>
 
-        <p v-if="context" class="border-l-2 border-gray-200 dark:border-gray-700 pl-2 text-xs text-gray-500 whitespace-pre-line">{{ context }}</p>
+        <p v-if="context" class="border-l-2 border-gray-200 dark:border-gray-700 pl-2 text-xs text-muted whitespace-pre-line">{{ context }}</p>
 
         <div class="flex justify-end gap-2">
           <UButton color="neutral" variant="ghost" @click="open = false">Close</UButton>

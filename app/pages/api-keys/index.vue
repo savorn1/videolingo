@@ -17,7 +17,7 @@
         <pre
           class="text-xs bg-gray-50 dark:bg-gray-900 rounded-lg p-3 overflow-x-auto"
         ><code>curl -H "X-API-Key: vl_…" {{ origin }}/api/admin/videos</code></pre>
-        <p class="text-xs text-gray-500">Calls made with a key show up in the audit log with a key icon. Keys can't create or revoke other keys.</p>
+        <p class="text-xs text-muted">Calls made with a key show up in the audit log with a key icon. Keys can't create or revoke other keys.</p>
       </div>
     </UCard>
 
@@ -26,7 +26,7 @@
         <template #name-data="{ row }">
           <div>
             <p class="font-medium text-gray-900 dark:text-white">{{ row.name }}</p>
-            <code class="text-xs text-gray-500">{{ row.prefix }}…</code>
+            <code class="text-xs text-muted">{{ row.prefix }}…</code>
           </div>
         </template>
         <template #state-data="{ row }">
@@ -85,7 +85,7 @@
           <UFormField label="Expires">
             <USelect v-model="form.expiresInDays" :items="expiryOptions" class="w-full" />
           </UFormField>
-          <p class="text-xs text-gray-500">
+          <p class="text-xs text-muted">
             It will act as <strong>{{ username }}</strong
             >{{ isAdmin ? ' (an administrator — it can do anything)' : ', with your role’s permissions' }}.
           </p>

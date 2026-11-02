@@ -40,7 +40,7 @@
       </EmptyState>
       <div v-else class="max-w-xl mx-auto space-y-4">
         <div>
-          <div class="flex items-center justify-between text-xs text-gray-500 mb-1.5">
+          <div class="flex items-center justify-between text-xs text-muted mb-1.5">
             <span>{{ reviewed }} reviewed</span>
             <span>{{ queue.length }} left in this session</span>
           </div>
@@ -65,7 +65,7 @@
             <template v-if="revealed">
               <USeparator />
               <p class="text-lg text-gray-800 dark:text-gray-200 whitespace-pre-line">{{ current.back }}</p>
-              <p v-if="current.context" class="text-sm italic text-gray-500 whitespace-pre-line">“{{ current.context }}”</p>
+              <p v-if="current.context" class="text-sm italic text-muted whitespace-pre-line">“{{ current.context }}”</p>
               <UButton
                 v-if="current.videoId"
                 size="xs"
@@ -117,7 +117,7 @@
               :aria-pressed="listFilter === f.value"
               @click="listFilter = f.value"
             >
-              {{ f.label }}<span v-if="listCounts[f.value] !== null" class="tabular-nums opacity-70"> {{ listCounts[f.value] }}</span>
+              {{ f.label }}<span v-if="listCounts[f.value] !== null" class="font-normal tabular-nums"> {{ listCounts[f.value] }}</span>
             </UButton>
           </div>
         </div>
@@ -147,7 +147,7 @@
                 <UBadge color="neutral" variant="subtle" size="sm" :class="sourceTone(c.source)">{{ sourceLabel(c.source) }}</UBadge>
               </div>
               <p class="text-sm text-gray-600 dark:text-gray-300 mt-0.5 whitespace-pre-line break-words">{{ c.back }}</p>
-              <p v-if="c.context" class="text-xs italic text-gray-500 mt-1 line-clamp-2 border-l-2 border-violet-300 dark:border-violet-800 pl-2">
+              <p v-if="c.context" class="text-xs italic text-muted mt-1 line-clamp-2 border-l-2 border-violet-300 dark:border-violet-800 pl-2">
                 “{{ c.context }}”
               </p>
               <div class="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-xs">

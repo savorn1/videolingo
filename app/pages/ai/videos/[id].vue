@@ -166,7 +166,7 @@
               <USkeleton class="h-4 w-3/4" />
               <USkeleton class="h-4 w-full" />
               <USkeleton class="h-4 w-5/6" />
-              <p class="text-xs text-gray-500">Reading the transcript — this can take up to a minute.</p>
+              <p class="text-xs text-muted">Reading the transcript — this can take up to a minute.</p>
             </div>
             <p v-else class="text-sm text-gray-500 dark:text-gray-400">
               Nothing generated in {{ languageLabel(outputLanguage) }} yet.

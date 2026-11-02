@@ -133,7 +133,7 @@ watch(activeIndex, (i) => {
   if (!row) return
   const box = list.value
   if (row.offsetTop < box.scrollTop || row.offsetTop + row.offsetHeight > box.scrollTop + box.clientHeight) {
-    box.scrollTo({ top: row.offsetTop - box.clientHeight / 3, behavior: 'smooth' })
+    box.scrollTo({ top: row.offsetTop - box.clientHeight / 3, behavior: scrollMotion() })
   }
 })
 </script>

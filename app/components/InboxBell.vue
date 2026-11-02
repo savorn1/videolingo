@@ -34,7 +34,7 @@
           <div v-if="loading && !items.length" class="p-3 space-y-2">
             <USkeleton v-for="i in 3" :key="i" class="h-12" />
           </div>
-          <div v-else-if="!items.length" class="px-4 py-10 text-center text-sm text-gray-500">
+          <div v-else-if="!items.length" class="px-4 py-10 text-center text-sm text-muted">
             <UIcon name="i-lucide-bell-off" class="w-6 h-6 mx-auto mb-2 text-gray-400" />
             {{ unreadOnly ? 'Nothing unread.' : 'No notifications yet.' }}
           </div>

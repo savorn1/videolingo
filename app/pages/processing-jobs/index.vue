@@ -81,7 +81,7 @@
         @select="(row: ProcessingJob) => navigateTo(`/processing-jobs/${row.id}`)"
       >
         <template #id-data="{ row }">
-          <span class="font-mono text-xs text-gray-500">#{{ row.id }}</span>
+          <span class="font-mono text-xs text-muted">#{{ row.id }}</span>
         </template>
 
         <template #type-data="{ row }">

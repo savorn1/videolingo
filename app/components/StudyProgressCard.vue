@@ -79,7 +79,7 @@
                   :style="{ height: d.height }"
                 />
               </span>
-              <span class="text-[10px] leading-none" :class="d.isToday ? 'font-semibold text-gray-900 dark:text-white' : 'text-gray-400'">{{ d.label }}</span>
+              <span class="text-[10px] leading-none" :class="d.isToday ? 'font-semibold text-gray-900 dark:text-white' : 'text-muted'">{{ d.label }}</span>
             </li>
           </ul>
         </div>

@@ -40,12 +40,13 @@
           />
         </UFormField>
       </div>
-      <USwitch v-model="transcribe" :disabled="!language" label="Transcribe when ready" description="Makes a transcript of each video once it is finished.">
-        <!-- Off until there's a language: a way straight to it -->
-        <template v-if="!language" #description>
-          <UButton size="xs" color="primary" variant="link" class="p-0" @click="languageOpen = true">Choose the spoken language first</UButton>
-        </template>
-      </USwitch>
+      <div>
+        <USwitch v-model="transcribe" :disabled="!language" label="Transcribe when ready" description="Makes a transcript of each video once it is finished." />
+        <!-- Off until there's a language: a way straight to it, outside the switch so it isn't faded with it -->
+        <UButton v-if="!language" size="xs" color="primary" variant="link" class="ml-11 min-h-6 px-0 py-1" @click="languageOpen = true"
+          >Choose the spoken language first</UButton
+        >
+      </div>
       <div v-if="transcribe" class="space-y-2 pl-11" data-testid="burn-subtitles">
         <USwitch
           v-model="burnSubtitles"

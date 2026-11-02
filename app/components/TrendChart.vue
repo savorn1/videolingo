@@ -3,7 +3,7 @@
     <div class="flex items-center justify-between gap-2 mb-3">
       <div class="min-w-0">
         <h3 class="font-semibold text-gray-900 dark:text-white">{{ title }}</h3>
-        <p v-if="subtitle" class="text-xs text-gray-500">{{ subtitle }}</p>
+        <p v-if="subtitle" class="text-xs text-muted">{{ subtitle }}</p>
       </div>
       <UButton size="xs" color="neutral" variant="ghost" :icon="asTable ? 'i-lucide-chart-column' : 'i-lucide-table'" @click="asTable = !asTable">
         {{ asTable ? 'Chart' : 'Table' }}
@@ -12,7 +12,7 @@
 
     <div v-if="asTable" class="max-h-64 overflow-y-auto">
       <table class="w-full text-sm">
-        <thead class="text-xs text-gray-500 text-left sticky top-0 bg-(--ui-bg)">
+        <thead class="text-xs text-muted text-left sticky top-0 bg-(--ui-bg)">
           <tr>
             <th class="py-1 font-medium">{{ columnLabel }}</th>
             <th class="py-1 font-medium text-right">{{ valueLabel }}</th>

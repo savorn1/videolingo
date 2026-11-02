@@ -7,7 +7,7 @@
   >
     <template #body>
       <UAlert v-if="error" color="error" variant="subtle" :title="error" icon="i-lucide-triangle-alert" class="mb-3" />
-      <div v-if="loading && !revisions.length" class="py-10 text-center text-sm text-gray-500">Loading history…</div>
+      <div v-if="loading && !revisions.length" class="py-10 text-center text-sm text-muted">Loading history…</div>
       <EmptyState
         v-else-if="!revisions.length"
         icon="i-lucide-history"
@@ -32,9 +32,7 @@
                 <span class="ml-auto text-xs text-gray-500 tabular-nums dark:text-gray-400">{{ r.itemCount }} {{ itemNoun }}</span>
               </div>
               <div class="text-gray-700 dark:text-gray-200 truncate">{{ r.summary }}</div>
-              <div class="text-xs text-gray-500" :title="formatDateTime(r.createdAt)">
-                {{ r.createdBy ?? 'system' }} · {{ formatRelativeTime(r.createdAt) }}
-              </div>
+              <div class="text-xs text-muted" :title="formatDateTime(r.createdAt)">{{ r.createdBy ?? 'system' }} · {{ formatRelativeTime(r.createdAt) }}</div>
             </button>
           </li>
         </ol>
@@ -47,7 +45,7 @@
             <USwitch v-model="showUnchanged" size="xs" label="Show unchanged" class="ml-auto" />
           </div>
 
-          <div v-if="comparing" class="py-8 text-center text-sm text-gray-500">Comparing…</div>
+          <div v-if="comparing" class="py-8 text-center text-sm text-muted">Comparing…</div>
           <template v-else-if="rows">
             <div class="flex flex-wrap gap-2 mb-2 text-xs">
               <UBadge color="success" variant="subtle">+{{ summary.added }} added</UBadge>
@@ -55,14 +53,14 @@
               <UBadge color="warning" variant="subtle">{{ summary.changed }} changed</UBadge>
               <UBadge color="neutral" variant="subtle">{{ summary.unchanged }} unchanged</UBadge>
             </div>
-            <p v-if="!shownRows.length" class="py-6 text-center text-sm text-gray-500">No differences.</p>
+            <p v-if="!shownRows.length" class="py-6 text-center text-sm text-muted">No differences.</p>
             <ol
               v-else
               class="max-h-[52vh] overflow-y-auto divide-y divide-gray-100 dark:divide-gray-800 rounded-lg border border-gray-200 dark:border-gray-800 text-sm"
             >
               <li v-for="(row, k) in shownRows" :key="k" class="px-3 py-1.5" :class="ROW_CLASS[row.type]">
                 <template v-if="row.type === 'changed'">
-                  <div class="flex gap-2 line-through decoration-error-400/70 text-gray-500">
+                  <div class="flex gap-2 line-through decoration-error-400/70 text-muted">
                     <span class="shrink-0 w-40 font-mono text-[11px] pt-0.5">{{ span(row.before) }}</span>
                     <span class="whitespace-pre-line">{{ row.before.text }}</span>
                   </div>
@@ -75,14 +73,14 @@
                   <span class="shrink-0 w-4 font-mono text-gray-500 dark:text-gray-400">{{
                     row.type === 'added' ? '+' : row.type === 'removed' ? '−' : ''
                   }}</span>
-                  <span class="shrink-0 w-36 font-mono text-[11px] pt-0.5 text-gray-500">{{ span(row.type === 'added' ? row.after : row.before) }}</span>
+                  <span class="shrink-0 w-36 font-mono text-[11px] pt-0.5 text-muted">{{ span(row.type === 'added' ? row.after : row.before) }}</span>
                   <span class="whitespace-pre-line" :class="row.type === 'removed' ? 'line-through text-gray-500' : 'text-gray-900 dark:text-white'">
                     {{ (row.type === 'added' ? row.after : row.before).text }}
                   </span>
                 </div>
               </li>
             </ol>
-            <p class="mt-2 text-xs text-gray-500">Showing what changed going from #{{ olderNumber }} to #{{ newerNumber }}.</p>
+            <p class="mt-2 text-xs text-muted">Showing what changed going from #{{ olderNumber }} to #{{ newerNumber }}.</p>
           </template>
 
           <div v-if="canRestore && selected && selected.id !== latest?.id" class="flex justify-end mt-4">

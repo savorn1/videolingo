@@ -40,7 +40,7 @@
         <div class="flex items-center justify-between gap-2 mb-2">
           <h3 class="text-sm font-semibold text-gray-900 dark:text-white">
             Comments
-            <span class="font-normal text-gray-500">({{ openCount }} open{{ resolvedCount ? `, ${resolvedCount} resolved` : '' }})</span>
+            <span class="font-normal text-muted">({{ openCount }} open{{ resolvedCount ? `, ${resolvedCount} resolved` : '' }})</span>
           </h3>
           <USwitch v-if="resolvedCount" v-model="showResolved" size="xs" label="Show resolved" />
         </div>
@@ -56,7 +56,7 @@
             class="rounded-lg border px-3 py-2 text-sm"
             :class="c.resolved ? 'border-gray-100 dark:border-gray-800 opacity-60' : 'border-gray-200 dark:border-gray-700'"
           >
-            <div class="flex items-center gap-2 text-xs text-gray-500">
+            <div class="flex items-center gap-2 text-xs text-muted">
               <UButton
                 v-if="c.atMs !== null"
                 size="xs"
@@ -94,7 +94,7 @@
                 />
               </div>
             </div>
-            <p v-if="c.cueText" class="mt-1 border-l-2 border-gray-200 dark:border-gray-700 pl-2 text-xs italic text-gray-500 whitespace-pre-line line-clamp-2">
+            <p v-if="c.cueText" class="mt-1 border-l-2 border-gray-200 dark:border-gray-700 pl-2 text-xs italic text-muted whitespace-pre-line line-clamp-2">
               {{ c.cueText }}
             </p>
             <p class="mt-1 text-gray-900 dark:text-white whitespace-pre-line">{{ c.body }}</p>

@@ -1,6 +1,6 @@
 <template>
   <div>
-    <div v-if="!rows.length" class="flex flex-col items-center gap-2 py-6 text-center text-sm text-gray-500">
+    <div v-if="!rows.length" class="flex flex-col items-center gap-2 py-6 text-center text-sm text-muted">
       <UIcon name="i-lucide-inbox" class="w-7 h-7 text-gray-300 dark:text-gray-600" />
       {{ empty }}
     </div>
@@ -30,7 +30,7 @@
             :style="{ width: `${max ? (r.value / max) * 100 : 0}%` }"
           />
         </div>
-        <p v-if="r.sub" class="text-xs text-gray-500 mt-0.5 ml-6 tabular-nums">{{ r.sub }}</p>
+        <p v-if="r.sub" class="text-xs text-muted mt-0.5 ml-6 tabular-nums">{{ r.sub }}</p>
       </li>
     </ul>
     <UButton v-if="rows.length > limit" size="xs" color="neutral" variant="link" :padded="false" class="mt-2" @click="expanded = !expanded">

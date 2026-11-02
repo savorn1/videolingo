@@ -34,7 +34,7 @@
           >
             <div class="h-full rounded-full bg-emerald-500" :style="{ width: `${hero.progress.percent}%` }" />
           </div>
-          <span class="text-xs tabular-nums text-gray-500">{{ Math.round(hero.progress.percent) }}%</span>
+          <span class="text-xs tabular-nums text-muted">{{ Math.round(hero.progress.percent) }}%</span>
         </div>
         <!-- Looks like a button; the whole card is the link, so it can't be a real button inside it -->
         <span
@@ -56,7 +56,7 @@
         :progress="item.progress"
         class="w-64 shrink-0 snap-start"
       >
-        <p class="text-xs text-gray-500">{{ remaining(item) }} · {{ formatRelativeTime(item.progress.lastWatchedAt) }}</p>
+        <p class="text-xs text-muted">{{ remaining(item) }} · {{ formatRelativeTime(item.progress.lastWatchedAt) }}</p>
       </VideoCard>
     </div>
   </section>

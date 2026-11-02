@@ -148,7 +148,7 @@
               @reset-offset="resetOffset"
             />
 
-            <span class="ml-auto text-sm text-gray-500 tabular-nums">
+            <span class="ml-auto text-sm text-muted tabular-nums">
               {{ positionInOrder + 1 }} / {{ order.length }}<template v-if="remainingSeconds"> · {{ formatDuration(remainingSeconds) }} left</template>
             </span>
           </div>
@@ -158,7 +158,7 @@
           <div class="flex items-start justify-between gap-3">
             <div class="min-w-0">
               <h2 class="text-lg font-semibold text-gray-900 dark:text-white">{{ video.title }}</h2>
-              <p class="text-sm text-gray-500">
+              <p class="text-sm text-muted">
                 {{ languageLabel(video.language) }}<template v-if="video.durationSeconds"> · {{ formatDuration(video.durationSeconds) }}</template> ·
                 {{ video.viewCount.toLocaleString() }} view{{ video.viewCount === 1 ? '' : 's' }}
               </p>
@@ -180,7 +180,7 @@
             <UBadge v-if="watchedCount" :color="watchedCount === order.length ? 'success' : 'neutral'" variant="subtle" size="sm" icon="i-lucide-circle-check">
               {{ watchedCount }} of {{ order.length }} watched
             </UBadge>
-            <span class="text-xs text-gray-500"
+            <span class="text-xs text-muted"
               >{{ order.length }} video{{ order.length === 1 ? '' : 's' }}<template v-if="totalSeconds"> · {{ formatDuration(totalSeconds) }}</template></span
             >
           </div>
@@ -241,7 +241,7 @@
                   >
                     {{ items[i]!.title ?? `Video #${items[i]!.videoId}` }}
                   </span>
-                  <span class="block text-xs text-gray-500 truncate">
+                  <span class="block text-xs text-muted truncate">
                     <template v-if="items[i]!.deleted">In the trash — skipped</template>
                     <template v-else-if="i === current">Now playing</template>
                     <template v-else>{{ languageLabel(items[i]!.language) }}</template>
@@ -401,7 +401,7 @@ async function playItem(i: number, autoplay = true) {
   current.value = i
   tracker.start(item.videoId, item.durationSeconds)
   router.replace({ query: { ...route.query, v: String(item.videoId) } })
-  nextTick(() => document.querySelector('[data-current]')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }))
+  nextTick(() => document.querySelector('[data-current]')?.scrollIntoView({ block: 'nearest', behavior: scrollMotion() }))
   const seq = ++loadSeq
   videoError.value = ''
   const cached = cache.get(item.videoId)

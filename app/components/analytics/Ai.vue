@@ -68,10 +68,10 @@
         </div>
       </template>
       <USkeleton v-if="!data" class="h-40" />
-      <p v-else-if="!data.byFeature.length" class="text-sm text-gray-500">No AI requests in this period.</p>
+      <p v-else-if="!data.byFeature.length" class="text-sm text-muted">No AI requests in this period.</p>
       <div v-else class="overflow-x-auto">
         <table class="w-full text-sm">
-          <thead class="text-xs text-gray-500 text-left">
+          <thead class="text-xs text-muted text-left">
             <tr>
               <th class="pb-2 font-medium">Feature</th>
               <th class="pb-2 font-medium text-right">Requests</th>
@@ -122,14 +122,14 @@
       <UCard>
         <template #header><h3 class="font-semibold text-gray-900 dark:text-white">Results by type</h3></template>
         <RankedBarList :rows="(data?.generationsByType ?? []).map((r) => ({ key: r.key, label: aiFeatureLabel(r.key), value: r.count }))" />
-        <p class="text-xs font-medium text-gray-500 mt-5 mb-2">Written in</p>
+        <p class="text-xs font-medium text-muted mt-5 mb-2">Written in</p>
         <RankedBarList :rows="(data?.generationsByLanguage ?? []).map((r) => ({ key: r.key, label: r.label, value: r.count }))" />
       </UCard>
       <UCard class="lg:col-span-2">
         <template #header><h3 class="font-semibold text-gray-900 dark:text-white">Videos using the most AI</h3></template>
-        <p v-if="data && !data.topVideos.length" class="text-sm text-gray-500">No AI requests in this period.</p>
+        <p v-if="data && !data.topVideos.length" class="text-sm text-muted">No AI requests in this period.</p>
         <table v-else class="w-full text-sm">
-          <thead class="text-xs text-gray-500 text-left">
+          <thead class="text-xs text-muted text-left">
             <tr>
               <th class="pb-2 font-medium">Video</th>
               <th class="pb-2 font-medium text-right">Requests</th>

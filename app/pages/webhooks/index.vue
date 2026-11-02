@@ -21,7 +21,7 @@
         <template #name-data="{ row }">
           <div class="min-w-0 max-w-md">
             <p class="font-medium text-gray-900 dark:text-white">{{ row.name }}</p>
-            <p class="text-xs text-gray-500 font-mono truncate" :title="row.url">{{ row.url }}</p>
+            <p class="text-xs text-muted font-mono truncate" :title="row.url">{{ row.url }}</p>
           </div>
         </template>
         <template #events-data="{ row }">
@@ -140,7 +140,7 @@
                 >Refresh</UButton
               >
             </div>
-            <p v-if="!deliveries.length && !deliveriesLoading" class="text-sm text-gray-500">Nothing sent yet — try “Send test”.</p>
+            <p v-if="!deliveries.length && !deliveriesLoading" class="text-sm text-muted">Nothing sent yet — try “Send test”.</p>
             <ul class="space-y-2">
               <li v-for="d in deliveries" :key="d.id" class="rounded-lg border border-gray-200 dark:border-gray-800 text-sm">
                 <button type="button" class="w-full flex items-center gap-2 px-3 py-2 text-left" @click="expanded = expanded === d.id ? null : d.id">
@@ -151,8 +151,8 @@
                   />
                   <span class="font-medium">{{ eventLabel(d.event) }}</span>
                   <UBadge size="sm" :color="d.success ? 'success' : 'error'" variant="subtle">{{ d.status || 'No response' }}</UBadge>
-                  <span v-if="d.attempt > 1" class="text-xs text-gray-500">attempt {{ d.attempt }}</span>
-                  <span class="ml-auto text-xs text-gray-500" :title="formatDateTime(d.createdAt)"
+                  <span v-if="d.attempt > 1" class="text-xs text-muted">attempt {{ d.attempt }}</span>
+                  <span class="ml-auto text-xs text-muted" :title="formatDateTime(d.createdAt)"
                     >{{ formatRelativeTime(d.createdAt) }} · {{ d.durationMs }} ms</span
                   >
                 </button>

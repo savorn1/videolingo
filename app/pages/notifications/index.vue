@@ -10,7 +10,7 @@
     <UCard v-if="batch" class="mb-4">
       <div class="flex flex-wrap items-start justify-between gap-4">
         <div class="min-w-0">
-          <p class="text-xs text-gray-500">Send #{{ batch.id }} · {{ formatDateTime(batch.createdAt) }} by {{ batch.sentBy ?? '—' }}</p>
+          <p class="text-xs text-muted">Send #{{ batch.id }} · {{ formatDateTime(batch.createdAt) }} by {{ batch.sentBy ?? '—' }}</p>
           <p class="font-semibold text-gray-900 dark:text-white truncate">{{ batch.subject }}</p>
           <p class="text-sm text-gray-600 dark:text-gray-400">
             {{ batch.audience }} · {{ batch.channels.map((c) => channelMeta(c).label).join(' + ') }}
@@ -53,13 +53,13 @@
             <NuxtLink :to="`/notifications/${row.id}`" class="font-medium text-gray-900 dark:text-white hover:underline line-clamp-1" @click.stop>{{
               row.subject
             }}</NuxtLink>
-            <p class="text-xs text-gray-500 line-clamp-1">{{ row.body }}</p>
+            <p class="text-xs text-muted line-clamp-1">{{ row.body }}</p>
           </div>
         </template>
         <template #recipientUsername-data="{ row }">
           <div class="min-w-0">
             <UserChip :name="row.recipientUsername" />
-            <p v-if="row.channel === 'EMAIL'" class="text-xs text-gray-500 truncate mt-0.5">{{ row.recipientEmail ?? 'no email' }}</p>
+            <p v-if="row.channel === 'EMAIL'" class="text-xs text-muted truncate mt-0.5">{{ row.recipientEmail ?? 'no email' }}</p>
           </div>
         </template>
         <template #channel-data="{ row }">

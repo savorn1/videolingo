@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { jumpTo, createHistory, record } from './history'
-import { describeStep, historySteps } from './historySteps'
+import { describeStep, historySteps, stepTab } from './historySteps'
 
 const base = {
   trim: { range: [0, 10_000], cropOn: false, crop: { x: 0, y: 0, w: 0, h: 0 }, look: { contrast: 1 }, cuts: [] },
@@ -82,5 +82,61 @@ describe('historySteps and jumpTo', () => {
     expect(historySteps(h.entries)).toEqual(['Start', 'Trim range', 'Sound: volume'])
     expect(jumpTo(h, 0).index).toBe(0)
     expect(jumpTo(h, 9).index).toBe(2)
+  })
+})
+
+describe('stepTab', () => {
+  it('names the tab a step changed', () => {
+    const start = s(() => {})
+    expect(
+      stepTab(
+        start,
+        s((x) => (x.trim.range = [1000, 10_000]))
+      )
+    ).toBe('trim')
+    expect(
+      stepTab(
+        start,
+        s((x) => (x.split = []))
+      )
+    ).toBe('split')
+    expect(
+      stepTab(
+        start,
+        s((x) => (x.audio.volume = 2))
+      )
+    ).toBe('audio')
+    expect(
+      stepTab(
+        start,
+        s((x) => (x.captions = { style: 'BOX' } as never))
+      )
+    ).toBe('overlay')
+    expect(
+      stepTab(
+        start,
+        s((x) => (x.join = { clips: [1] } as never))
+      )
+    ).toBe('join')
+  })
+  it('takes the first tab when a step changed several, and null when nothing or garbage', () => {
+    expect(
+      stepTab(
+        s(() => {}),
+        s((x) => ((x.audio.volume = 2), (x.trim.range = [1, 2])))
+      )
+    ).toBe('trim')
+    expect(
+      stepTab(
+        s(() => {}),
+        s(() => {})
+      )
+    ).toBeNull()
+    expect(
+      stepTab(
+        '{',
+        s(() => {})
+      )
+    ).toBeNull()
   })
 })

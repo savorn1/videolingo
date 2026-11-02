@@ -88,7 +88,7 @@
                 <UIcon name="i-lucide-layers" class="w-4 h-4 text-gray-400" />
                 <USelect v-model="secondaryId" :items="secondaryOptions" size="sm" class="w-56" aria-label="Show a second track" />
               </div>
-              <div class="flex items-center gap-2 text-sm text-gray-500">
+              <div class="flex items-center gap-2 text-sm text-muted">
                 <span class="tabular-nums font-mono text-xs">{{ formatTimestamp(currentMs) }}</span>
                 <UFieldGroup size="xs">
                   <UButton
@@ -212,7 +212,7 @@
                   :class="i === activeIndex ? 'bg-primary-50 dark:bg-primary-950/40' : ''"
                   @click="seek(cues[i]!.startMs, true)"
                 >
-                  <div class="shrink-0 w-24 font-mono text-[11px] leading-4 text-gray-500 tabular-nums pt-0.5">
+                  <div class="shrink-0 w-24 font-mono text-[11px] leading-4 text-muted tabular-nums pt-0.5">
                     <div class="text-sky-700 dark:text-sky-300">{{ formatTimestamp(cues[i]!.startMs) }}</div>
                     <div class="text-violet-700 dark:text-violet-300">{{ formatTimestamp(cues[i]!.endMs) }}</div>
                   </div>
@@ -550,7 +550,7 @@ const primaryCueText = computed(() => {
 // needs the row on screen just as much as reading along does.
 watch(activeIndex, (i) => {
   if (i < 0 || !player.value || player.value.paused) return
-  nextTick(() => document.getElementById(`cue-${i}`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }))
+  nextTick(() => document.getElementById(`cue-${i}`)?.scrollIntoView({ block: 'nearest', behavior: scrollMotion() }))
 })
 
 const SIZES = [

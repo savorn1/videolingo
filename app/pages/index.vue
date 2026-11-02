@@ -179,7 +179,7 @@
                     <span class="truncate text-gray-900 dark:text-white"
                       >{{ jobTypeMeta(job.type).label }} · {{ job.videoTitle ?? `Video #${job.videoId}` }}</span
                     >
-                    <span class="text-xs tabular-nums text-gray-500">{{ job.progress }}%</span>
+                    <span class="text-xs tabular-nums text-muted">{{ job.progress }}%</span>
                   </div>
                   <UProgress :model-value="job.progress" size="xs" class="mt-1.5" />
                 </NuxtLink>
@@ -200,7 +200,7 @@
                 <NuxtLink :to="`/videos/${v.videoId}`" class="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors">
                   <span class="w-5 text-xs font-semibold text-gray-500 tabular-nums dark:text-gray-400">{{ i + 1 }}</span>
                   <span class="flex-1 min-w-0 text-sm text-gray-900 dark:text-white truncate">{{ v.title }}</span>
-                  <span class="text-xs text-gray-500 tabular-nums">{{ formatCount(v.views) }} views</span>
+                  <span class="text-xs text-muted tabular-nums">{{ formatCount(v.views) }} views</span>
                 </NuxtLink>
               </li>
             </ol>

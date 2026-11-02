@@ -1,6 +1,6 @@
 <template>
   <div class="flex items-center gap-3">
-    <span class="w-16 shrink-0 text-xs text-gray-500">{{ label }}</span>
+    <span class="w-16 shrink-0 text-xs text-muted">{{ label }}</span>
     <USlider
       :model-value="model"
       :min="min"

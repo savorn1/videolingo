@@ -131,7 +131,7 @@
                 :aria-pressed="resolution === r.value"
                 @click="resolution = r.value"
               >
-                {{ r.label }} <span class="text-xs opacity-70 tabular-nums">{{ r.size }}</span>
+                {{ r.label }} <span class="text-xs font-normal tabular-nums">{{ r.size }}</span>
               </UButton>
             </div>
             <p class="text-xs text-gray-500 dark:text-gray-400">

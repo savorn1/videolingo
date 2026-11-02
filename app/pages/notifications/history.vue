@@ -45,12 +45,12 @@
             <NuxtLink :to="`/notifications?batchId=${row.id}`" class="font-medium text-gray-900 dark:text-white hover:underline line-clamp-1" @click.stop>
               {{ row.subject }}
             </NuxtLink>
-            <p class="text-xs text-gray-500">{{ row.templateName ? `Template: ${row.templateName}` : 'Written directly' }}</p>
+            <p class="text-xs text-muted">{{ row.templateName ? `Template: ${row.templateName}` : 'Written directly' }}</p>
           </div>
         </template>
         <template #audience-data="{ row }">
           <p>{{ row.audience }}</p>
-          <p class="text-xs text-gray-500">{{ row.recipientCount }} recipient{{ row.recipientCount === 1 ? '' : 's' }}</p>
+          <p class="text-xs text-muted">{{ row.recipientCount }} recipient{{ row.recipientCount === 1 ? '' : 's' }}</p>
         </template>
         <template #channels-data="{ row }">
           <div class="flex gap-1">

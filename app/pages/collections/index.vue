@@ -18,7 +18,7 @@
         label="Select all on this page"
         @update:model-value="toggleSelectAll"
       />
-      <span class="text-sm text-gray-500">{{ selected.size }} selected</span>
+      <span class="text-sm text-muted">{{ selected.size }} selected</span>
       <CollectionBulkActions v-if="selected.size" :collections="selectedCollections" class="ml-auto" @done="onBulkDone" />
       <UButton v-if="selected.size" size="xs" color="neutral" variant="ghost" icon="i-lucide-x" @click="selected.clear()">Clear</UButton>
     </UCard>
@@ -97,7 +97,7 @@
             </UDropdownMenu>
           </div>
           <p v-if="c.description" class="text-xs text-gray-500 dark:text-gray-400 line-clamp-2">{{ c.description }}</p>
-          <div class="mt-auto flex items-center justify-between gap-2 pt-2 text-xs text-gray-500">
+          <div class="mt-auto flex items-center justify-between gap-2 pt-2 text-xs text-muted">
             <UBadge :color="visibilityMeta(c.visibility).color" variant="subtle" :icon="visibilityMeta(c.visibility).icon" size="sm">
               {{ visibilityMeta(c.visibility).label }}
             </UBadge>

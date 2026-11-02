@@ -77,7 +77,7 @@
                 </div>
                 <div class="min-w-0 flex-1">
                   <p class="font-semibold text-sm text-gray-900 dark:text-white truncate">{{ v.title }}</p>
-                  <p class="text-xs text-gray-500">{{ languageLabel(v.language) }} · {{ formatDuration(v.durationSeconds) }} · {{ v.viewCount }} views</p>
+                  <p class="text-xs text-muted">{{ languageLabel(v.language) }} · {{ formatDuration(v.durationSeconds) }} · {{ v.viewCount }} views</p>
                 </div>
                 <UBadge :color="v.enabled ? 'success' : 'warning'" variant="subtle" size="sm">{{ v.enabled ? 'Enabled' : 'Disabled' }}</UBadge>
               </NuxtLink>
@@ -90,7 +90,7 @@
             description="File videos under this category from a video's Edit form."
             class="py-10"
           />
-          <p v-if="category.videoCount > videos.length" class="px-4 py-3 text-xs text-gray-500 border-t border-gray-100 dark:border-gray-800">
+          <p v-if="category.videoCount > videos.length" class="px-4 py-3 text-xs text-muted border-t border-gray-100 dark:border-gray-800">
             Showing {{ videos.length }} of {{ category.videoCount }} — open in Videos to see them all.
           </p>
         </UCard>

@@ -1,6 +1,6 @@
 <template>
   <div ref="root" class="max-h-[70vh] overflow-y-auto">
-    <p v-if="!cues.length" class="p-4 text-sm text-gray-500">No subtitles for this video yet.</p>
+    <p v-if="!cues.length" class="p-4 text-sm text-muted">No subtitles for this video yet.</p>
     <ol v-else class="divide-y divide-gray-100 dark:divide-gray-800">
       <li
         v-for="(cue, i) in cues"
@@ -71,6 +71,6 @@ watch(active, (i) => {
   if (!el) return
   // Scroll only the transcript, never the page.
   const top = el.offsetTop - root.value.clientHeight / 3
-  root.value.scrollTo({ top: Math.max(0, top), behavior: 'smooth' })
+  root.value.scrollTo({ top: Math.max(0, top), behavior: scrollMotion() })
 })
 </script>

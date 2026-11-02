@@ -69,6 +69,38 @@
   --color-ink-950: #15181e;
 }
 
+/* Text colours dark enough to read (HIG Accessibility: 4.5:1 for text up to 17 pt, in light and dark).
+   Nuxt UI uses each colour's 500 shade in light mode and 400 in dark, which is too light on white
+   (success-500 2.2:1, warning-500 1.9:1, error-500 3.8:1) and, for several, too dark on ink-900. These are
+   the lightest shades reaching 4.5:1 on the page and on the colour's own 10-15 % tint (soft buttons, badges,
+   alerts), so coloured text, links and badges are legible and solid buttons' white text is too.
+   Muted text (descriptions, hints) is ink-600 in light; dimmed (placeholders) sits between ink-500 and
+   ink-600, and in dark between ink-400 and ink-500, so it reaches 4.5:1 while staying a step fainter than
+   muted. Nuxt UI sets these in a layer, so these plain rules win. codebase.spec.ts checks the ratios. */
+:root,
+.light {
+  --ui-primary: var(--ui-color-primary-600);
+  --ui-secondary: var(--ui-color-secondary-600);
+  --ui-success: var(--ui-color-success-800);
+  --ui-info: var(--ui-color-info-700);
+  --ui-warning: var(--ui-color-warning-800);
+  --ui-error: var(--ui-color-error-700);
+  --ui-cancelled: var(--ui-color-cancelled-700);
+  --ui-text-muted: var(--ui-color-neutral-600);
+  --ui-text-dimmed: color-mix(in oklab, var(--ui-color-neutral-500) 40%, var(--ui-color-neutral-600));
+}
+.dark {
+  --ui-primary: var(--ui-color-primary-300);
+  --ui-secondary: var(--ui-color-secondary-300);
+  --ui-success: var(--ui-color-success-400);
+  --ui-info: var(--ui-color-info-300);
+  --ui-warning: var(--ui-color-warning-400);
+  --ui-error: var(--ui-color-error-300);
+  --ui-cancelled: var(--ui-color-cancelled-400);
+  --ui-text-muted: color-mix(in oklab, var(--ui-color-neutral-300) 30%, var(--ui-color-neutral-400));
+  --ui-text-dimmed: color-mix(in oklab, var(--ui-color-neutral-400) 55%, var(--ui-color-neutral-500));
+}
+
 /* Default body text was resetting to the browser's normal (400) weight —
    bumping the base to medium (500) makes body copy read heavier everywhere
    without touching every component; explicit font-weight utilities
@@ -103,7 +135,7 @@
   --ui-color-primary-800: var(--color-sky-800);
   --ui-color-primary-900: var(--color-sky-900);
   --ui-color-primary-950: var(--color-sky-950);
-  --ui-primary: var(--color-sky-600);
+  --ui-primary: var(--color-sky-700); /* 600 is under 4.5:1 on white */
 }
 .dark .tab-scope-sky {
   --ui-primary: var(--color-sky-400);
@@ -123,7 +155,7 @@
   --ui-primary: var(--color-violet-600);
 }
 .dark .tab-scope-violet {
-  --ui-primary: var(--color-violet-400);
+  --ui-primary: var(--color-violet-300); /* 400 is under 4.5:1 on its own tint */
 }
 .tab-scope-emerald {
   --ui-color-primary-50: var(--color-emerald-50);
@@ -137,7 +169,7 @@
   --ui-color-primary-800: var(--color-emerald-800);
   --ui-color-primary-900: var(--color-emerald-900);
   --ui-color-primary-950: var(--color-emerald-950);
-  --ui-primary: var(--color-emerald-600);
+  --ui-primary: var(--color-emerald-700); /* 600 is under 4.5:1 on white */
 }
 .dark .tab-scope-emerald {
   --ui-primary: var(--color-emerald-400);
@@ -157,7 +189,7 @@
   --ui-primary: var(--color-rose-600);
 }
 .dark .tab-scope-rose {
-  --ui-primary: var(--color-rose-400);
+  --ui-primary: var(--color-rose-300); /* 400 is under 4.5:1 on its own tint */
 }
 .tab-scope-orange {
   --ui-color-primary-50: var(--color-orange-50);
@@ -171,7 +203,7 @@
   --ui-color-primary-800: var(--color-orange-800);
   --ui-color-primary-900: var(--color-orange-900);
   --ui-color-primary-950: var(--color-orange-950);
-  --ui-primary: var(--color-orange-600);
+  --ui-primary: var(--color-orange-700); /* 600 is under 4.5:1 on white */
 }
 .dark .tab-scope-orange {
   --ui-primary: var(--color-orange-400);
@@ -258,6 +290,13 @@
   .render-bar {
     height: 60%;
   }
+  /* Pulsing placeholders and badges hold still (HIG Motion: "Make motion optional"); spinners keep turning,
+     since they're the progress indicator and a still one would look stuck. */
+  .animate-pulse,
+  .animate-ping,
+  .animate-bounce {
+    animation: none;
+  }
 }
 
 .tab-scope-teal {
@@ -272,7 +311,7 @@
   --ui-color-primary-800: var(--color-teal-800);
   --ui-color-primary-900: var(--color-teal-900);
   --ui-color-primary-950: var(--color-teal-950);
-  --ui-primary: var(--color-teal-600);
+  --ui-primary: var(--color-teal-700); /* 600 is under 4.5:1 on white */
 }
 .dark .tab-scope-teal {
   --ui-primary: var(--color-teal-400);
@@ -289,8 +328,46 @@
   --ui-color-primary-800: var(--color-amber-800);
   --ui-color-primary-900: var(--color-amber-900);
   --ui-color-primary-950: var(--color-amber-950);
-  --ui-primary: var(--color-amber-600);
+  --ui-primary: var(--color-amber-700); /* 600 is under 4.5:1 on white */
 }
 .dark .tab-scope-amber {
   --ui-primary: var(--color-amber-400);
+}
+
+/* Touch screens: every control is at least 44×44 px, Apple's default control size
+   (HIG Accessibility, "Offer sufficiently sized controls"; Buttons: a hit region of at least 44x44 pt).
+   Nuxt UI's switches, checkboxes and radios (in their data-slot="container") and slider thumbs keep their look and get
+   a 44 px hit area. Fields use 16 px text so iOS Safari doesn't zoom in on focus. A dense spot that must stay small opts out with .touch-compact (on it or an ancestor). */
+@media (pointer: coarse) {
+  :is(button, a[href], summary, select, input[type='color']):not(
+    [data-slot='container'] > :is([role='switch'], [role='checkbox'], [role='radio']),
+    .sr-only,
+    .touch-compact,
+    .touch-compact *
+  ) {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  [data-slot='root']:has(> [data-slot='container'] > [role='switch']):not(.touch-compact *) {
+    min-height: 44px;
+    align-items: center;
+  }
+  [data-slot='container'] > :is([role='switch'], [role='checkbox'], [role='radio']):not(.touch-compact *) {
+    position: relative;
+  }
+  /* Slider thumbs and handles are already absolutely placed, so they hold the hit box without being moved */
+  :is([data-slot='container'] > :is([role='switch'], [role='checkbox'], [role='radio']), [role='slider']):not(.touch-compact *)::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: max(100%, 44px);
+    height: 44px;
+    transform: translate(-50%, -50%);
+    z-index: 1;
+  }
+  :is(input:not([type='checkbox'], [type='radio'], [type='range'], [type='color'], [type='file']), textarea):not(.touch-compact *) {
+    min-height: 44px;
+    font-size: 16px;
+  }
 }

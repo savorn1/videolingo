@@ -1,6 +1,8 @@
 // Names for the editor's undo steps (the History list): what changed between one snapshot and the one before,
 // from the parts of the state (useClipEditor takeState). Pure — tested with hand-made snapshots.
 
+import type { EditorTab } from './tabAccent'
+
 type State = Record<string, unknown>
 
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b)
@@ -84,4 +86,22 @@ export function describeStep(before: string, after: string): string {
 /** The History list: each snapshot's name ("Start" for the first), oldest first. */
 export function historySteps(entries: string[]): string[] {
   return entries.map((e, i) => (i === 0 ? 'Start' : describeStep(entries[i - 1]!, e)))
+}
+
+/** The editor tab a step changed (the first, in tab order), so undo can show it; null when it can't tell. */
+export function stepTab(before: string, after: string): EditorTab | null {
+  let a: State
+  let b: State
+  try {
+    a = JSON.parse(before) as State
+    b = JSON.parse(after) as State
+  } catch {
+    return null
+  }
+  if (!same(a.trim, b.trim)) return 'trim'
+  if (!same(a.split, b.split)) return 'split'
+  if (!same(a.audio, b.audio)) return 'audio'
+  if (!same(a.overlay, b.overlay) || !same(a.captions, b.captions)) return 'overlay'
+  if (!same(a.join, b.join)) return 'join'
+  return null
 }
