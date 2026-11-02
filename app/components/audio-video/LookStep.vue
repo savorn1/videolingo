@@ -1,7 +1,11 @@
 <template>
   <AudioVideoStepCard :step="2" title="The look">
     <template #aside>
-      <AudioVideoSavedLooks />
+      <div class="flex items-center gap-1">
+        <!-- On a phone the preview is below every step: a way to it while choosing the look -->
+        <UButton class="lg:hidden" size="xs" color="neutral" variant="ghost" icon="i-lucide-eye" @click="showPreview">Preview</UButton>
+        <AudioVideoSavedLooks />
+      </div>
     </template>
     <div class="space-y-5 divide-y divide-gray-100 dark:divide-gray-800">
       <!-- The frame: its shape and size, which everything else is placed in -->
@@ -502,6 +506,10 @@ const {
   waveColor2,
   waveGlow
 } = useAudioToVideoFormContext()
+/** Brings the preview into view (instantly when the user prefers less motion). */
+function showPreview() {
+  document.getElementById('preview')?.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' })
+}
 const cards = [
   { name: 'Intro', card: intro, hint: 'Before the recording, on the background with the logo.', placeholder: 'e.g. Lesson 4 — Greetings' },
   { name: 'Outro', card: outro, hint: 'After it. Leave empty for none.', placeholder: 'e.g. Thanks for listening!' }

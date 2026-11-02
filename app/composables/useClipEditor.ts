@@ -8,6 +8,7 @@
 // Its state and actions live here, shared by VideoClipEditor.vue and its tab components
 // (app/components/clip-editor/*), which inject them with useClipEditorContext().
 import { EDITOR_TOOL_TONE, TAB_ACCENTS } from '#shared/utils/tabAccent'
+import { tabForKey } from '#shared/utils/tabKeys'
 import type { BurnedCaptions } from '~/composables/useOverlayEdit'
 import type { InjectionKey } from 'vue'
 import type { EditOverview, PromoteResult, VideoClip } from '~/composables/useVideoEdits'
@@ -175,6 +176,7 @@ export function useClipEditor(props: ClipEditorProps, emit: ClipEditorEmit) {
   const tabKeysHint = computed(() => TAB_KEYS[mode.value] ?? '')
 
   const EDITOR_SHORTCUTS = [
+    { keys: '1–5', label: 'Open Trim, Split, Audio, Text or Join' },
     { keys: 'space', label: 'Play / pause' },
     { keys: 'K', label: 'Pause (and back to normal speed)' },
     { keys: '←', label: 'Previous frame' },
@@ -357,6 +359,21 @@ export function useClipEditor(props: ClipEditorProps, emit: ClipEditorEmit) {
     return !!el && (el.isContentEditable || el.tagName === 'TEXTAREA' || el.tagName === 'INPUT')
   }
   function onKeyDown(e: KeyboardEvent) {
+    // 1–5 open the tabs (not while typing, in a dialog, or when a page part already took the key).
+    const tab = tabForKey(e.key)
+    if (
+      tab &&
+      !e.defaultPrevented &&
+      !e.ctrlKey &&
+      !e.metaKey &&
+      !e.altKey &&
+      !isTyping(e.target) &&
+      !(e.target as HTMLElement | null)?.closest?.('[role="dialog"]')
+    ) {
+      e.preventDefault()
+      mode.value = tab
+      return
+    }
     if (
       mode.value === 'trim' &&
       !e.ctrlKey &&

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { clipLabel, promotableAsNew } from './editResults'
+import { EXPIRES_SOON_MS, clipLabel, expiresSoon, promotableAsNew } from './editResults'
 
 describe('clipLabel', () => {
   it('shows the name of a split part', () => {
@@ -16,5 +16,20 @@ describe('promotableAsNew', () => {
   it('leaves out sound files and results of videos in the trash', () => {
     const row = (operation: 'TRIM' | 'EXTRACT', videoDeleted = false) => ({ videoDeleted, clip: { operation } })
     expect(promotableAsNew([row('TRIM'), row('EXTRACT'), row('TRIM', true)])).toHaveLength(1)
+  })
+})
+
+describe('expiresSoon', () => {
+  const now = Date.parse('2026-10-31T12:00:00Z')
+  const at = (ms: number) => new Date(now + ms).toISOString()
+  it('flags results within the last hours, or already past', () => {
+    expect(expiresSoon(at(EXPIRES_SOON_MS - 60_000), now)).toBe(true)
+    expect(expiresSoon(at(-60_000), now)).toBe(true)
+  })
+  it('leaves the rest alone, and unknown times', () => {
+    expect(expiresSoon(at(EXPIRES_SOON_MS + 60_000), now)).toBe(false)
+    expect(expiresSoon(at(3 * 24 * 3600_000), now)).toBe(false)
+    expect(expiresSoon(null, now)).toBe(false)
+    expect(expiresSoon('not a date', now)).toBe(false)
   })
 })

@@ -618,3 +618,23 @@ test('Text: a title on the picture as each chapter marker starts', async ({ page
       { kind: 'TEXT', text: 'Practice', startMs: 6000, endMs: 10_000 }
     ])
 })
+
+test('Text: a template can be added from the keyboard', async ({ page }) => {
+  await openEditor(page)
+  await page.getByRole('tab', { name: /Text/ }).click()
+  // With no layers yet, Templates is open.
+  await page.getByRole('button', { name: 'Add template Intro title card' }).focus()
+  await page.keyboard.press('Enter')
+  await page.getByRole('button', { name: /Render layers/ }).click()
+  await expect.poll(async () => (await mockRequests()).find((r) => r.path === '/api/admin/videos/7/edits/overlay')?.body?.layers?.length).toBe(1)
+})
+
+test('Number keys open the tabs', async ({ page }) => {
+  await openEditor(page)
+  await page.keyboard.press('4')
+  await expect(page.getByRole('tab', { name: /Text/ })).toHaveAttribute('aria-selected', 'true')
+  await page.keyboard.press('2')
+  await expect(page.getByRole('tab', { name: /Split/ })).toHaveAttribute('aria-selected', 'true')
+  await page.keyboard.press('1')
+  await expect(page.getByRole('tab', { name: /Trim/ })).toHaveAttribute('aria-selected', 'true')
+})

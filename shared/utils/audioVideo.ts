@@ -1,4 +1,5 @@
 import { spreadEvenly } from './slides'
+import { formatDuration } from './format'
 // Making a video from a sound: the checks and small conversions the "Video from
 // audio" page does before anything is uploaded. The server checks again.
 
@@ -324,15 +325,28 @@ export function clampPartMinutes(value: unknown): number {
  * Recordings up to 1.5 parts long, or of unknown length, stay one video.
  */
 export function estimatedParts(durationSeconds: number | null, partMinutes: number): number {
+  return estimatedPartSeconds(durationSeconds, partMinutes).length || 1
+}
+
+/** The length in seconds of each of those parts: whole parts, then what's left (between half a part and 1.5). Unknown length: []. */
+export function estimatedPartSeconds(durationSeconds: number | null, partMinutes: number): number[] {
   const part = partMinutes * 60
-  if (!durationSeconds || part <= 0) return 1
+  if (!durationSeconds || part <= 0) return []
+  const lengths: number[] = []
   let from = 0
-  let parts = 1
   while (durationSeconds - from > part * 1.5) {
+    lengths.push(part)
     from += part
-    parts++
   }
-  return parts
+  lengths.push(durationSeconds - from)
+  return lengths
+}
+
+/** "10:00 + 10:00 + 12:30", or, for many, "10:00 each, the last 7:30". Lengths are rounded to the second. */
+export function describeParts(lengths: number[]): string {
+  const fmt = (sec: number) => formatDuration(Math.round(sec))
+  if (lengths.length <= 4) return lengths.map(fmt).join(' + ')
+  return `${fmt(lengths[0]!)} each, the last ${fmt(lengths[lengths.length - 1]!)}`
 }
 
 /** "Lesson 4 — Part 2 of 3", the title kept within the 200-character limit. */

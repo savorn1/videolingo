@@ -470,18 +470,24 @@
         :hint="`${formatTimecode(layer.startMs)} – ${layer.endMs == null ? 'end' : formatTimecode(layer.endMs)}`"
       >
         <div class="grid grid-cols-2 gap-2">
-          <UFormField label="Starts (s)">
+          <UFormField label="Starts">
             <UInput
+              class="w-full"
+              aria-label="Starts at (seconds)"
               :model-value="sec(layer.startMs)"
               type="number"
               step="0.1"
               min="0"
               size="sm"
               @update:model-value="(v) => layer && (layer.startMs = ms(v))"
-            />
+            >
+              <template #trailing><span class="text-xs text-gray-500 dark:text-gray-400">s</span></template>
+            </UInput>
           </UFormField>
-          <UFormField label="Ends (s)">
+          <UFormField label="Ends">
             <UInput
+              class="w-full"
+              aria-label="Ends at (seconds)"
               :model-value="layer.endMs == null ? undefined : sec(layer.endMs)"
               type="number"
               step="0.1"
@@ -490,7 +496,9 @@
               placeholder="end"
               :disabled="layer.endMs == null"
               @update:model-value="(v) => layer && (layer.endMs = ms(v))"
-            />
+            >
+              <template #trailing><span class="text-xs text-gray-500 dark:text-gray-400">s</span></template>
+            </UInput>
           </UFormField>
         </div>
         <div class="flex flex-wrap items-center gap-1">
@@ -574,11 +582,18 @@
 
     <!-- ── Templates ───────────────────────────────────────────────────── -->
     <EditorSection v-model:open="open.templates" title="Templates" hint="click one to add it">
-      <div class="flex items-center justify-between">
-        <p class="text-xs text-gray-500 dark:text-gray-400">The starred ones ship with the editor.</p>
+      <div class="flex items-center justify-between gap-2">
+        <p class="min-w-0 text-xs text-gray-500 dark:text-gray-400">The starred ones ship with the editor.</p>
         <div class="flex items-center gap-1">
           <UPopover v-model:open="savingTemplate">
-            <UButton size="xs" color="neutral" variant="soft" :class="TAB_ACCENTS.overlay.soft" icon="i-lucide-save" :disabled="!s.layers.length"
+            <UButton
+              size="xs"
+              color="neutral"
+              variant="soft"
+              :class="TAB_ACCENTS.overlay.soft"
+              class="whitespace-nowrap"
+              icon="i-lucide-save"
+              :disabled="!s.layers.length"
               >Save as template</UButton
             >
             <template #content>
@@ -605,15 +620,21 @@
           <input ref="importInput" type="file" accept="application/json" class="hidden" @change="onImportFile" />
         </div>
       </div>
-      <ul class="flex flex-wrap gap-2" data-testid="overlay-templates">
+      <ul class="grid grid-cols-1 gap-1.5" data-testid="overlay-templates">
         <li v-for="t in templates.templates.value" :key="t.id">
+          <!-- A card, not a <button>, because it holds buttons of its own; Enter or Space adds it from the keyboard -->
           <div
-            class="group flex items-center gap-1.5 rounded-md border border-gray-200 dark:border-gray-800 pl-1.5 pr-1 py-1 cursor-pointer hover:border-rose-400"
+            role="button"
+            tabindex="0"
+            :aria-label="`Add template ${t.name}`"
+            class="group flex h-full cursor-pointer items-center gap-1.5 rounded-md border border-gray-200 py-1 pl-1.5 pr-1 hover:border-rose-400 focus-visible:outline-2 focus-visible:outline-rose-500 dark:border-gray-800"
             @click="edit.addTemplate(t.data)"
+            @keydown.enter.self.prevent="edit.addTemplate(t.data)"
+            @keydown.space.self.prevent="edit.addTemplate(t.data)"
           >
             <OverlayTemplateThumb :layers="t.data" />
-            <span class="text-xs">
-              <span class="flex items-center gap-1">
+            <span class="min-w-0 flex-1 text-xs">
+              <span class="flex items-center gap-1 truncate" :title="t.name">
                 <UIcon v-if="t.builtin" name="i-lucide-star" class="w-3 h-3 text-amber-400" />
                 {{ t.name }}
               </span>
@@ -621,7 +642,7 @@
             </span>
             <button
               type="button"
-              class="ml-1 p-0.5 rounded opacity-0 group-hover:opacity-100 hover:bg-gray-100 dark:hover:bg-gray-800"
+              class="ml-1 rounded p-0.5 opacity-0 hover:bg-gray-100 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 dark:hover:bg-gray-800 [@media(hover:none)]:opacity-100"
               :aria-label="`Export template ${t.name}`"
               @click.stop="templates.exportOne(t)"
             >
@@ -630,7 +651,7 @@
             <button
               v-if="!t.builtin"
               type="button"
-              class="p-0.5 rounded opacity-0 group-hover:opacity-100 hover:bg-error-50 dark:hover:bg-error-950"
+              class="rounded p-0.5 opacity-0 hover:bg-error-50 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 dark:hover:bg-error-950 [@media(hover:none)]:opacity-100"
               :aria-label="`Delete template ${t.name}`"
               @click.stop="confirmDeleteTemplate = t"
             >

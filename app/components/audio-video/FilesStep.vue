@@ -39,7 +39,7 @@
                 >{{ p }}</UButton
               >
             </div>
-            <UFormField label="Start at">
+            <UFormField label="Start at" :description="carriedOn ? 'Carries on from your last numbering.' : undefined">
               <UInput v-model.number="numberStart" type="number" size="sm" :min="0" :max="9999" class="w-24" aria-label="First number" />
             </UFormField>
             <p v-if="example" class="truncate text-xs text-gray-500 dark:text-gray-400" :title="example">
@@ -73,8 +73,36 @@
       </UPopover>
     </div>
     <ul v-if="items.length" class="mb-3 divide-y divide-gray-100 dark:divide-gray-800 rounded-lg border border-gray-200 dark:border-gray-800">
-      <li v-for="(it, idx) in items" :key="it.id" class="space-y-2 px-3 py-2.5">
+      <li
+        v-for="(it, idx) in items"
+        :key="it.id"
+        class="space-y-2 px-3 py-2.5"
+        :class="[
+          dragId === it.id ? 'opacity-40' : '',
+          dropLine(idx) === 'before'
+            ? 'shadow-[inset_0_2px_0_0_var(--ui-primary)]'
+            : dropLine(idx) === 'after'
+              ? 'shadow-[inset_0_-2px_0_0_var(--ui-primary)]'
+              : ''
+        ]"
+        :data-testid="`recording-${idx}`"
+        @dragover="onRowDragOver($event, idx)"
+        @drop.prevent.stop="onRowDrop"
+      >
         <div class="flex items-center gap-3">
+          <!-- Drag by the grip (the arrows do the same from the keyboard); only the grip drags, so the title stays selectable. Not on touch screens, which don't drag this way. -->
+          <span
+            v-if="items.length > 1 && !saving"
+            draggable="true"
+            class="-ml-1 shrink-0 cursor-grab active:cursor-grabbing [@media(pointer:coarse)]:hidden"
+            title="Drag to reorder"
+            aria-hidden="true"
+            data-testid="drag-grip"
+            @dragstart="onRowDragStart($event, it.id)"
+            @dragend="clearDrag"
+          >
+            <UIcon name="i-lucide-grip-vertical" class="block size-4 text-gray-300 dark:text-gray-600" />
+          </span>
           <!-- Several files: a play button each (one plays at a time); a single file gets the full player below -->
           <UButton
             v-if="items.length > 1 && it.status === 'ready'"
@@ -94,6 +122,11 @@
               <template v-if="it.status === 'queued'"> · waiting</template>
               <template v-else-if="it.status === 'uploading'"> · uploading {{ Math.round(it.progress * 100) }}%</template>
             </p>
+            <!-- Split into parts (step 3): about how long each video will be; the cuts move to the nearest pause -->
+            <p v-if="partLengthsOf(it).length" class="text-xs tabular-nums text-gray-500 dark:text-gray-400" data-testid="part-lengths">
+              <UIcon name="i-lucide-scissors" class="inline size-3 align-[-1px]" />
+              about {{ partLengthsOf(it).length }} videos: {{ describeParts(partLengthsOf(it)) }}
+            </p>
           </div>
           <!-- Its own picture: the cover art found in the file, or one chosen for it -->
           <img
@@ -103,7 +136,17 @@
             class="size-9 shrink-0 rounded object-cover ring-1 ring-gray-200 dark:ring-gray-700"
             :title="it.coverFromFile ? 'Cover art from the file' : 'Its own picture'"
           />
-          <UBadge v-if="it.status === 'ready'" color="success" variant="subtle" size="sm" icon="i-lucide-check">Uploaded</UBadge>
+          <!-- A narrow screen keeps just the tick, leaving room for the file name -->
+          <UBadge
+            v-if="it.status === 'ready'"
+            color="success"
+            variant="subtle"
+            size="sm"
+            icon="i-lucide-check"
+            label="Uploaded"
+            title="Uploaded"
+            :ui="{ label: 'max-sm:sr-only' }"
+          />
           <!-- The order is the order the videos are made (and added to a collection) -->
           <div v-if="items.length > 1" class="flex shrink-0 items-center">
             <UButton
@@ -153,12 +196,28 @@
           :aria-label="`Title for ${it.name}`"
           placeholder="Title (needed)"
         />
+        <!-- Not a blocker: a series may mean it, but videos with the same title are hard to tell apart -->
+        <p
+          v-if="it.status !== 'error' && twins[idx] != null"
+          class="flex items-center gap-1 text-xs text-amber-700 dark:text-amber-400"
+          data-testid="same-title"
+        >
+          <UIcon name="i-lucide-copy" class="size-3.5 shrink-0" />
+          Same title as recording {{ twins[idx]! + 1 }} — the videos would be hard to tell apart.
+          <UButton v-if="items.length > 1" size="xs" color="neutral" variant="link" :padded="false" :disabled="saving" @click="numberOpen = true"
+            >Number the titles</UButton
+          >
+        </p>
         <div v-if="it.status !== 'error'" class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500 dark:text-gray-400">
           <template v-if="it.coverKey">
             <span>{{ it.coverFromFile ? 'Uses the cover art from the file' : 'Uses its own picture' }} instead of the shared pictures.</span>
             <UButton size="xs" color="neutral" variant="link" :padded="false" @click="clearItemPicture(it.id)">Remove</UButton>
           </template>
-          <label class="cursor-pointer text-primary-700 underline-offset-2 hover:underline dark:text-primary-400">
+          <!-- Styled like the Chapters link beside it; the focus ring shows on the label when its hidden input has focus -->
+          <label
+            class="inline-flex cursor-pointer items-center gap-1 rounded font-medium text-gray-600 hover:text-gray-900 focus-within:outline-2 focus-within:outline-primary-500 dark:text-gray-300 dark:hover:text-white"
+          >
+            <UIcon :name="it.coverUploading ? 'i-lucide-loader' : 'i-lucide-image-plus'" class="size-3.5" :class="it.coverUploading ? 'animate-spin' : ''" />
             {{ it.coverUploading ? 'Uploading the picture…' : it.coverKey ? 'Change the picture' : 'Give it its own picture' }}
             <input
               type="file"
@@ -216,8 +275,9 @@
 
 <script setup lang="ts">
 // Step 1 of "Video from audio": the recordings, each with its title and (optionally) its own picture.
-import { MAX_BATCH } from '#shared/utils/audioVideo'
-import { numberTitles, replaceInTitles, TITLE_PATTERNS, titlePatternProblem } from '#shared/utils/audioVideoExtras'
+import { numberTitles, replaceInTitles, sanitizeTitleNumbering, TITLE_PATTERNS, titlePatternProblem, titleTwins } from '#shared/utils/audioVideoExtras'
+import { describeParts, MAX_BATCH } from '#shared/utils/audioVideo'
+import { dropIndex } from '#shared/utils/reorder'
 const {
   maxUploadMb,
   items,
@@ -230,6 +290,11 @@ const {
   retryItem,
   removeItem,
   moveItem,
+  moveItemTo,
+  partLengthsOf,
+  loadPrefs,
+  appValue,
+  setApp,
   hasTracks,
   orderItems,
   numberItemTitles,
@@ -262,7 +327,61 @@ const example = computed(() =>
 function applyNumbers() {
   numberItemTitles(pattern.value, start.value)
   numberOpen.value = false
+  // Kept with the user's preferences: the same pattern next time, carrying on after the last number used (a series in batches).
+  setApp(NUMBERING_KEY, { pattern: pattern.value, start: start.value + titled.value.length })
 }
+const NUMBERING_KEY = 'audioVideoTitleNumbering'
+// The start put back from last time, so the field can say where it came from (until it's changed).
+const keptStart = ref<number | null>(null)
+const carriedOn = computed(() => keptStart.value !== null && keptStart.value > 1 && numberStart.value === keptStart.value)
+onMounted(async () => {
+  await loadPrefs()
+  const kept = sanitizeTitleNumbering(appValue<unknown>(NUMBERING_KEY, null))
+  if (!kept) return
+  pattern.value = kept.pattern
+  numberStart.value = kept.start
+  keptStart.value = kept.start
+})
+
+// ── Drag to reorder (the arrow buttons do the same from the keyboard) ────────
+const dragId = ref<number | null>(null)
+const overIndex = ref<number | null>(null)
+const overHalf = ref<'before' | 'after'>('before')
+function onRowDragStart(event: DragEvent, id: number) {
+  dragId.value = id
+  if (event.dataTransfer) {
+    event.dataTransfer.effectAllowed = 'move'
+    event.dataTransfer.setData('text/plain', String(id)) // Firefox won't start a drag without data
+    // Show the whole row being dragged, not just the grip.
+    const row = (event.currentTarget as HTMLElement).closest('li')
+    if (row) event.dataTransfer.setDragImage(row, 16, 16)
+  }
+}
+function onRowDragOver(event: DragEvent, index: number) {
+  if (dragId.value === null) return
+  event.preventDefault() // marks the row as a drop target
+  const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()
+  overIndex.value = index
+  overHalf.value = event.clientY < rect.top + rect.height / 2 ? 'before' : 'after'
+}
+function clearDrag() {
+  dragId.value = null
+  overIndex.value = null
+}
+function onRowDrop() {
+  const from = items.value.findIndex((i) => i.id === dragId.value)
+  if (from >= 0 && overIndex.value !== null) moveItemTo(from, dropIndex(from, overIndex.value, overHalf.value))
+  clearDrag()
+}
+/** Where to draw the drop line on row `i`: only when dropping there would actually move the file. */
+function dropLine(i: number): 'before' | 'after' | null {
+  if (dragId.value === null || overIndex.value !== i) return null
+  const from = items.value.findIndex((x) => x.id === dragId.value)
+  return dropIndex(from, i, overHalf.value) === from ? null : overHalf.value
+}
+
+// Recordings whose titles read the same as another's (failed uploads have no title field, so they don't count).
+const twins = computed(() => titleTwins(items.value.map((i) => (i.status === 'error' ? '' : i.title))))
 
 // "Find and replace": across every title at once, counted before it is applied.
 const toast = useToast()

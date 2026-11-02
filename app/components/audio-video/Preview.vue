@@ -1,7 +1,9 @@
 <template>
-  <aside class="lg:col-span-2 lg:sticky lg:top-4 space-y-2" aria-label="Preview">
+  <aside id="preview" class="scroll-mt-4 lg:col-span-2 lg:sticky lg:top-4 space-y-2" aria-label="Preview">
     <div class="flex items-center justify-between gap-2">
       <p class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Preview</p>
+      <!-- On a phone the preview comes after every step: a way back to the look -->
+      <UButton class="mr-auto lg:hidden" size="xs" color="neutral" variant="ghost" icon="i-lucide-arrow-up" @click="scrollToStep(2)">Back to the look</UButton>
       <!-- Several recordings: choose which one's title, own picture and length the preview shows -->
       <USelect
         v-if="readyItems.length > 1"
@@ -39,8 +41,16 @@
       >
         {{ previewTitle }}
       </p>
-      <div v-else class="absolute inset-0 flex items-center justify-center">
-        <UIcon name="i-lucide-audio-lines" class="h-12 w-12" :class="darkBackground ? 'text-white/40' : 'text-black/30'" />
+      <!-- Nothing drawn on the colour yet: say so, rather than show a waveform the video won't have -->
+      <div
+        v-else-if="plainFrame"
+        class="absolute inset-0 flex flex-col items-center justify-center gap-2 p-4 text-center"
+        :class="darkBackground ? 'text-white/70' : 'text-black/60'"
+        data-testid="preview-plain"
+      >
+        <UIcon name="i-lucide-image-off" class="size-8 opacity-60" />
+        <p class="max-w-56 text-xs">Just the background colour — add pictures, a waveform or the title.</p>
+        <UButton size="xs" color="neutral" variant="solid" icon="i-lucide-type" @click="titleCard = true">Write the title</UButton>
       </div>
       <!-- A moving sketch of the chosen style, so the look and placement can be judged -->
       <!-- The gradient as a second copy in the second colour, faded in from the left; the glow as a soft shadow -->
@@ -189,8 +199,13 @@ const {
   outro,
   music,
   hearWithMusic,
-  hearingMix
+  hearingMix,
+  scrollToStep
 } = useAudioToVideoFormContext()
+// The video would be the background colour alone: no picture, title, waveform, strip or logo.
+const plainFrame = computed(
+  () => !previewOwnCover.value && !shownSlide.value && !titleCard.value && waveform.value === 'NONE' && !stripText.value.trim() && !logoUrl.value
+)
 
 // Showing a card in the frame, by choice (it goes when its text is cleared).
 const showCard = ref<'intro' | 'outro' | null>(null)

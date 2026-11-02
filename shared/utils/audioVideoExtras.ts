@@ -222,6 +222,15 @@ export function titlePatternProblem(pattern: string): string | null {
   return null
 }
 
+/** A remembered "Number the titles" choice, or null when what was kept can't be used. */
+export function sanitizeTitleNumbering(raw: unknown): { pattern: string; start: number } | null {
+  if (!raw || typeof raw !== 'object') return null
+  const { pattern, start } = raw as Record<string, unknown>
+  if (typeof pattern !== 'string' || pattern.length > MAX_VIDEO_TITLE || titlePatternProblem(pattern)) return null
+  const n = typeof start === 'number' && Number.isFinite(start) ? Math.max(0, Math.min(9999, Math.round(start))) : 1
+  return { pattern, start: n }
+}
+
 const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 /** A leading "01 ", "3. " or "12 - ", as file names numbered for sorting have. */
 const LEADING_NUMBER = /^\d{1,3}(?:\s*[-–—.:)_]\s*|\s+)(?=\S)/
@@ -274,4 +283,17 @@ export function replaceInTitles(titles: string[], find: string, replace: string,
     return next
   })
   return { titles: out, changed }
+}
+
+/**
+ * For each title, the index of the first other title that reads the same (case and spacing aside), or null: such
+ * videos would be hard to tell apart in a list. Empty titles are left out (they're reported as missing instead).
+ */
+export function titleTwins(titles: string[]): (number | null)[] {
+  const keys = titles.map((t) => t.replace(/\s+/g, ' ').trim().toLowerCase())
+  return keys.map((k, i) => {
+    if (!k) return null
+    const j = keys.findIndex((other, at) => at !== i && other === k)
+    return j === -1 ? null : j
+  })
 }

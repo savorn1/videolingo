@@ -75,11 +75,16 @@ export function formatDateTime(value: string | null | undefined): string {
 // right whenever the browser and backend share a timezone; appending 'Z'
 // made everything within the server's UTC offset (7h here) read "just now".
 // A future-dated value (clock skew) also reads "just now" rather than "-3m ago".
-export function formatRelativeTime(value: string | null | undefined): string {
-  if (!value) return '—'
+export function serverTimeMs(value: string | null | undefined): number | null {
+  if (!value) return null
   const hasZone = /(Z|[+-]\d{2}:?\d{2})$/.test(value)
   const then = new Date(hasZone ? value : value.replace(' ', 'T')).getTime()
-  if (Number.isNaN(then)) return '—'
+  return Number.isNaN(then) ? null : then
+}
+
+export function formatRelativeTime(value: string | null | undefined): string {
+  const then = serverTimeMs(value)
+  if (then == null) return '—'
   const diffMs = Date.now() - then
   const diffSeconds = Math.round(diffMs / 1000)
   if (diffSeconds < 45) return 'just now'
@@ -94,10 +99,8 @@ export function formatRelativeTime(value: string | null | undefined): string {
 
 /** How long until a future time ("in 3d", "in 5h", "in 12m"), e.g. an expiry. Past or imminent: "soon". */
 export function formatTimeUntil(value: string | null | undefined): string {
-  if (!value) return '—'
-  const hasZone = /(Z|[+-]\d{2}:?\d{2})$/.test(value)
-  const then = new Date(hasZone ? value : value.replace(' ', 'T')).getTime()
-  if (Number.isNaN(then)) return '—'
+  const then = serverTimeMs(value)
+  if (then == null) return '—'
   const minutes = Math.round((then - Date.now()) / 60_000)
   if (minutes < 1) return 'soon'
   if (minutes < 60) return `in ${minutes}m`

@@ -13,6 +13,7 @@ import {
   audioFileProblem,
   clampPartMinutes,
   estimatedParts,
+  estimatedPartSeconds,
   frameSizeLabel,
   freshFiles,
   partTitle,
@@ -40,6 +41,7 @@ import {
 } from '#shared/utils/audioVideo'
 import { uploadToStorage, UploadInterruptedError, type ResumableUpload } from '~/composables/useVideos'
 import { formatTimecode, parseTimecode } from '#shared/utils/transport'
+import { moveItem as moveInList } from '#shared/utils/reorder'
 import { MAX_SLIDES, nextSlideStart, slideIndexAt, slideProblem, slidesBeyond, spreadEvenly, swapContents } from '#shared/utils/slides'
 import {
   cardRequest,
@@ -213,6 +215,8 @@ export function useAudioToVideoForm() {
     return ''
   })
   const partsOf = (i: Item) => (chapters.value ? estimatedParts(i.durationSeconds, partMinutes.value) : 1)
+  /** The likely length of each part a long recording is split into (empty when it stays one video). */
+  const partLengthsOf = (i: Item) => (partsOf(i) > 1 ? estimatedPartSeconds(i.durationSeconds, partMinutes.value) : [])
   const longItems = computed(() => readyItems.value.filter((i) => partsOf(i) > 1).length)
   /** Videos that will be made: one per recording, or its parts when long recordings are split (an estimate — pauses can move it by one). */
   const videoCount = computed(() => readyItems.value.reduce((n, i) => n + partsOf(i), 0))
@@ -670,6 +674,10 @@ export function useAudioToVideoForm() {
     const next = [...items.value]
     ;[next[index], next[j]] = [next[j]!, next[index]!]
     items.value = next
+  }
+  /** Drag to reorder: the file at `from` ends up at `to`. */
+  function moveItemTo(from: number, to: number) {
+    items.value = moveInList(items.value, from, to)
   }
   /** Find and replace across every title; returns how many changed. */
   function replaceItemTitles(find: string, replace: string, matchCase: boolean) {
@@ -1259,6 +1267,7 @@ export function useAudioToVideoForm() {
     stripOnTop,
     subtitleClash,
     partsOf,
+    partLengthsOf,
     longItems,
     videoCount,
     videoCountLabel,
@@ -1321,6 +1330,7 @@ export function useAudioToVideoForm() {
     retryItem,
     removeItem,
     moveItem,
+    moveItemTo,
     hasTracks,
     orderItems,
     numberItemTitles,

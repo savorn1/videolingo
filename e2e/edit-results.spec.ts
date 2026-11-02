@@ -14,6 +14,8 @@ test('results of several videos are listed and can become new videos together', 
   await expect(list).toContainText('Trim · 0:00 – 0:05')
   await expect(list).toContainText('Segment 2')
   await expect(list).toContainText('Old lesson')
+  // The two past their expiry are flagged; the sound file, with two days left, is not.
+  await expect(list.getByTestId('expires-soon')).toHaveCount(2)
   // A sound file can only be downloaded, so "Select all" leaves it out.
   await page.getByRole('checkbox', { name: 'Select all' }).click()
   await expect(page.getByText('2 selected')).toBeVisible()

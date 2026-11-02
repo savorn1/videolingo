@@ -129,7 +129,8 @@
           </p>
           <div
             class="absolute top-2 right-2 z-20 flex items-center gap-0.5 rounded-md bg-black/70 px-1 py-0.5 text-white transition-opacity"
-            :class="zoom > 1 ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'"
+            :class="zoom > 1 ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 [@media(hover:none)]:opacity-100'"
+            data-testid="zoom-tools"
           >
             <button
               type="button"
@@ -205,7 +206,7 @@
           <UIcon name="i-lucide-keyboard" class="w-3 h-3 inline align-text-top" /> {{ tabKeysHint }}
         </p>
         <p v-if="!stageFullscreen" class="text-xs text-gray-500 dark:text-gray-400 [@media(pointer:coarse)]:hidden">
-          Drag on the video to crop · scroll over it to zoom · more shortcuts under
+          Drag on the video to crop · scroll over it to zoom · <UKbd value="1" />–<UKbd value="5" /> switch tools · more shortcuts under
           <UIcon name="i-lucide-keyboard" class="w-3 h-3 inline align-text-top" /> above, or press <UKbd value="?" />
         </p>
       </div>

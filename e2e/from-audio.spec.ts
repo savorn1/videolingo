@@ -312,3 +312,86 @@ test('The waveform templates show two rows, and Show all opens the rest', async 
   await templates.getByRole('button', { name: 'Show fewer' }).click()
   await expect(templates.getByRole('button', { name: /Lavender/ })).toHaveAttribute('aria-pressed', 'true')
 })
+
+test('V38: two recordings with the same title are pointed out, but can still be made', async ({ page }) => {
+  await openReady(page, '/videos/from-audio')
+  await page.getByLabel('Choose audio files').setInputFiles([wavFile('a.wav'), wavFile('b.wav')])
+  await expect(page.getByText('Uploaded')).toHaveCount(2)
+  await expect(page.getByTestId('same-title')).toHaveCount(0)
+  await page.getByLabel('Title for b.wav').fill(' a ')
+  await expect(page.getByTestId('same-title')).toHaveCount(2)
+  await expect(page.getByTestId('same-title').first()).toContainText('Same title as recording 2')
+  // "Number the titles" from the warning makes them differ.
+  await page.getByTestId('same-title').first().getByRole('button', { name: 'Number the titles' }).click()
+  await page
+    .getByTestId('number-titles')
+    .getByRole('button', { name: /^Number 2 titles$/ })
+    .click()
+  await expect(page.getByTestId('same-title')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Make 2 videos' })).toBeEnabled()
+})
+
+test('V1: a file can be dragged to a new place by its grip', async ({ page }) => {
+  await openReady(page, '/videos/from-audio')
+  await page.getByLabel('Choose audio files').setInputFiles([wavFile('a.wav'), wavFile('b.wav'), wavFile('c.wav')])
+  await expect(page.getByText('Uploaded')).toHaveCount(3)
+  // c.wav's grip onto the top half of the first row
+  await page
+    .getByTestId('recording-2')
+    .getByTestId('drag-grip')
+    .dragTo(page.getByTestId('recording-0'), { targetPosition: { x: 40, y: 4 } })
+  await expect(page.getByTestId('recording-0')).toContainText('c.wav')
+  await page.getByRole('button', { name: 'Make 3 videos' }).click()
+  await expect(page).toHaveURL(/\/videos\/made/)
+  const titles = (await mockRequests()).filter((r) => r.path === '/api/admin/videos/from-audio').map((r) => r.body.title)
+  expect(titles).toEqual(['C', 'A', 'B'])
+})
+
+test('V39: a long recording says how long each part will be', async ({ page }) => {
+  await openReady(page, '/videos/from-audio')
+  await page.getByLabel('Choose audio files').setInputFiles(wavFile('talk.wav', 5 * 60))
+  await expect(page.getByText('Uploaded')).toBeVisible()
+  await expect(page.getByTestId('part-lengths')).toHaveCount(0)
+  await page.getByRole('switch', { name: 'Split long recordings into parts' }).click()
+  const minutes = page.getByLabel('Minutes per part')
+  await minutes.fill('2')
+  await minutes.blur()
+  await expect(page.getByTestId('part-lengths')).toHaveText(/about 2 videos: 2:00 \+ 3:00/)
+})
+
+test('V40: the numbering pattern is kept, carrying on after the last number', async ({ page }) => {
+  await openReady(page, '/videos/from-audio')
+  await page.getByLabel('Choose audio files').setInputFiles([wavFile('a.wav'), wavFile('b.wav')])
+  await expect(page.getByText('Uploaded')).toHaveCount(2)
+  await page.getByRole('button', { name: 'Number the titles' }).click()
+  await page.getByTestId('number-titles').getByRole('button', { name: 'Lesson {nn} — {title}' }).click()
+  await page
+    .getByTestId('number-titles')
+    .getByRole('button', { name: /^Number 2 titles$/ })
+    .click()
+  await expect(page.getByLabel('Title for a.wav')).toHaveValue('Lesson 01 — A')
+  await expect
+    .poll(async () => (await mockRequests()).filter((r) => r.path === '/api/me/preferences' && r.method === 'PUT').at(-1)?.body?.app?.audioVideoTitleNumbering)
+    .toEqual({ pattern: 'Lesson {nn} — {title}', start: 3 })
+})
+
+test('V42: an empty frame says so, and the transcribe hint opens the languages', async ({ page }) => {
+  await openReady(page, '/videos/from-audio')
+  const plain = page.getByTestId('preview-plain')
+  await expect(plain).toContainText('Just the background colour')
+  await plain.getByRole('button', { name: 'Write the title' }).click()
+  await expect(plain).toHaveCount(0)
+  await expect(page.getByRole('switch', { name: 'Write the title on the picture' })).toBeChecked()
+
+  await page.getByRole('button', { name: 'Choose the spoken language first' }).click()
+  await expect(page.getByPlaceholder('Search languages…')).toBeVisible()
+})
+
+test('V43: on a phone, the look and the preview are a tap apart', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await openReady(page, '/videos/from-audio')
+  await page.locator('#step-2').getByRole('button', { name: 'Preview' }).click()
+  await expect(page.locator('#preview')).toBeInViewport()
+  await page.getByRole('button', { name: 'Back to the look' }).click()
+  await expect(page.locator('#step-2').getByRole('heading', { name: /The look/ })).toBeInViewport()
+})

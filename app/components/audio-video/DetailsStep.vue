@@ -8,6 +8,7 @@
         <UFormField label="Spoken language" :error="errors.language">
           <USelectMenu
             v-model="language"
+            v-model:open="languageOpen"
             :items="languageItems"
             value-key="value"
             placeholder="Not set"
@@ -39,12 +40,12 @@
           />
         </UFormField>
       </div>
-      <USwitch
-        v-model="transcribe"
-        :disabled="!language"
-        label="Transcribe when ready"
-        :description="language ? 'Makes a transcript of each video once it is finished.' : 'Choose the spoken language first.'"
-      />
+      <USwitch v-model="transcribe" :disabled="!language" label="Transcribe when ready" description="Makes a transcript of each video once it is finished.">
+        <!-- Off until there's a language: a way straight to it -->
+        <template v-if="!language" #description>
+          <UButton size="xs" color="primary" variant="link" class="p-0" @click="languageOpen = true">Choose the spoken language first</UButton>
+        </template>
+      </USwitch>
       <div v-if="transcribe" class="space-y-2 pl-11" data-testid="burn-subtitles">
         <USwitch
           v-model="burnSubtitles"
@@ -207,6 +208,8 @@ const {
   scheduleStart,
   scheduleStep
 } = useAudioToVideoFormContext()
+// The language list, opened from the transcribe switch's hint.
+const languageOpen = ref(false)
 // Any language but the spoken one.
 const secondLanguageItems = computed(() => [{ label: 'None', value: undefined }, ...languageItems.value.filter((o) => o.value && o.value !== language.value)])
 </script>

@@ -5,6 +5,8 @@ import {
   clampPartMinutes,
   defaultWaveHeight,
   estimatedParts,
+  estimatedPartSeconds,
+  describeParts,
   frameSizeLabel,
   partTitle,
   recordingSlides,
@@ -374,5 +376,24 @@ describe('freshFiles', () => {
       { name: 'a.mp3', size: 11 }
     ])
     expect(duplicates).toEqual(['a.mp3', 'b.mp3'])
+  })
+})
+
+describe('estimatedPartSeconds', () => {
+  it('gives whole parts, then what is left', () => {
+    expect(estimatedPartSeconds(26 * 60, 10)).toEqual([600, 600, 360])
+    expect(estimatedPartSeconds(24 * 60, 10)).toEqual([600, 840])
+    expect(estimatedPartSeconds(14 * 60, 10)).toEqual([840])
+    expect(estimatedPartSeconds(null, 10)).toEqual([])
+  })
+  it('agrees with estimatedParts', () => {
+    for (const min of [1, 14, 15.1, 26, 40, 125]) expect(estimatedPartSeconds(min * 60, 10).length).toBe(estimatedParts(min * 60, 10))
+  })
+})
+
+describe('describeParts', () => {
+  it('lists a few parts, and sums up many', () => {
+    expect(describeParts([600, 600, 450.4])).toBe('10:00 + 10:00 + 7:30')
+    expect(describeParts([600, 600, 600, 600, 600, 450])).toBe('10:00 each, the last 7:30')
   })
 })

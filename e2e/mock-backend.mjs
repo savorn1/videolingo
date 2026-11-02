@@ -289,7 +289,12 @@ function route(method, path, body, query = new URLSearchParams()) {
     })
     return ok([
       { videoId: 7, videoTitle: 'Sample lesson', videoDeleted: false, clip: clip(301, 'TRIM') },
-      { videoId: 7, videoTitle: 'Sample lesson', videoDeleted: false, clip: clip(302, 'EXTRACT', { summary: 'MP3' }) },
+      {
+        videoId: 7,
+        videoTitle: 'Sample lesson',
+        videoDeleted: false,
+        clip: clip(302, 'EXTRACT', { summary: 'MP3', expiresAt: new Date(Date.now() + 48 * 3600e3).toISOString() })
+      },
       { videoId: 8, videoTitle: 'Old lesson', videoDeleted: false, clip: clip(303, 'SPLIT', { segmentIndex: 1 }) }
     ])
   }
@@ -434,7 +439,8 @@ function route(method, path, body, query = new URLSearchParams()) {
   // Archive, unarchive and restore answer with the video as it is afterwards (for "Undo" on the toast).
   const flip = /^\/api\/admin\/videos\/(\d+)\/(archive|unarchive|restore)$/.exec(path)
   if (method === 'POST' && flip) return ok({ ...video(Number(flip[1])), archived: flip[2] === 'archive', deleted: false })
-  if (method === 'GET' && /^\/api\/admin\/videos\/\d+\/edits$/.test(path)) return ok({ clips: [], jobs: [] })
+  // The editor's waiting results and recent edit jobs: none, unless a test sets `edits: { clips, jobs }`.
+  if (method === 'GET' && /^\/api\/admin\/videos\/\d+\/edits$/.test(path)) return ok(config.edits ?? { clips: [], jobs: [] })
   if (method === 'POST' && /^\/api\/admin\/videos\/\d+\/edits\/(trim|split|audio|overlay|cut)$/.test(path)) {
     return ok({
       id: 100 + requests.length,

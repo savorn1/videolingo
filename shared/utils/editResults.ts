@@ -1,6 +1,6 @@
 // Edit results — what a finished edit job made, kept until promoted, discarded or expired — named the same way in
 // the editor's Results and on the Edit results page (every video's results at once).
-import { formatDuration } from './format'
+import { formatDuration, serverTimeMs } from './format'
 
 export type ResultOperation = 'TRIM' | 'SPLIT' | 'AUDIO' | 'EXTRACT' | 'OVERLAY' | 'SAMPLE'
 
@@ -16,6 +16,15 @@ export const CLIP_OPERATION_ICONS: Record<ResultOperation, string> = {
 /** Results that can only be looked at or downloaded, never made into a video: extracted audio and test renders. */
 export function downloadOnly(operation: ResultOperation): boolean {
   return operation === 'EXTRACT' || operation === 'SAMPLE'
+}
+
+/** A result this close to its expiry is flagged, so it gets kept or discarded before it's gone (results last 72 h). */
+export const EXPIRES_SOON_MS = 12 * 60 * 60 * 1000
+
+/** True when a result expires within EXPIRES_SOON_MS (or is already past it). */
+export function expiresSoon(expiresAt: string | null | undefined, now = Date.now()): boolean {
+  const at = serverTimeMs(expiresAt)
+  return at != null && at - now < EXPIRES_SOON_MS
 }
 
 const short = (ms: number) => formatDuration(Math.round(ms / 1000))

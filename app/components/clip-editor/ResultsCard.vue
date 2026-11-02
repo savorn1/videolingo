@@ -60,7 +60,7 @@
       v-if="!visibleJobs.length && !data?.clips.length"
       icon="i-lucide-clapperboard"
       title="Nothing yet"
-      description="Start a trim, split or audio edit — the results appear here to preview, then replace the original or add as new videos."
+      description="Start a trim, split, audio or text edit — the results appear here to preview, then replace the original or add as new videos."
       class="py-6"
     />
 
@@ -76,16 +76,20 @@
     </div>
 
     <ul v-if="data?.clips.length" class="divide-y divide-gray-100 dark:divide-gray-800 rounded-lg border border-gray-200 dark:border-gray-800">
-      <li v-for="clip in data.clips" :key="clip.id" class="flex items-center gap-3 px-3 py-2" :class="freshClipIds.includes(clip.id) ? 'result-in' : ''">
+      <li
+        v-for="clip in data.clips"
+        :key="clip.id"
+        class="flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2"
+        :class="freshClipIds.includes(clip.id) ? 'result-in' : ''"
+      >
         <UCheckbox
           v-if="canWrite && selectableClips.length > 1 && !downloadOnly(clip.operation)"
           :model-value="pickedClipIds.includes(clip.id)"
           :aria-label="`Select ${clipTitle(clip)}`"
           @update:model-value="(v: boolean | 'indeterminate') => pickClip(clip.id, v === true)"
         />
-        <span
-          class="flex items-center justify-center w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300 shrink-0"
-        >
+        <!-- In the colour of the tab that made it -->
+        <span class="flex size-8 shrink-0 items-center justify-center rounded-full" :class="TAB_ACCENTS[RESULT_TAB[clip.operation] ?? 'audio'].soft">
           <UIcon :name="CLIP_ICONS[clip.operation]" class="w-4 h-4" />
         </span>
         <div class="min-w-0 flex-1">
@@ -95,32 +99,54 @@
             {{ formatFileSize(clip.sizeBytes) }}
             <template v-if="clip.crop"> · cropped {{ clip.crop.w }}×{{ clip.crop.h }}</template>
             <template v-if="clip.scale"> · resized {{ clip.scale.w }}×{{ clip.scale.h }}</template>
-            · expires {{ formatTimeUntil(clip.expiresAt) }}
+            ·
+            <span
+              :class="expiresSoon(clip.expiresAt) ? 'inline-flex items-center gap-0.5 font-medium text-amber-700 dark:text-amber-400' : ''"
+              :title="expiresSoon(clip.expiresAt) ? 'Keep it or discard it soon — results are deleted when they expire' : undefined"
+              :data-testid="expiresSoon(clip.expiresAt) ? 'expires-soon' : undefined"
+              ><UIcon v-if="expiresSoon(clip.expiresAt)" name="i-lucide-clock-alert" class="size-3" />expires {{ formatTimeUntil(clip.expiresAt) }}</span
+            >
           </p>
           <audio v-if="clip.operation === 'EXTRACT'" :src="clip.url" controls preload="none" class="mt-1 h-8 w-full max-w-sm" />
         </div>
-        <template v-if="clip.operation === 'EXTRACT'">
-          <UButton size="xs" color="primary" variant="soft" icon="i-lucide-download" :href="clip.url" download>Download</UButton>
-        </template>
-        <template v-else-if="clip.operation === 'SAMPLE'">
-          <UButton size="xs" color="neutral" variant="soft" icon="i-lucide-play" @click="previewClip = clip">Preview</UButton>
-          <UButton size="xs" color="neutral" variant="ghost" icon="i-lucide-download" :href="clip.url" download>Download</UButton>
-        </template>
-        <template v-else>
-          <UButton size="xs" color="neutral" variant="soft" icon="i-lucide-play" @click="previewClip = clip">Preview</UButton>
-          <UButton v-if="video.videoUrl" size="xs" color="neutral" variant="ghost" icon="i-lucide-columns-2" @click="compareClip = clip">Compare</UButton>
-          <template v-if="canWrite">
-            <!-- A trim, audio or overlay result can be kept as a separate video, leaving the original as it is -->
-            <!-- The safe choice is the solid button; replacing (which asks to confirm) is the quieter one. -->
-            <UButton v-if="replaces(clip)" size="xs" color="neutral" :class="TAB_ACCENTS.audio.button" icon="i-lucide-copy-plus" @click="openAsNew(clip)"
-              >Add as new video</UButton
-            >
-            <UButton size="xs" :color="replaces(clip) ? 'warning' : 'primary'" :variant="replaces(clip) ? 'soft' : 'solid'" @click="confirmPromote = clip">
-              {{ replaces(clip) ? 'Replace original' : 'Add as new video' }}
-            </UButton>
+        <div class="flex shrink-0 flex-wrap items-center justify-end gap-1">
+          <template v-if="clip.operation === 'EXTRACT'">
+            <UButton size="xs" color="primary" variant="soft" icon="i-lucide-download" :href="clip.url" download>Download</UButton>
           </template>
-        </template>
-        <UButton v-if="canWrite" size="xs" color="error" variant="ghost" icon="i-lucide-trash-2" aria-label="Discard clip" @click="confirmDiscardClip = clip" />
+          <template v-else-if="clip.operation === 'SAMPLE'">
+            <UButton size="xs" color="neutral" variant="soft" icon="i-lucide-play" @click="previewClip = clip">Preview</UButton>
+            <UButton size="xs" color="neutral" variant="ghost" icon="i-lucide-download" :href="clip.url" download>Download</UButton>
+          </template>
+          <template v-else>
+            <UButton size="xs" color="neutral" variant="soft" icon="i-lucide-play" @click="previewClip = clip">Preview</UButton>
+            <UButton v-if="video.videoUrl" size="xs" color="neutral" variant="ghost" icon="i-lucide-columns-2" @click="compareClip = clip">Compare</UButton>
+            <template v-if="canWrite">
+              <!-- A trim, audio or overlay result can be kept as a separate video, leaving the original as it is -->
+              <!-- The safe choice is the solid button; replacing (which asks to confirm) is the quieter one. -->
+              <!-- (A split part can only become a new video, after a confirm.) -->
+              <UButton
+                size="xs"
+                color="neutral"
+                :class="TAB_ACCENTS.audio.button"
+                icon="i-lucide-copy-plus"
+                @click="replaces(clip) ? openAsNew(clip) : (confirmPromote = clip)"
+                >Add as new video</UButton
+              >
+              <UButton v-if="replaces(clip)" size="xs" color="warning" variant="soft" icon="i-lucide-replace" @click="confirmPromote = clip"
+                >Replace original</UButton
+              >
+            </template>
+          </template>
+          <UButton
+            v-if="canWrite"
+            size="xs"
+            color="error"
+            variant="ghost"
+            icon="i-lucide-trash-2"
+            aria-label="Discard clip"
+            @click="confirmDiscardClip = clip"
+          />
+        </div>
       </li>
     </ul>
   </UCard>
@@ -128,9 +154,9 @@
 
 <script setup lang="ts">
 // The editor's Results: jobs in progress (or the latest failure), then clips to preview, keep or discard.
-import { TAB_ACCENTS } from '#shared/utils/tabAccent'
+import { RESULT_TAB, TAB_ACCENTS } from '#shared/utils/tabAccent'
 import { formatFileSize, formatTimeUntil } from '#shared/utils/format'
-import { downloadOnly } from '#shared/utils/editResults'
+import { downloadOnly, expiresSoon } from '#shared/utils/editResults'
 const {
   data,
   freshClipIds,

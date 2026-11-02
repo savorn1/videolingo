@@ -32,6 +32,9 @@ export interface TabAccent {
 /** The header's tools, which act on the whole video whatever tab is open (Thumbnail, Brand kit, Recipes). */
 export const EDITOR_TOOL_TONE = 'bg-amber-50 text-amber-800 hover:bg-amber-100 dark:bg-amber-950/50 dark:text-amber-300 dark:hover:bg-amber-900/60'
 
+/** The tab each kind of result comes from, so Results shows it in that tab's colour. */
+export const RESULT_TAB: Record<string, EditorTab> = { TRIM: 'trim', SAMPLE: 'trim', SPLIT: 'split', AUDIO: 'audio', EXTRACT: 'audio', OVERLAY: 'overlay' }
+
 const BUTTON_BASE = 'text-white disabled:bg-gray-200 disabled:text-gray-400 dark:text-gray-950 dark:disabled:bg-gray-800 dark:disabled:text-gray-500'
 
 export const TAB_ACCENTS: Record<EditorTab, TabAccent> = {

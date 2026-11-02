@@ -65,7 +65,13 @@
             </p>
             <p class="text-xs text-gray-500 dark:text-gray-400">
               <template v-if="r.clip.summary">{{ r.clip.summary }} · </template>{{ formatFileSize(r.clip.sizeBytes) }} · made
-              {{ formatRelativeTime(r.clip.createdAt) }} · expires {{ formatTimeUntil(r.clip.expiresAt) }}
+              {{ formatRelativeTime(r.clip.createdAt) }} ·
+              <span
+                :class="expiresSoon(r.clip.expiresAt) ? 'inline-flex items-center gap-0.5 font-medium text-amber-700 dark:text-amber-400' : ''"
+                :title="expiresSoon(r.clip.expiresAt) ? 'Keep it or discard it soon — results are deleted when they expire' : undefined"
+                :data-testid="expiresSoon(r.clip.expiresAt) ? 'expires-soon' : undefined"
+                ><UIcon v-if="expiresSoon(r.clip.expiresAt)" name="i-lucide-clock-alert" class="size-3" />expires {{ formatTimeUntil(r.clip.expiresAt) }}</span
+              >
             </p>
           </div>
           <div class="flex shrink-0 items-center gap-1">
@@ -117,7 +123,7 @@
 // Every edit result still kept, across all videos (VideoEditService.allResults), so they can be reviewed in one
 // place: preview, add as new videos (several at once), discard, or open the video's editor to replace the original.
 import type { EditResultRow } from '~/composables/useVideoEdits'
-import { CLIP_OPERATION_ICONS, clipLabel, promotableAsNew } from '#shared/utils/editResults'
+import { CLIP_OPERATION_ICONS, clipLabel, expiresSoon, promotableAsNew } from '#shared/utils/editResults'
 import { suggestedNewTitle } from '#shared/utils/videoEdit'
 
 definePageMeta({ middleware: 'admin' })

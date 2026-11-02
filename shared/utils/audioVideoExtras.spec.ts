@@ -12,6 +12,8 @@ import {
   parseChapterList,
   replaceInTitles,
   titlePatternProblem,
+  sanitizeTitleNumbering,
+  titleTwins,
   paletteFromPixels,
   tidyChapters
 } from './audioVideoExtras'
@@ -165,5 +167,29 @@ describe('find and replace in titles', () => {
     expect(replaceInTitles(titles, '(2)', '$&!').titles[1]).toBe('Episode $&!')
     expect(replaceInTitles(['Part  one '], 'one', '')).toEqual({ titles: ['Part'], changed: 1 })
     expect(replaceInTitles(titles, '', 'x').changed).toBe(0)
+  })
+})
+
+describe('titles that read the same', () => {
+  it('points each to the first other one, case and spacing aside', () => {
+    expect(titleTwins(['Intro', 'Lesson', ' intro ', 'Lesson', 'Outro'])).toEqual([2, 3, 0, 1, null])
+    expect(titleTwins(['Lesson  one', 'lesson one'])).toEqual([1, 0])
+  })
+  it('leaves out empty titles', () => {
+    expect(titleTwins(['', ' ', 'A'])).toEqual([null, null, null])
+  })
+})
+
+describe('a remembered numbering', () => {
+  it('keeps a usable pattern and a start within 0–9999', () => {
+    expect(sanitizeTitleNumbering({ pattern: 'Episode {n}: {title}', start: 12 })).toEqual({ pattern: 'Episode {n}: {title}', start: 12 })
+    expect(sanitizeTitleNumbering({ pattern: '{nn} {title}', start: 99_999 })).toEqual({ pattern: '{nn} {title}', start: 9999 })
+    expect(sanitizeTitleNumbering({ pattern: '{n}. {title}', start: 'x' })).toEqual({ pattern: '{n}. {title}', start: 1 })
+  })
+  it('drops what cannot be used', () => {
+    expect(sanitizeTitleNumbering(null)).toBeNull()
+    expect(sanitizeTitleNumbering('Episode {n}')).toBeNull()
+    expect(sanitizeTitleNumbering({ pattern: 'no number {title}' })).toBeNull()
+    expect(sanitizeTitleNumbering({ pattern: 7 })).toBeNull()
   })
 })
