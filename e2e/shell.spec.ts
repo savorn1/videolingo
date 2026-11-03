@@ -21,6 +21,17 @@ test('g then a letter goes to that page, and ? lists the shortcuts', async ({ pa
   await expect(dialog).toContainText('Go to Profile')
 })
 
+test('an address that leads nowhere suggests the page it was probably meant to be', async ({ page }) => {
+  await page.goto('/new?sort=time')
+  // There's no settings call to wait on here, so wait for the page to come to life before clicking.
+  await page.waitForFunction(() => (document.querySelector('#__nuxt') as { __vue_app__?: unknown } | null)?.__vue_app__)
+  await expect(page.getByRole('heading', { name: 'Page not found' })).toBeVisible()
+  const nav = page.getByRole('navigation', { name: 'Did you mean' })
+  await expect(nav.getByRole('button')).toHaveText(['/videos/new'])
+  await nav.getByRole('button', { name: '/videos/new' }).click()
+  await expect(page).toHaveURL(/\/videos\/new$/)
+})
+
 test('typing in a box does not trigger the shortcuts', async ({ page }) => {
   await openReady(page, '/videos')
   const box = page.getByRole('textbox').first()

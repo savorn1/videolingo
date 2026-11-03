@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { errorCopy, tabTitle } from './errorPage'
+import { errorCopy, nearbyPages, tabTitle } from './errorPage'
 
 describe('errorCopy', () => {
   it('has plain words for the usual statuses', () => {
@@ -30,5 +30,25 @@ describe('tabTitle', () => {
     expect(tabTitle(undefined, 'VideoLingo')).toBe('VideoLingo')
     expect(tabTitle('  ', 'VideoLingo')).toBe('VideoLingo')
     expect(tabTitle('VideoLingo', 'VideoLingo')).toBe('VideoLingo')
+  })
+})
+
+describe('nearbyPages', () => {
+  const pages = ['/', '/videos', '/videos/new', '/videos/:id', '/videos/from-audio', '/learn', '/learn/cards', '/users', '/users/:id']
+  it('finds the page a word belongs to', () => {
+    expect(nearbyPages('/new?sort=time', pages)).toEqual(['/videos/new'])
+    expect(nearbyPages('/cards', pages)).toEqual(['/learn/cards'])
+  })
+  it('allows a singular for a plural', () => {
+    expect(nearbyPages('/video', pages)[0]).toBe('/videos')
+    expect(nearbyPages('/user/12', pages)).toEqual(['/users'])
+  })
+  it('suggests nothing when no word matches, and never a page with an id or the home page', () => {
+    expect(nearbyPages('/nowhere', pages)).toEqual([])
+    expect(nearbyPages('/', pages)).toEqual([])
+    expect(nearbyPages('/videos/zzz', pages, 10).some((p) => p.includes(':') || p === '/')).toBe(false)
+  })
+  it('keeps to the limit', () => {
+    expect(nearbyPages('/videos/x', pages, 2)).toHaveLength(2)
   })
 })

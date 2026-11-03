@@ -32,3 +32,21 @@ export function tabTitle(pageTitle: string | undefined | null, siteName: string)
   const t = (pageTitle ?? '').trim()
   return t && t !== siteName ? `${t} · ${siteName}` : siteName
 }
+
+/** For an address that leads nowhere, up to `max` of the app's own pages (no ":id" parts) that share a word with it,
+ *  closest first: "/new" → "/videos/new", "/video" → "/videos". The query and hash are ignored. */
+export function nearbyPages(missing: string, pages: string[], max = 3): string[] {
+  const words = (p: string) => p.split(/[?#]/)[0]!.toLowerCase().split('/').filter(Boolean)
+  const asked = words(missing)
+  if (!asked.length) return []
+  const alike = (a: string, b: string) => a === b || a === `${b}s` || b === `${a}s`
+  const scored = pages
+    .filter((p) => p !== '/' && !p.includes(':'))
+    .map((page) => {
+      const have = words(page)
+      const shared = asked.filter((w) => have.some((h) => alike(w, h))).length
+      return { page, score: shared * 10 - Math.abs(have.length - asked.length) }
+    })
+    .filter((s) => s.score > 0 && s.page !== missing.split(/[?#]/)[0])
+  return [...new Set(scored.sort((a, b) => b.score - a.score || a.page.localeCompare(b.page)).map((s) => s.page))].slice(0, max)
+}
