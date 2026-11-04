@@ -182,6 +182,18 @@ const items = computed<SidebarItem[]>(() => [
           ]
         },
         {
+          label: 'RuengFlix',
+          icon: 'i-lucide-tv',
+          color: 'orange',
+          defaultOpen: true,
+          children: [
+            { label: 'Overview', to: '/ruengflix', icon: 'i-lucide-radio' },
+            { label: 'Problem reports', to: '/ruengflix/reports', icon: 'i-lucide-flag' },
+            { label: 'Viewers', to: '/ruengflix/viewers', icon: 'i-lucide-user-round' },
+            { label: 'Prices', to: '/ruengflix/prices', icon: 'i-lucide-badge-dollar-sign' }
+          ]
+        },
+        {
           label: 'Notifications',
           icon: 'i-lucide-bell',
           color: 'sky',

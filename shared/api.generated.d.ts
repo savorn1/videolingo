@@ -1428,6 +1428,22 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/admin/videos/storage/prune-versions': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    post: operations['pruneVersions']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/api/admin/videos/merge': {
     parameters: {
       query?: never
@@ -1486,6 +1502,22 @@ export interface paths {
     get?: never
     put?: never
     post: operations['previewFromAudio']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/admin/videos/from-audio/highlight': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    post: operations['highlightFromAudio']
     delete?: never
     options?: never
     head?: never
@@ -2100,6 +2132,54 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/public/series': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get: operations['series']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/public/series/{id}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get: operations['seriesDetail']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/public/episodes/{videoId}/subtitles.vtt': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get: operations['subtitles']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/api/me/quiz-attempts': {
     parameters: {
       query?: never
@@ -2420,6 +2500,22 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/admin/videos/{videoId}/edits/scenes': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get: operations['scenes']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/api/admin/videos/{videoId}/edits/pauses': {
     parameters: {
       query?: never
@@ -2476,6 +2572,22 @@ export interface paths {
       cookie?: never
     }
     get: operations['statistics']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/admin/videos/storage': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get: operations['report_1']
     put?: never
     post?: never
     delete?: never
@@ -3389,12 +3501,34 @@ export interface components {
       createdAt?: string
       /** Format: date-time */
       updatedAt?: string
+      streaming?: components['schemas']['StreamingSettingsDto']
       /** Format: int64 */
       totalDurationSeconds?: number
       /** Format: int64 */
       trashedVideoCount?: number
       /** Format: int64 */
       disabledVideoCount?: number
+    }
+    StreamingSettingsDto: {
+      /** Format: int32 */
+      featuredRank?: number
+      enabled?: boolean
+      /** @enum {string} */
+      category?: 'CULTIVATION' | 'ROMANCE' | 'FANTASY'
+      /** @enum {string} */
+      status?: 'ONGOING' | 'COMPLETED'
+      vip?: boolean
+      /** Format: int32 */
+      freeEpisodes?: number
+      /** Format: int32 */
+      recapSeconds?: number
+      searchKeywords?: string
+      region?: string
+      /** Format: int32 */
+      releaseYear?: number
+      genres?: string[]
+      bannerUrl?: string
+      verticalUrl?: string
     }
     CardRequest: {
       front: string
@@ -4126,6 +4260,7 @@ export interface components {
       visibility: 'PUBLIC' | 'UNLISTED' | 'PRIVATE'
       /** Format: int64 */
       ownerId?: number
+      streaming?: components['schemas']['StreamingSettingsDto']
       videoIds?: number[]
     }
     UpdateSectionsRequest: {
@@ -4408,6 +4543,10 @@ export interface components {
       kind?: string
       /** Format: int64 */
       newVideoId?: number
+      /** Format: int32 */
+      markers?: number
+      /** Format: int32 */
+      transcripts?: number
     }
     BlurBox: {
       /** Format: int32 */
@@ -4492,6 +4631,11 @@ export interface components {
       /** Format: double */
       sizePct?: number
     }
+    PunchIn: {
+      /** Format: double */
+      scale?: number
+      ranges?: components['schemas']['Segment'][]
+    }
     Reframe: {
       /** Format: double */
       aspect?: number
@@ -4501,6 +4645,12 @@ export interface components {
       w?: number
       /** Format: int32 */
       h?: number
+    }
+    Segment: {
+      /** Format: int64 */
+      startMs?: number
+      /** Format: int64 */
+      endMs?: number
     }
     SpeedRange: {
       /** Format: int64 */
@@ -4540,6 +4690,12 @@ export interface components {
       zoomTo?: components['schemas']['ZoomTo']
       greenScreen?: components['schemas']['GreenScreen']
       reframe?: components['schemas']['Reframe']
+      holds?: components['schemas']['Freeze'][]
+      speeds?: components['schemas']['SpeedRange'][]
+      punchIn?: components['schemas']['PunchIn']
+      progressBar?: string
+      lutKey?: string
+      sample?: boolean
     }
     ZoomTo: {
       /** Format: double */
@@ -4597,11 +4753,8 @@ export interface components {
       /** Format: int64 */
       atMs?: number
     }
-    SegmentRange: {
-      /** Format: int64 */
-      startMs?: number
-      /** Format: int64 */
-      endMs?: number
+    SplitRequest: {
+      segments?: components['schemas']['SplitSegment'][]
     }
     SplitSegment: {
       /** Format: int64 */
@@ -4611,9 +4764,6 @@ export interface components {
       label?: string
       /** Format: double */
       aspect?: number
-    }
-    SplitRequest: {
-      segments?: components['schemas']['SplitSegment'][]
     }
     Captions: {
       /** Format: int64 */
@@ -4696,6 +4846,12 @@ export interface components {
     CutRequest: {
       cuts?: components['schemas']['SegmentRange'][]
     }
+    SegmentRange: {
+      /** Format: int64 */
+      startMs?: number
+      /** Format: int64 */
+      endMs?: number
+    }
     AudioClipInput: {
       /** Format: int64 */
       srcStartMs?: number
@@ -4729,6 +4885,15 @@ export interface components {
       music?: components['schemas']['MusicInput']
       tracks?: components['schemas']['MusicInput'][]
       keepSoundSpeed?: boolean
+      volumeCurve?: components['schemas']['PointInput'][]
+      preset?: string
+      deEss?: boolean
+    }
+    PointInput: {
+      /** Format: int64 */
+      atMs?: number
+      /** Format: double */
+      gain?: number
     }
     RangeInput: {
       /** Format: int64 */
@@ -4835,6 +5000,25 @@ export interface components {
     MultipartRef: {
       key: string
       uploadId: string
+    }
+    PruneRequest: {
+      /** Format: int32 */
+      keepLatest?: number
+      /** Format: int32 */
+      olderThanDays?: number
+    }
+    ApiResponsePruneResult: {
+      traceId?: string
+      /** Format: int32 */
+      statusCode?: number
+      message?: string
+      data?: components['schemas']['PruneResult']
+    }
+    PruneResult: {
+      /** Format: int32 */
+      removed?: number
+      /** Format: int64 */
+      freedBytes?: number
     }
     MergeVideosRequest: {
       videoIds: number[]
@@ -4949,11 +5133,6 @@ export interface components {
       position?: string
       secondLanguage?: string
     }
-    TitleCardDto: {
-      text?: string
-      /** Format: int64 */
-      durationMs?: number
-    }
     ChapterDto: {
       /** Format: int64 */
       startMs?: number
@@ -4970,6 +5149,11 @@ export interface components {
       key: string
       /** Format: int64 */
       startMs?: number
+    }
+    TitleCardDto: {
+      text?: string
+      /** Format: int64 */
+      durationMs?: number
     }
     ApiResponseAudioToVideoResponse: {
       traceId?: string
@@ -5005,6 +5189,26 @@ export interface components {
       url?: string
       /** Format: int64 */
       seconds?: number
+    }
+    HighlightRequest: {
+      audioKey: string
+      /** Format: int32 */
+      seconds?: number
+    }
+    ApiResponseHighlightResponse: {
+      traceId?: string
+      /** Format: int32 */
+      statusCode?: number
+      message?: string
+      data?: components['schemas']['HighlightResponse']
+    }
+    HighlightResponse: {
+      /** Format: int64 */
+      totalMs?: number
+      /** Format: int64 */
+      startMs?: number
+      /** Format: int64 */
+      endMs?: number
     }
     ChaptersRequest: {
       audioKey: string
@@ -5396,6 +5600,67 @@ export interface components {
       maxStrip?: number
       waveforms?: string[]
     }
+    ApiResponseListSeries: {
+      traceId?: string
+      /** Format: int32 */
+      statusCode?: number
+      message?: string
+      data?: components['schemas']['Series'][]
+    }
+    Series: {
+      /** Format: int64 */
+      id?: number
+      slug?: string
+      title?: string
+      description?: string
+      posterUrl?: string
+      bannerUrl?: string
+      verticalUrl?: string
+      /** @enum {string} */
+      category?: 'CULTIVATION' | 'ROMANCE' | 'FANTASY'
+      /** @enum {string} */
+      status?: 'ONGOING' | 'COMPLETED'
+      vip?: boolean
+      /** Format: int32 */
+      freeEpisodes?: number
+      /** Format: int32 */
+      recapSeconds?: number
+      searchKeywords?: string
+      region?: string
+      /** Format: int32 */
+      releaseYear?: number
+      genres?: string[]
+      /** Format: int32 */
+      episodes?: number
+      /** Format: date-time */
+      latestEpisodeAt?: string
+      /** Format: date-time */
+      nextEpisodeAt?: string
+    }
+    ApiResponseSeriesDetail: {
+      traceId?: string
+      /** Format: int32 */
+      statusCode?: number
+      message?: string
+      data?: components['schemas']['SeriesDetail']
+    }
+    EpisodeView: {
+      /** Format: int32 */
+      number?: number
+      /** Format: int64 */
+      videoId?: number
+      title?: string
+      /** Format: int32 */
+      durationSeconds?: number
+      thumbnailUrl?: string
+      locked?: boolean
+      videoUrl?: string
+      subtitlesUrl?: string
+    }
+    SeriesDetail: {
+      series?: components['schemas']['Series']
+      episodes?: components['schemas']['EpisodeView'][]
+    }
     ApiResponseListAttemptSummary: {
       traceId?: string
       /** Format: int32 */
@@ -5730,6 +5995,18 @@ export interface components {
       durationMs?: number
       peaks?: number[]
     }
+    ApiResponseScenes: {
+      traceId?: string
+      /** Format: int32 */
+      statusCode?: number
+      message?: string
+      data?: components['schemas']['Scenes']
+    }
+    Scenes: {
+      /** Format: int64 */
+      durationMs?: number
+      cuts?: number[]
+    }
     ApiResponsePauses: {
       traceId?: string
       /** Format: int32 */
@@ -5859,6 +6136,53 @@ export interface components {
       statusCode?: number
       message?: string
       data?: components['schemas']['NoteResponse'][]
+    }
+    ApiResponseReport: {
+      traceId?: string
+      /** Format: int32 */
+      statusCode?: number
+      message?: string
+      data?: components['schemas']['Report']
+    }
+    Report: {
+      totals?: components['schemas']['Totals']
+      /** Format: int64 */
+      totalBytes?: number
+      /** Format: int32 */
+      videoCount?: number
+      biggest?: components['schemas']['Row'][]
+    }
+    Row: {
+      /** Format: int64 */
+      videoId?: number
+      title?: string
+      deleted?: boolean
+      /** Format: int64 */
+      fileBytes?: number
+      /** Format: int32 */
+      versions?: number
+      /** Format: int64 */
+      versionBytes?: number
+      /** Format: int32 */
+      results?: number
+      /** Format: int64 */
+      resultBytes?: number
+      /** Format: int64 */
+      dubBytes?: number
+      /** Format: int64 */
+      exportBytes?: number
+    }
+    Totals: {
+      /** Format: int64 */
+      files?: number
+      /** Format: int64 */
+      versions?: number
+      /** Format: int64 */
+      results?: number
+      /** Format: int64 */
+      dubs?: number
+      /** Format: int64 */
+      exports?: number
     }
     ApiResponseListResultRow: {
       traceId?: string
@@ -9865,6 +10189,30 @@ export interface operations {
       }
     }
   }
+  pruneVersions: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['PruneRequest']
+      }
+    }
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponsePruneResult']
+        }
+      }
+    }
+  }
   merge: {
     parameters: {
       query?: never
@@ -9957,6 +10305,30 @@ export interface operations {
         }
         content: {
           '*/*': components['schemas']['ApiResponseAudioPreviewResponse']
+        }
+      }
+    }
+  }
+  highlightFromAudio: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['HighlightRequest']
+      }
+    }
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseHighlightResponse']
         }
       }
     }
@@ -11251,6 +11623,70 @@ export interface operations {
       }
     }
   }
+  series: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseListSeries']
+        }
+      }
+    }
+  }
+  seriesDetail: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseSeriesDetail']
+        }
+      }
+    }
+  }
+  subtitles: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        videoId: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': string
+        }
+      }
+    }
+  }
   attempts: {
     parameters: {
       query?: {
@@ -11710,6 +12146,30 @@ export interface operations {
       }
     }
   }
+  scenes: {
+    parameters: {
+      query?: {
+        sensitivity?: string
+      }
+      header?: never
+      path: {
+        videoId: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseScenes']
+        }
+      }
+    }
+  }
   pauses: {
     parameters: {
       query?: {
@@ -11800,6 +12260,26 @@ export interface operations {
         }
         content: {
           '*/*': components['schemas']['ApiResponseVideoStatisticsResponse']
+        }
+      }
+    }
+  }
+  report_1: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseReport']
         }
       }
     }

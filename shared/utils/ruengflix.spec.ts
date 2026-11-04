@@ -1,0 +1,59 @@
+import { describe, expect, it } from 'vitest'
+import { biggestDropOff, continuePercents, finishPercent, likePercent, playerTime, priceProblems, ruengflixUrl } from './ruengflix'
+
+describe('viewer arithmetic', () => {
+  it('finishPercent and likePercent are whole percents, null without data', () => {
+    expect(finishPercent(0, 0)).toBeNull()
+    expect(finishPercent(3, 2)).toBe(67)
+    expect(finishPercent(2, 5)).toBe(100)
+    expect(likePercent(0, 0)).toBeNull()
+    expect(likePercent(3, 1)).toBe(75)
+  })
+
+  it('continuePercents compares each finish with the next start', () => {
+    const eps = [
+      { starts: 100, completes: 80 },
+      { starts: 60, completes: 50 },
+      { starts: 45, completes: 0 },
+      { starts: 10, completes: 5 }
+    ]
+    expect(continuePercents(eps)).toEqual([75, 90, null])
+    expect(biggestDropOff(eps)).toBe(1)
+    expect(biggestDropOff([{ starts: 1, completes: 1 }])).toBeNull()
+  })
+})
+
+describe('ruengflixUrl', () => {
+  it('builds series and episode links, or null without an address', () => {
+    expect(ruengflixUrl('https://ruengflix.example/', 7)).toBe('https://ruengflix.example/detail/7')
+    expect(ruengflixUrl('https://ruengflix.example', 7, 3)).toBe('https://ruengflix.example/watch/7/3')
+    expect(ruengflixUrl('  ', 7)).toBeNull()
+  })
+})
+
+describe('playerTime', () => {
+  it('formats like a player clock', () => {
+    expect(playerTime(65)).toBe('1:05')
+    expect(playerTime(3665)).toBe('1:01:05')
+  })
+})
+
+describe('priceProblems', () => {
+  const ok = { seriesUnlockPrice: 0.49, vip1Month: 1.99, vip3Months: 4.99, vip6Months: 8.99, vip12Months: 14.99 }
+
+  it('accepts the defaults', () => {
+    expect(priceProblems(ok)).toEqual([])
+  })
+
+  it('needs every price, in range, with two decimals', () => {
+    expect(priceProblems({ ...ok, seriesUnlockPrice: null, vip1Month: -1, vip3Months: 4.999 })).toEqual([
+      'Unlock one series: enter a price.',
+      'VIP · 1 month: must be from $0 to $1,000.',
+      'VIP · 3 months: use at most two decimals.'
+    ])
+  })
+
+  it('flags a yearly plan dearer per month than the monthly one', () => {
+    expect(priceProblems({ ...ok, vip12Months: 30 })).toEqual(['The 12-month plan costs more per month than the 1-month plan.'])
+  })
+})

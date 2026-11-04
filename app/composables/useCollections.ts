@@ -2,6 +2,7 @@
 // "collections": GET = READ, everything else — incl. adding/removing videos — WRITE).
 
 import type { ApiEnvelope, PageEnvelope } from '#shared/types'
+import type { StreamingSettings } from '#shared/utils/streamingSeries'
 
 export type CollectionVisibility = 'PUBLIC' | 'UNLISTED' | 'PRIVATE'
 
@@ -21,6 +22,8 @@ export interface Collection {
   totalDurationSeconds?: number | null
   trashedVideoCount?: number | null
   disabledVideoCount?: number | null
+  /** Settings as a series on the public streaming site (RuengFlix). */
+  streaming?: StreamingSettings | null
 }
 
 export interface CollectionVideo {
@@ -62,6 +65,8 @@ export interface CollectionPayload {
   ownerId?: number
   /** Create only. */
   videoIds?: number[]
+  /** Leave out to keep the current settings (off on create). */
+  streaming?: StreamingSettings
 }
 
 export interface CollectionFilter {

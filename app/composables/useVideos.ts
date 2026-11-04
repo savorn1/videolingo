@@ -229,11 +229,11 @@ export function useVideos() {
     kind: UploadKind,
     file: File,
     opts: { onProgress?: (fraction: number) => void; signal?: AbortSignal; resume?: ResumableUpload | null } = {}
-  ): Promise<{ key: string }> {
+  ): Promise<{ key: string; publicUrl: string }> {
     if (file.size < MULTIPART_THRESHOLD) {
       const ticket = await requestUpload(kind, file)
       await uploadToStorage(ticket, file, opts.onProgress, opts.signal)
-      return { key: ticket.key }
+      return { key: ticket.key, publicUrl: ticket.publicUrl }
     }
     const state: ResumableUpload =
       opts.resume && opts.resume.size === file.size
@@ -278,7 +278,7 @@ export function useVideos() {
       throw new UploadInterruptedError(err instanceof Error ? err.message : 'The upload stopped', { ...state, done: [...done] })
     }
     await api('/api/admin/videos/uploads/multipart/complete', { method: 'POST', body: ref })
-    return { key: state.key }
+    return { key: state.key, publicUrl: state.publicUrl }
   }
 
   async function create(payload: CreateVideoPayload) {
