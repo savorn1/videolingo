@@ -88,3 +88,54 @@ export function priceProblems(values: Record<PriceKey, number | null | undefined
   }
   return problems
 }
+
+/** Coin settings (all optional: an empty one uses RuengFlix's default). Packs in dollars, the rest in coins. */
+export const COIN_PACK_FIELDS = [
+  { key: 'coinPack100', label: '100 coins', hint: 'bought with KHQR' },
+  { key: 'coinPack300', label: '300 coins', hint: '' },
+  { key: 'coinPack1000', label: '1,000 coins', hint: '' }
+] as const
+
+export const COIN_FIELDS = [
+  { key: 'episodeUnlockCoins', label: 'Unlock one VIP episode', hint: 'coins', max: 10000 },
+  { key: 'dailyCheckInCoins', label: 'Daily check-in', hint: 'coins; the 7th day in a row pays double', max: 1000 }
+] as const
+
+export type CoinPackKey = (typeof COIN_PACK_FIELDS)[number]['key']
+export type CoinKey = (typeof COIN_FIELDS)[number]['key']
+
+/** Problems with the coin settings (the backend allows packs $0.01–$1,000 and whole coin amounts). */
+export function coinProblems(values: Record<CoinPackKey | CoinKey, number | null | undefined>): string[] {
+  const problems: string[] = []
+  for (const f of COIN_PACK_FIELDS) {
+    const v = values[f.key]
+    if (v == null) continue
+    if (!Number.isFinite(v) || v < 0.01 || v > 1000) problems.push(`${f.label}: must be from $0.01 to $1,000.`)
+    else if (Math.round(v * 100) !== Math.round(v * 1000) / 10) problems.push(`${f.label}: use at most two decimals.`)
+  }
+  for (const f of COIN_FIELDS) {
+    const v = values[f.key]
+    if (v == null) continue
+    if (!Number.isInteger(v) || v < 1 || v > f.max) problems.push(`${f.label}: a whole number from 1 to ${f.max.toLocaleString('en-US')}.`)
+  }
+  return problems
+}
+
+export const ORDER_STATUS_META: Record<'PENDING' | 'PAID' | 'EXPIRED' | 'CANCELLED', { label: string; color: 'warning' | 'success' | 'neutral' | 'error' }> = {
+  PENDING: { label: 'Waiting', color: 'warning' },
+  PAID: { label: 'Paid', color: 'success' },
+  EXPIRED: { label: 'Expired', color: 'neutral' },
+  CANCELLED: { label: 'Cancelled', color: 'error' }
+}
+
+/** What an order bought: "300 coins", "VIP · 3 months", "Series: Summer love" */
+export function orderProduct(o: { kind: string; coins: number | null; months: number | null; seriesTitle: string | null }): string {
+  if (o.kind === 'COINS') return `${(o.coins ?? 0).toLocaleString('en-US')} coins`
+  if (o.kind === 'VIP') return `VIP · ${o.months ?? 0} month${o.months === 1 ? '' : 's'}`
+  return `Series: ${o.seriesTitle ?? 'deleted'}`
+}
+
+/** A retention rate as a whole percent, or "—" when nobody is in the cohort yet */
+export function retentionLabel(rate: number | null): string {
+  return rate == null ? '—' : `${Math.round(rate * 100)}%`
+}

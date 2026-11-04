@@ -115,6 +115,76 @@ export interface StreamingPrices {
   vip3Months: number
   vip6Months: number
   vip12Months: number
+  /** Coin settings: null uses RuengFlix's default */
+  coinPack100: number | null
+  coinPack300: number | null
+  coinPack1000: number | null
+  episodeUnlockCoins: number | null
+  dailyCheckInCoins: number | null
+}
+
+export type OrderStatus = 'PENDING' | 'PAID' | 'EXPIRED' | 'CANCELLED'
+
+/** A RuengFlix KHQR payment (coins, a series or VIP time) */
+export interface StreamingOrder {
+  id: number
+  viewerId: number | null
+  viewerName: string | null
+  kind: 'COINS' | 'SERIES' | 'VIP'
+  amountUsd: number
+  coins: number | null
+  seriesId: number | null
+  seriesTitle: string | null
+  months: number | null
+  status: OrderStatus
+  billNumber: string
+  createdAt: string
+  expiresAt: string
+  paidAt: string | null
+  /** "bakong" (confirmed by the bank) or the admin who confirmed it */
+  paidBy: string | null
+  bakongHash: string | null
+  note: string | null
+}
+
+export interface Paged<T> {
+  items: T[]
+  total: number
+  page: number
+  size: number
+}
+
+export interface StreamingComment {
+  id: number
+  seriesId: number
+  seriesTitle: string
+  episode: number
+  viewerId: number
+  viewerName: string
+  body: string
+  reportCount: number
+  createdAt: string
+  hiddenAt: string | null
+  hiddenBy: string | null
+}
+
+export type CommentFilter = 'reported' | 'hidden' | 'all'
+
+export interface StreamingDashboard {
+  revenue7Days: number
+  revenue30Days: number
+  pendingOrders: number
+  revenueByDay: { day: string; amountUsd: number; orders: number }[]
+  revenueByKind: { kind: 'COINS' | 'SERIES' | 'VIP'; amountUsd: number; orders: number }[]
+  topSeries: { seriesId: number; title: string; amountUsd: number; orders: number }[]
+  coinsHeld: number
+  coinsSpent30Days: number
+  vipActive: number
+  viewers: number
+  newViewers7Days: number
+  activeToday: number
+  active7Days: number
+  retention: { day: number; cohort: number; returned: number; rate: number | null }[]
 }
 
 export interface PricesView {
@@ -226,6 +296,32 @@ export function useStreaming() {
     return (await api<ApiEnvelope<ViewerAccount>>(`${base}/viewers/${id}`, { method: 'PUT', body: { disabled } })).data
   }
 
+  async function orders(opts: { status?: OrderStatus | 'all'; q?: string; page?: number; size?: number } = {}) {
+    return (await api<ApiEnvelope<Paged<StreamingOrder>>>(`${base}/orders`, { query: opts })).data
+  }
+
+  /** Confirm a payment checked in the bank app: RuengFlix delivers the coins, series or VIP time */
+  async function markOrderPaid(id: number) {
+    return (await api<ApiEnvelope<StreamingOrder>>(`${base}/orders/${id}/paid`, { method: 'POST' })).data
+  }
+
+  async function cancelOrder(id: number) {
+    return (await api<ApiEnvelope<StreamingOrder>>(`${base}/orders/${id}/cancel`, { method: 'POST' })).data
+  }
+
+  async function comments(opts: { filter?: CommentFilter; page?: number; size?: number } = {}) {
+    return (await api<ApiEnvelope<Paged<StreamingComment>>>(`${base}/comments`, { query: opts })).data
+  }
+
+  /** Showing a comment again also clears its reports */
+  async function setCommentHidden(id: number, hidden: boolean) {
+    return (await api<ApiEnvelope<StreamingComment>>(`${base}/comments/${id}`, { method: 'PUT', body: { hidden } })).data
+  }
+
+  async function dashboard() {
+    return (await api<ApiEnvelope<StreamingDashboard>>(`${base}/dashboard`)).data
+  }
+
   async function status() {
     return (await api<ApiEnvelope<StreamingStatus>>(`${base}/status`)).data
   }
@@ -249,6 +345,12 @@ export function useStreaming() {
     savePrices,
     viewers,
     setViewerDisabled,
+    orders,
+    markOrderPaid,
+    cancelOrder,
+    comments,
+    setCommentHidden,
+    dashboard,
     status,
     refreshSite
   }

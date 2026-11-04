@@ -2,7 +2,7 @@
   <div>
     <PageHeader
       title="Prices"
-      description="What RuengFlix shows on its VIP page and on the wall after a VIP series' free episodes, in US dollars."
+      description="What RuengFlix charges with KHQR (US dollars) on its VIP page and on the wall after a VIP series' free episodes, and how coins work."
       :crumbs="[{ label: 'RuengFlix', to: '/ruengflix' }, { label: 'Prices' }]"
     />
 
@@ -11,8 +11,8 @@
       color="info"
       variant="subtle"
       icon="i-lucide-info"
-      title="Payments aren't connected yet"
-      description="RuengFlix shows these prices, but KHQR payment isn't built, so nobody can pay or unlock yet. Unlocks are only stored in the viewer's browser."
+      title="Payments go through KHQR"
+      description="Viewers pay with any Cambodian banking app. With a Bakong token on movie-api, payments are confirmed automatically; otherwise confirm them under Orders. Purchases and coins belong to the viewer's account."
     />
     <UAlert v-if="error" color="error" variant="subtle" class="mb-4" :title="error" icon="i-lucide-triangle-alert" />
 
@@ -30,6 +30,33 @@
             class="w-48"
           />
           <template v-if="view && form[f.key] !== view.defaults[f.key]" #help>Default {{ formatUsd(view.defaults[f.key]) }}</template>
+        </UFormField>
+
+        <USeparator label="Coins" class="pt-2" />
+        <p class="text-sm text-muted">Leave a field empty to use RuengFlix's default.</p>
+        <UFormField v-for="f in COIN_PACK_FIELDS" :key="f.key" :label="f.label" :hint="f.hint || undefined">
+          <UInputNumber
+            v-model="coinForm[f.key]"
+            :min="0.01"
+            :max="1000"
+            :step="0.01"
+            :format-options="{ style: 'currency', currency: 'USD' }"
+            :disabled="!canWrite"
+            class="w-48"
+            :placeholder="view ? formatUsd(Number(view.defaults[f.key])) : ''"
+          />
+        </UFormField>
+        <UFormField v-for="f in COIN_FIELDS" :key="f.key" :label="f.label" :hint="f.hint">
+          <UInputNumber
+            v-model="coinForm[f.key]"
+            :min="1"
+            :max="f.max"
+            :step="1"
+            :format-options="{ useGrouping: false }"
+            :disabled="!canWrite"
+            class="w-48"
+            :placeholder="view ? String(view.defaults[f.key] ?? '') : ''"
+          />
         </UFormField>
 
         <UAlert v-if="problems.length && tried" color="error" variant="subtle" title="Fix before saving" icon="i-lucide-triangle-alert">
@@ -60,7 +87,16 @@
 
 <script setup lang="ts">
 import type { PricesView, StreamingPrices } from '~/composables/useStreaming'
-import { PRICE_FIELDS, priceProblems, type PriceKey } from '#shared/utils/ruengflix'
+import {
+  COIN_FIELDS,
+  COIN_PACK_FIELDS,
+  PRICE_FIELDS,
+  coinProblems,
+  priceProblems,
+  type CoinKey,
+  type CoinPackKey,
+  type PriceKey
+} from '#shared/utils/ruengflix'
 
 definePageMeta({ middleware: 'admin' })
 
@@ -82,12 +118,27 @@ const form = reactive<Record<PriceKey, number | undefined>>({
   vip12Months: undefined
 })
 
-const problems = computed(() => priceProblems(form))
-const dirty = computed(() => !!view.value && PRICE_FIELDS.some((f) => form[f.key] !== Number(view.value!.values[f.key])))
+const coinForm = reactive<Record<CoinPackKey | CoinKey, number | undefined>>({
+  coinPack100: undefined,
+  coinPack300: undefined,
+  coinPack1000: undefined,
+  episodeUnlockCoins: undefined,
+  dailyCheckInCoins: undefined
+})
+const COIN_KEYS = [...COIN_PACK_FIELDS, ...COIN_FIELDS].map((f) => f.key)
+const stored = (v: unknown) => (v == null ? undefined : Number(v))
+
+const problems = computed(() => [...priceProblems(form), ...coinProblems(coinForm)])
+const dirty = computed(
+  () =>
+    !!view.value &&
+    (PRICE_FIELDS.some((f) => form[f.key] !== Number(view.value!.values[f.key])) || COIN_KEYS.some((k) => coinForm[k] !== stored(view.value!.values[k])))
+)
 
 function fill() {
   if (!view.value) return
   for (const f of PRICE_FIELDS) form[f.key] = Number(view.value.values[f.key])
+  for (const k of COIN_KEYS) coinForm[k] = stored(view.value.values[k])
   tried.value = false
 }
 
@@ -109,7 +160,8 @@ async function onSave() {
   if (problems.value.length || !view.value) return
   saving.value = true
   try {
-    view.value = await streaming.savePrices({ ...form } as StreamingPrices, view.value.version)
+    const coins = Object.fromEntries(COIN_KEYS.map((k) => [k, coinForm[k] ?? null]))
+    view.value = await streaming.savePrices({ ...form, ...coins } as StreamingPrices, view.value.version)
     fill()
     toast.add({ title: 'Prices saved', color: 'success' })
   } catch (err) {

@@ -188,6 +188,9 @@ const items = computed<SidebarItem[]>(() => [
           defaultOpen: true,
           children: [
             { label: 'Overview', to: '/ruengflix', icon: 'i-lucide-radio' },
+            { label: 'Revenue & retention', to: '/ruengflix/money', icon: 'i-lucide-chart-line' },
+            { label: 'Orders', to: '/ruengflix/orders', icon: 'i-lucide-receipt' },
+            { label: 'Comments', to: '/ruengflix/comments', icon: 'i-lucide-message-square' },
             { label: 'Problem reports', to: '/ruengflix/reports', icon: 'i-lucide-flag' },
             { label: 'Viewers', to: '/ruengflix/viewers', icon: 'i-lucide-user-round' },
             { label: 'Prices', to: '/ruengflix/prices', icon: 'i-lucide-badge-dollar-sign' }

@@ -1,5 +1,16 @@
 import { describe, expect, it } from 'vitest'
-import { biggestDropOff, continuePercents, finishPercent, likePercent, playerTime, priceProblems, ruengflixUrl } from './ruengflix'
+import {
+  biggestDropOff,
+  coinProblems,
+  continuePercents,
+  finishPercent,
+  likePercent,
+  orderProduct,
+  playerTime,
+  priceProblems,
+  retentionLabel,
+  ruengflixUrl
+} from './ruengflix'
 
 describe('viewer arithmetic', () => {
   it('finishPercent and likePercent are whole percents, null without data', () => {
@@ -55,5 +66,30 @@ describe('priceProblems', () => {
 
   it('flags a yearly plan dearer per month than the monthly one', () => {
     expect(priceProblems({ ...ok, vip12Months: 30 })).toEqual(['The 12-month plan costs more per month than the 1-month plan.'])
+  })
+})
+
+describe('coinProblems', () => {
+  const empty = { coinPack100: null, coinPack300: null, coinPack1000: null, episodeUnlockCoins: null, dailyCheckInCoins: null }
+  it('allows leaving everything to the defaults', () => {
+    expect(coinProblems(empty)).toEqual([])
+  })
+  it('refuses free packs and fractional coins', () => {
+    expect(coinProblems({ ...empty, coinPack100: 0, episodeUnlockCoins: 2.5 })).toEqual([
+      '100 coins: must be from $0.01 to $1,000.',
+      'Unlock one VIP episode: a whole number from 1 to 10,000.'
+    ])
+  })
+})
+
+describe('orderProduct and retentionLabel', () => {
+  it('names what was bought', () => {
+    expect(orderProduct({ kind: 'COINS', coins: 1000, months: null, seriesTitle: null })).toBe('1,000 coins')
+    expect(orderProduct({ kind: 'VIP', coins: null, months: 1, seriesTitle: null })).toBe('VIP · 1 month')
+    expect(orderProduct({ kind: 'SERIES', coins: null, months: null, seriesTitle: 'Summer love' })).toBe('Series: Summer love')
+  })
+  it('shows a dash before there is a cohort', () => {
+    expect(retentionLabel(null)).toBe('—')
+    expect(retentionLabel(0.256)).toBe('26%')
   })
 })
