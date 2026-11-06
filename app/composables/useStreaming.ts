@@ -5,6 +5,7 @@
 
 import type { ApiEnvelope } from '#shared/types'
 import type { SeriesCategory, SeriesStatus } from '#shared/utils/streamingSeries'
+import type { HomeRowSource } from '#shared/utils/homeRows'
 
 export type SeriesState = 'LIVE' | 'NOT_PUBLIC' | 'NO_EPISODES'
 
@@ -57,6 +58,8 @@ export interface StreamingEpisode extends ViewerTotals {
   title: string
   durationSeconds: number | null
   subtitled: boolean
+  /** Has a Khmer voice-over track (made or uploaded), offered on RuengFlix as "Khmer voice" */
+  dubbed: boolean
   locked: boolean
 }
 
@@ -121,9 +124,119 @@ export interface StreamingPrices {
   coinPack1000: number | null
   episodeUnlockCoins: number | null
   dailyCheckInCoins: number | null
+  /** Extra coins (percent) on a viewer's first coin pack; 0 turns it off, null uses the default */
+  firstTopUpBonusPercent: number | null
+  /** Seconds of the first VIP episode viewers may watch before paying; 0 turns previews off */
+  previewSeconds: number | null
+  /** VIP episodes a viewer may unlock a day by watching a sponsor ad; 0 turns ad unlocks off */
+  adUnlocksPerDay: number | null
 }
 
-export type OrderStatus = 'PENDING' | 'PAID' | 'EXPIRED' | 'CANCELLED'
+/** A sponsor video viewers watch to unlock one VIP episode */
+export interface StreamingAd {
+  id: number
+  title: string
+  videoUrl: string
+  clickUrl: string | null
+  seconds: number
+  active: boolean
+  weight: number
+  /** Times shown, and watched to the end (each one unlocked an episode) */
+  started: number
+  completed: number
+  createdBy: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export type AdInput = Partial<Pick<StreamingAd, 'title' | 'videoUrl' | 'clickUrl' | 'seconds' | 'active' | 'weight'>>
+
+/** A row of series on RuengFlix's home page, in `position` order (backend StreamingHomeRowsService) */
+export interface StreamingHomeRow {
+  id: number
+  title: string
+  source: HomeRowSource
+  /** The category (CATEGORY) or genre (GENRE); null otherwise */
+  value: string | null
+  maxItems: number
+  position: number
+  active: boolean
+  createdBy: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export type HomeRowInput = Partial<Pick<StreamingHomeRow, 'title' | 'source' | 'value' | 'maxItems' | 'active'>>
+
+export type PromotionKind = 'FREE_SERIES' | 'COIN_BONUS'
+
+export interface StreamingPromotion {
+  id: number
+  kind: PromotionKind
+  title: string
+  seriesId: number | null
+  seriesTitle: string | null
+  bonusPercent: number | null
+  /** Database wall-clock times (the server's time zone), like every RuengFlix time */
+  startsAt: string
+  endsAt: string
+  state: 'SCHEDULED' | 'RUNNING' | 'ENDED'
+  createdBy: string | null
+  createdAt: string
+}
+
+export interface PromotionInput {
+  kind: PromotionKind
+  title: string
+  seriesId?: number | null
+  bonusPercent?: number | null
+  /** "YYYY-MM-DDTHH:mm" local times */
+  startsAt: string
+  endsAt: string
+}
+
+export interface StreamingClip {
+  id: number
+  code: string
+  seriesId: number
+  seriesTitle: string
+  episode: number
+  startSeconds: number
+  seconds: number
+  status: 'PENDING' | 'WORKING' | 'READY' | 'FAILED'
+  url: string | null
+  posterUrl: string | null
+  error: string | null
+  views: number
+  viewerName: string | null
+  createdAt: string
+}
+
+export interface FunnelEpisode {
+  episode: number
+  /** After the free episodes of a VIP series */
+  premium: boolean
+  starts: number
+  completes: number
+  /** Times the unlock screen was shown */
+  wallViews: number
+  coinUnlocks: number
+  adUnlocks: number
+  adsStarted: number
+}
+
+export interface SeriesFunnel {
+  seriesId: number
+  title: string
+  vip: boolean
+  freeEpisodes: number
+  episodes: FunnelEpisode[]
+  seriesPurchases: number
+  seriesRevenueUsd: number
+  coinsSpent: number
+}
+
+export type OrderStatus = 'PENDING' | 'PAID' | 'EXPIRED' | 'CANCELLED' | 'REFUNDED'
 
 /** A RuengFlix KHQR payment (coins, a series or VIP time) */
 export interface StreamingOrder {
@@ -145,6 +258,38 @@ export interface StreamingOrder {
   paidBy: string | null
   bakongHash: string | null
   note: string | null
+  /** First top-up bonus added on top of a coin pack */
+  bonusCoins: number | null
+  refundedAt: string | null
+  refundedBy: string | null
+  refundReason: string | null
+  /** Extra coins from a running promotion */
+  promoCoins: number | null
+  /** Bought for someone else: its code once paid, and who redeemed it */
+  gift: boolean
+  giftCode: string | null
+  giftRedeemedByName: string | null
+  giftRedeemedAt: string | null
+}
+
+/** A viewer's money, for support: wallet, orders, unlocks, coin history and invites */
+export interface ViewerMoney {
+  viewer: {
+    id: number
+    displayName: string
+    phone: string | null
+    telegramUsername: string | null
+    telegramLinked: boolean
+    googleEmail: string | null
+    disabled: boolean
+    createdAt: string
+    lastLoginAt: string | null
+  }
+  wallet: { coins: number; vipUntil: string | null; vipActive: boolean }
+  orders: StreamingOrder[]
+  unlocks: { seriesId: number; seriesTitle: string | null; episode: number; source: string; createdAt: string }[]
+  ledger: { id: number; delta: number; reason: string; ref: string | null; createdAt: string }[]
+  invites: { code: string | null; invitedByName: string | null; invitedById: number | null; joined: number; rewarded: number }
 }
 
 export interface Paged<T> {
@@ -166,9 +311,23 @@ export interface StreamingComment {
   createdAt: string
   hiddenAt: string | null
   hiddenBy: string | null
+  likeCount: number
+  /** Pinned to the top of its episode (one per episode) */
+  pinnedAt: string | null
+  pinnedBy: string | null
+  /** The official reply under it, if any */
+  replyId: number | null
+  replyBody: string | null
+  replyBy: string | null
 }
 
-export type CommentFilter = 'reported' | 'hidden' | 'all'
+export type CommentFilter = 'reported' | 'hidden' | 'pinned' | 'all'
+
+/** What waits for an admin, for the menu badges */
+export interface StreamingBadges {
+  pendingOrders: number
+  reportedComments: number
+}
 
 export interface StreamingDashboard {
   revenue7Days: number
@@ -318,12 +477,105 @@ export function useStreaming() {
     return (await api<ApiEnvelope<StreamingComment>>(`${base}/comments/${id}`, { method: 'PUT', body: { hidden } })).data
   }
 
+  /** Pin a comment to the top of its episode (replacing the one pinned there), or unpin it */
+  async function setCommentPinned(id: number, pinned: boolean) {
+    return (await api<ApiEnvelope<StreamingComment>>(`${base}/comments/${id}`, { method: 'PUT', body: { pinned } })).data
+  }
+
+  /** Answer as RuengFlix (replaces an earlier official reply) */
+  async function replyToComment(id: number, body: string) {
+    return (await api<ApiEnvelope<StreamingComment>>(`${base}/comments/${id}/reply`, { method: 'POST', body: { body } })).data
+  }
+
+  async function deleteReply(id: number) {
+    return (await api<ApiEnvelope<StreamingComment>>(`${base}/comments/${id}/reply`, { method: 'DELETE' })).data
+  }
+
+  /** Refund a paid order (APPROVE): what it delivered is taken back; return the money in the bank app */
+  async function refundOrder(id: number, reason: string) {
+    return (await api<ApiEnvelope<StreamingOrder>>(`${base}/orders/${id}/reverse`, { method: 'POST', body: { reason } })).data
+  }
+
+  async function viewerMoney(viewerId: number) {
+    return (await api<ApiEnvelope<ViewerMoney>>(`${base}/viewers/${viewerId}/account`)).data
+  }
+
+  /** Give coins (negative takes them back, never below 0) */
+  async function grantCoins(viewerId: number, coins: number, reason: string) {
+    return (await api<ApiEnvelope<ViewerMoney>>(`${base}/viewers/${viewerId}/coins`, { method: 'POST', body: { coins, reason } })).data
+  }
+
+  async function badges() {
+    return (await api<ApiEnvelope<StreamingBadges>>(`${base}/badges`)).data
+  }
+
   async function dashboard() {
     return (await api<ApiEnvelope<StreamingDashboard>>(`${base}/dashboard`)).data
   }
 
   async function status() {
     return (await api<ApiEnvelope<StreamingStatus>>(`${base}/status`)).data
+  }
+
+  async function ads() {
+    return (await api<ApiEnvelope<StreamingAd[]>>(`${base}/ads`)).data
+  }
+
+  async function createAd(body: AdInput) {
+    return (await api<ApiEnvelope<StreamingAd>>(`${base}/ads`, { method: 'POST', body })).data
+  }
+
+  async function updateAd(id: number, body: AdInput) {
+    return (await api<ApiEnvelope<StreamingAd>>(`${base}/ads/${id}`, { method: 'PUT', body })).data
+  }
+
+  async function deleteAd(id: number) {
+    await api(`${base}/ads/${id}`, { method: 'DELETE' })
+  }
+
+  async function homeRows() {
+    return (await api<ApiEnvelope<StreamingHomeRow[]>>(`${base}/home-rows`)).data
+  }
+
+  async function createHomeRow(body: HomeRowInput) {
+    return (await api<ApiEnvelope<StreamingHomeRow>>(`${base}/home-rows`, { method: 'POST', body })).data
+  }
+
+  async function updateHomeRow(id: number, body: HomeRowInput) {
+    return (await api<ApiEnvelope<StreamingHomeRow>>(`${base}/home-rows/${id}`, { method: 'PUT', body })).data
+  }
+
+  async function deleteHomeRow(id: number) {
+    await api(`${base}/home-rows/${id}`, { method: 'DELETE' })
+  }
+
+  async function orderHomeRows(ids: number[]) {
+    return (await api<ApiEnvelope<StreamingHomeRow[]>>(`${base}/home-rows/order`, { method: 'PUT', body: { ids } })).data
+  }
+
+  async function promotions() {
+    return (await api<ApiEnvelope<StreamingPromotion[]>>(`${base}/promotions`)).data
+  }
+
+  async function createPromotion(body: PromotionInput) {
+    return (await api<ApiEnvelope<StreamingPromotion>>(`${base}/promotions`, { method: 'POST', body })).data
+  }
+
+  /** Ends a running promotion now; removes a scheduled or finished one */
+  async function stopPromotion(id: number) {
+    await api(`${base}/promotions/${id}`, { method: 'DELETE' })
+  }
+
+  async function clips() {
+    return (await api<ApiEnvelope<StreamingClip[]>>(`${base}/clips`)).data
+  }
+
+  async function deleteClip(id: number) {
+    await api(`${base}/clips/${id}`, { method: 'DELETE' })
+  }
+
+  async function funnel(seriesId: number) {
+    return (await api<ApiEnvelope<SeriesFunnel>>(`${base}/series/${seriesId}/funnel`)).data
   }
 
   async function refreshSite() {
@@ -350,8 +602,30 @@ export function useStreaming() {
     cancelOrder,
     comments,
     setCommentHidden,
+    setCommentPinned,
+    replyToComment,
+    deleteReply,
+    refundOrder,
+    viewerMoney,
+    grantCoins,
+    badges,
     dashboard,
     status,
-    refreshSite
+    refreshSite,
+    ads,
+    createAd,
+    updateAd,
+    deleteAd,
+    homeRows,
+    createHomeRow,
+    updateHomeRow,
+    deleteHomeRow,
+    orderHomeRows,
+    promotions,
+    createPromotion,
+    stopPromotion,
+    clips,
+    deleteClip,
+    funnel
   }
 }

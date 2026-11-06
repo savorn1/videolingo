@@ -23,7 +23,7 @@
 
       <DataTable :rows="rows" :columns="columns" :loading="loading" refreshable @refresh="load">
         <template #displayName-data="{ row }">
-          <p class="font-medium text-highlighted">{{ row.displayName }}</p>
+          <NuxtLink :to="`/ruengflix/viewers/${row.id}`" class="font-medium text-highlighted hover:underline">{{ row.displayName }}</NuxtLink>
           <p class="text-xs text-muted tabular-nums">{{ viewerSignInLabel(row) }}</p>
         </template>
         <template #disabled-data="{ row }">

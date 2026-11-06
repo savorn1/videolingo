@@ -104,12 +104,13 @@
 <script setup lang="ts">
 import type { BreadcrumbItem, DropdownMenuItem } from '@nuxt/ui'
 import type { SidebarItem } from '~/components/SidebarNav.vue'
+import type { StreamingBadges } from '~/composables/useStreaming'
 import { usePageCrumbs } from '~/composables/usePageCrumbs'
 import { goShortcutHelp, goShortcutsFor } from '#shared/utils/goShortcuts'
 import { activeJobs, withJobCount } from '#shared/utils/jobsIndicator'
 import { pushRecentPage, sanitizeRecentPages, type RecentPage } from '#shared/utils/recentPages'
 
-const { username, role, hasAnyAccess, logout } = useAuth()
+const { username, role, hasAnyAccess, can, logout } = useAuth()
 // Settings › General
 const { settings: clientSettings } = useClientSettings()
 const siteName = computed(() => clientSettings.value?.siteName || 'VideoLingo')
@@ -139,6 +140,29 @@ const profileItems = computed<DropdownMenuItem[][]>(() => [
   [{ label: 'Profile', icon: 'i-lucide-user', to: '/profile' }],
   [{ label: 'Log out', icon: 'i-lucide-log-out', color: 'error', onSelect: () => logout() }]
 ])
+
+// RuengFlix work waiting for an admin (menu badges): checked on load, every minute while the tab is
+// visible, and after each page change (so confirming an order clears its badge soon after)
+const ruengflixBadges = ref<StreamingBadges | null>(null)
+const streamingApi = useStreaming()
+async function loadBadges() {
+  if (!hasAnyAccess.value || !can('streaming', 'READ') || document.visibilityState !== 'visible') return
+  try {
+    ruengflixBadges.value = await streamingApi.badges()
+  } catch {
+    // Badges are a hint: keep the last numbers
+  }
+}
+let badgeTimer: ReturnType<typeof setInterval> | undefined
+onMounted(() => {
+  loadBadges()
+  badgeTimer = setInterval(loadBadges, 60_000)
+})
+onBeforeUnmount(() => clearInterval(badgeTimer))
+watch(
+  () => route.path,
+  () => route.path.startsWith('/ruengflix') && loadBadges()
+)
 
 // Starter nav — add feature groups here as a top-level item with `children`,
 // gating admin-only items behind `hasAnyAccess` (ADMIN always, or a USER
@@ -189,11 +213,27 @@ const items = computed<SidebarItem[]>(() => [
           children: [
             { label: 'Overview', to: '/ruengflix', icon: 'i-lucide-radio' },
             { label: 'Revenue & retention', to: '/ruengflix/money', icon: 'i-lucide-chart-line' },
-            { label: 'Orders', to: '/ruengflix/orders', icon: 'i-lucide-receipt' },
-            { label: 'Comments', to: '/ruengflix/comments', icon: 'i-lucide-message-square' },
+            {
+              label: 'Orders',
+              to: '/ruengflix/orders',
+              icon: 'i-lucide-receipt',
+              count: ruengflixBadges.value?.pendingOrders,
+              countLabel: `${ruengflixBadges.value?.pendingOrders ?? 0} orders waiting for confirmation`
+            },
+            {
+              label: 'Comments',
+              to: '/ruengflix/comments',
+              icon: 'i-lucide-message-square',
+              count: ruengflixBadges.value?.reportedComments,
+              countLabel: `${ruengflixBadges.value?.reportedComments ?? 0} reported comments`
+            },
             { label: 'Problem reports', to: '/ruengflix/reports', icon: 'i-lucide-flag' },
             { label: 'Viewers', to: '/ruengflix/viewers', icon: 'i-lucide-user-round' },
-            { label: 'Prices', to: '/ruengflix/prices', icon: 'i-lucide-badge-dollar-sign' }
+            { label: 'Home rows', to: '/ruengflix/home-rows', icon: 'i-lucide-rows-3' },
+            { label: 'Prices', to: '/ruengflix/prices', icon: 'i-lucide-badge-dollar-sign' },
+            { label: 'Promotions', to: '/ruengflix/promotions', icon: 'i-lucide-ticket-percent' },
+            { label: 'Sponsor ads', to: '/ruengflix/ads', icon: 'i-lucide-megaphone' },
+            { label: 'Shared clips', to: '/ruengflix/clips', icon: 'i-lucide-clapperboard' }
           ]
         },
         {

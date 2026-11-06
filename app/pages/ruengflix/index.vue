@@ -71,8 +71,22 @@
       <DataTable :rows="data?.series ?? []" :columns="columns" :loading="loading" refreshable @refresh="load">
         <template #title-data="{ row }">
           <NuxtLink :to="`/ruengflix/${row.id}`" class="flex items-center gap-3 min-w-0 group">
-            <img v-if="row.coverUrl" :src="row.coverUrl" alt="" class="w-9 h-12 rounded object-cover shrink-0 bg-elevated" loading="lazy" />
-            <div v-else class="w-9 h-12 rounded bg-elevated shrink-0" />
+            <img
+              v-if="row.coverUrl && !brokenCovers.has(row.id)"
+              :src="row.coverUrl"
+              alt=""
+              class="w-9 h-12 rounded object-cover shrink-0 bg-elevated"
+              loading="lazy"
+              @error="markBroken(row.id)"
+            />
+            <div
+              v-else
+              class="w-9 h-12 rounded bg-elevated shrink-0 grid place-items-center"
+              :class="row.coverUrl ? 'ring-1 ring-warning' : ''"
+              :title="row.coverUrl ? 'Cover image does not load' : 'No cover image'"
+            >
+              <UIcon v-if="row.coverUrl" name="i-lucide-image-off" class="size-4 text-warning" />
+            </div>
             <div class="min-w-0">
               <p class="font-medium text-highlighted truncate group-hover:underline">{{ row.title }}</p>
               <p class="text-xs text-muted">
@@ -109,9 +123,16 @@
           <span v-else class="text-muted">0</span>
         </template>
         <template #problems-data="{ row }">
-          <UTooltip v-if="row.problems.length" :text="row.problems.map((p: SeriesProblem) => p.message).join(' · ')">
-            <UBadge :color="row.problems.some((p: SeriesProblem) => p.level === 'ERROR') ? 'error' : 'warning'" variant="subtle" icon="i-lucide-list-checks"
-              >{{ row.problems.length }} to fix</UBadge
+          <UTooltip
+            v-if="problemsOf(row).length"
+            :text="
+              problemsOf(row)
+                .map((p: SeriesProblem) => p.message)
+                .join(' · ')
+            "
+          >
+            <UBadge :color="problemsOf(row).some((p: SeriesProblem) => p.level === 'ERROR') ? 'error' : 'warning'" variant="subtle" icon="i-lucide-list-checks"
+              >{{ problemsOf(row).length }} to fix</UBadge
             >
           </UTooltip>
           <UBadge v-else color="success" variant="subtle" icon="i-lucide-check">Ready</UBadge>
@@ -237,6 +258,16 @@ const streaming = useStreaming()
 const { can } = useAuth()
 const toast = useToast()
 const canWrite = computed(() => can('streaming', 'WRITE'))
+
+// A cover URL that is set but doesn't load: the server can't tell (it only checks the field is filled),
+// the browser finds out when the thumbnail fails. The site then shows a plain title tile instead.
+const brokenCovers = ref(new Set<number>())
+const markBroken = (id: number) => (brokenCovers.value = new Set(brokenCovers.value).add(id))
+const BROKEN_COVER: SeriesProblem = {
+  level: 'WARNING',
+  message: "Cover image doesn't load: the site shows a plain title tile. Upload it again or fix the link"
+}
+const problemsOf = (row: StreamingSeriesSummary): SeriesProblem[] => (brokenCovers.value.has(row.id) ? [...row.problems, BROKEN_COVER] : row.problems)
 
 const data = ref<StreamingOverview | null>(null)
 const loading = ref(false)

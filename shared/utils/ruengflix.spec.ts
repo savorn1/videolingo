@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   biggestDropOff,
+  coinGrantProblems,
   coinProblems,
   continuePercents,
   finishPercent,
@@ -70,9 +71,29 @@ describe('priceProblems', () => {
 })
 
 describe('coinProblems', () => {
-  const empty = { coinPack100: null, coinPack300: null, coinPack1000: null, episodeUnlockCoins: null, dailyCheckInCoins: null }
+  const empty = {
+    coinPack100: null,
+    coinPack300: null,
+    coinPack1000: null,
+    episodeUnlockCoins: null,
+    dailyCheckInCoins: null,
+    firstTopUpBonusPercent: null,
+    previewSeconds: null,
+    adUnlocksPerDay: null
+  }
   it('allows leaving everything to the defaults', () => {
     expect(coinProblems(empty)).toEqual([])
+  })
+  it('lets the bonus and preview be turned off with 0, within their limits', () => {
+    expect(coinProblems({ ...empty, firstTopUpBonusPercent: 0, previewSeconds: 0 })).toEqual([])
+    expect(coinProblems({ ...empty, firstTopUpBonusPercent: 250, previewSeconds: -1 })).toEqual([
+      'First top-up bonus: a whole number from 0 to 200.',
+      'Free preview: a whole number from 0 to 180.'
+    ])
+  })
+  it('ad unlocks a day: 0 turns them off, up to 20', () => {
+    expect(coinProblems({ ...empty, adUnlocksPerDay: 0 })).toEqual([])
+    expect(coinProblems({ ...empty, adUnlocksPerDay: 21 })).toEqual(['Ad unlocks a day: a whole number from 0 to 20.'])
   })
   it('refuses free packs and fractional coins', () => {
     expect(coinProblems({ ...empty, coinPack100: 0, episodeUnlockCoins: 2.5 })).toEqual([
@@ -82,14 +103,32 @@ describe('coinProblems', () => {
   })
 })
 
+describe('orderProduct gifts and promos', () => {
+  it('labels gifts and promotion coins', () => {
+    expect(orderProduct({ kind: 'COINS', coins: 300, months: null, seriesTitle: null, promoCoins: 90, gift: true })).toBe('Gift: 300 coins +90 promo')
+    expect(orderProduct({ kind: 'VIP', coins: null, months: 1, seriesTitle: null })).toBe('VIP · 1 month')
+  })
+})
+
 describe('orderProduct and retentionLabel', () => {
   it('names what was bought', () => {
     expect(orderProduct({ kind: 'COINS', coins: 1000, months: null, seriesTitle: null })).toBe('1,000 coins')
+    expect(orderProduct({ kind: 'COINS', coins: 300, months: null, seriesTitle: null, bonusCoins: 150 })).toBe('300 coins +150 bonus')
     expect(orderProduct({ kind: 'VIP', coins: null, months: 1, seriesTitle: null })).toBe('VIP · 1 month')
     expect(orderProduct({ kind: 'SERIES', coins: null, months: null, seriesTitle: 'Summer love' })).toBe('Series: Summer love')
   })
   it('shows a dash before there is a cohort', () => {
     expect(retentionLabel(null)).toBe('—')
     expect(retentionLabel(0.256)).toBe('26%')
+  })
+})
+
+describe('coinGrantProblems', () => {
+  it('needs a non-zero whole amount within limits and a reason', () => {
+    expect(coinGrantProblems(50, 'Paid but not delivered')).toEqual([])
+    expect(coinGrantProblems(-20, 'Duplicate')).toEqual([])
+    expect(coinGrantProblems(0, 'x')).toEqual(['Coins: a whole number from -10,000 to 10,000, not 0.', 'Reason: 3 to 200 characters.'])
+    expect(coinGrantProblems(20000, 'Too many')).toHaveLength(1)
+    expect(coinGrantProblems(null, 'ok reason')).toHaveLength(1)
   })
 })

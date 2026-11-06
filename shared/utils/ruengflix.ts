@@ -97,8 +97,11 @@ export const COIN_PACK_FIELDS = [
 ] as const
 
 export const COIN_FIELDS = [
-  { key: 'episodeUnlockCoins', label: 'Unlock one VIP episode', hint: 'coins', max: 10000 },
-  { key: 'dailyCheckInCoins', label: 'Daily check-in', hint: 'coins; the 7th day in a row pays double', max: 1000 }
+  { key: 'episodeUnlockCoins', label: 'Unlock one VIP episode', hint: 'coins', min: 1, max: 10000 },
+  { key: 'dailyCheckInCoins', label: 'Daily check-in', hint: 'coins; the 7th day in a row pays double', min: 1, max: 1000 },
+  { key: 'firstTopUpBonusPercent', label: 'First top-up bonus', hint: "% extra coins on a viewer's first pack; 0 = off", min: 0, max: 200 },
+  { key: 'previewSeconds', label: 'Free preview', hint: 'seconds of the first VIP episode before paying; 0 = off', min: 0, max: 180 },
+  { key: 'adUnlocksPerDay', label: 'Ad unlocks a day', hint: 'VIP episodes a viewer may unlock daily by watching a sponsor ad; 0 = off', min: 0, max: 20 }
 ] as const
 
 export type CoinPackKey = (typeof COIN_PACK_FIELDS)[number]['key']
@@ -116,23 +119,67 @@ export function coinProblems(values: Record<CoinPackKey | CoinKey, number | null
   for (const f of COIN_FIELDS) {
     const v = values[f.key]
     if (v == null) continue
-    if (!Number.isInteger(v) || v < 1 || v > f.max) problems.push(`${f.label}: a whole number from 1 to ${f.max.toLocaleString('en-US')}.`)
+    if (!Number.isInteger(v) || v < f.min || v > f.max) problems.push(`${f.label}: a whole number from ${f.min} to ${f.max.toLocaleString('en-US')}.`)
   }
   return problems
 }
 
-export const ORDER_STATUS_META: Record<'PENDING' | 'PAID' | 'EXPIRED' | 'CANCELLED', { label: string; color: 'warning' | 'success' | 'neutral' | 'error' }> = {
+export const ORDER_STATUS_META: Record<
+  'PENDING' | 'PAID' | 'EXPIRED' | 'CANCELLED' | 'REFUNDED',
+  { label: string; color: 'warning' | 'success' | 'neutral' | 'error' | 'info' }
+> = {
   PENDING: { label: 'Waiting', color: 'warning' },
   PAID: { label: 'Paid', color: 'success' },
   EXPIRED: { label: 'Expired', color: 'neutral' },
-  CANCELLED: { label: 'Cancelled', color: 'error' }
+  CANCELLED: { label: 'Cancelled', color: 'error' },
+  REFUNDED: { label: 'Refunded', color: 'info' }
 }
 
-/** What an order bought: "300 coins", "VIP · 3 months", "Series: Summer love" */
-export function orderProduct(o: { kind: string; coins: number | null; months: number | null; seriesTitle: string | null }): string {
-  if (o.kind === 'COINS') return `${(o.coins ?? 0).toLocaleString('en-US')} coins`
-  if (o.kind === 'VIP') return `VIP · ${o.months ?? 0} month${o.months === 1 ? '' : 's'}`
-  return `Series: ${o.seriesTitle ?? 'deleted'}`
+/** Coin history reasons, as admins read them */
+export const LEDGER_REASONS: Record<string, string> = {
+  PURCHASE: 'Bought (KHQR)',
+  BONUS: 'First top-up bonus',
+  CHECK_IN: 'Daily check-in',
+  UNLOCK: 'Unlocked an episode',
+  MISSION: 'Daily mission',
+  INVITE: 'Invite reward',
+  REFUND: 'Refund (taken back)',
+  ADMIN: 'Given by an admin'
+}
+
+/** Problems with an admin's coin adjustment: a whole number from -10,000 to 10,000, not 0, and a reason */
+export function coinGrantProblems(coins: number | null | undefined, reason: string): string[] {
+  const problems: string[] = []
+  if (coins == null || !Number.isInteger(coins) || coins === 0 || Math.abs(coins) > 10000) {
+    problems.push('Coins: a whole number from -10,000 to 10,000, not 0.')
+  }
+  const r = reason.trim()
+  if (r.length < 3 || r.length > 200) problems.push('Reason: 3 to 200 characters.')
+  return problems
+}
+
+/**
+ * What an order bought: "300 coins" (+ "+150 bonus" on a first top-up, "+90 promo" during a promotion),
+ * "VIP · 3 months", "Series: Summer love"; "Gift: …" when bought for someone else.
+ */
+export function orderProduct(o: {
+  kind: string
+  coins: number | null
+  months: number | null
+  seriesTitle: string | null
+  bonusCoins?: number | null
+  promoCoins?: number | null
+  gift?: boolean
+}): string {
+  const what =
+    o.kind === 'COINS'
+      ? `${(o.coins ?? 0).toLocaleString('en-US')} coins${o.bonusCoins ? ` +${o.bonusCoins.toLocaleString('en-US')} bonus` : ''}${
+          o.promoCoins ? ` +${o.promoCoins.toLocaleString('en-US')} promo` : ''
+        }`
+      : o.kind === 'VIP'
+        ? `VIP · ${o.months ?? 0} month${o.months === 1 ? '' : 's'}`
+        : `Series: ${o.seriesTitle ?? 'deleted'}`
+  return o.gift ? `Gift: ${what}` : what
 }
 
 /** A retention rate as a whole percent, or "—" when nobody is in the cohort yet */

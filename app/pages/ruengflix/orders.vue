@@ -19,19 +19,45 @@
       <div class="flex flex-wrap items-center gap-3 mb-4">
         <UInput v-model="q" icon="i-lucide-search" placeholder="Bill number or viewer" aria-label="Search orders" class="w-72" />
         <UTabs v-model="status" :items="statusItems" :content="false" size="sm" />
+        <span v-if="status === 'PENDING'" class="text-xs text-muted ml-auto" aria-live="polite">
+          <UIcon name="i-lucide-refresh-cw" class="size-3 align-[-1px]" /> Checks for new payments every 30 s<template v-if="lastLoaded">
+            · updated {{ lastLoaded }}</template
+          >
+        </span>
       </div>
 
       <DataTable :rows="rows" :columns="columns" :loading="loading" refreshable @refresh="load">
         <template #product-data="{ row }">
           <p class="font-medium text-highlighted">{{ orderProduct(row) }}</p>
-          <p class="text-xs text-muted tabular-nums">{{ row.billNumber }} · {{ row.viewerName ?? 'Deleted account' }}</p>
+          <p v-if="row.gift && row.giftCode" class="text-xs text-muted">
+            Code <span class="font-mono">{{ row.giftCode }}</span> ·
+            <template v-if="row.giftRedeemedAt">redeemed by {{ row.giftRedeemedByName ?? 'a deleted account' }}</template>
+            <template v-else>not redeemed yet</template>
+          </p>
+          <p class="text-xs text-muted tabular-nums flex items-center gap-1">
+            {{ row.billNumber }}
+            <UButton
+              size="xs"
+              color="neutral"
+              variant="ghost"
+              :icon="copiedId === row.id ? 'i-lucide-check' : 'i-lucide-copy'"
+              :aria-label="`Copy bill number ${row.billNumber}`"
+              title="Copy bill number"
+              class="-my-1"
+              @click="copyBill(row)"
+            />
+            ·
+            <NuxtLink v-if="row.viewerId" :to="`/ruengflix/viewers/${row.viewerId}`" class="underline">{{ row.viewerName }}</NuxtLink>
+            <span v-else>Deleted account</span>
+          </p>
         </template>
         <template #amountUsd-data="{ row }">
           <span class="tabular-nums">{{ formatUsd(row.amountUsd) }}</span>
         </template>
         <template #status-data="{ row }">
           <UBadge :color="ORDER_STATUS_META[row.status].color" variant="subtle">{{ ORDER_STATUS_META[row.status].label }}</UBadge>
-          <p v-if="row.paidBy" class="text-xs text-muted mt-1">{{ row.paidBy === 'bakong' ? 'Confirmed by Bakong' : `By ${row.paidBy}` }}</p>
+          <p v-if="row.status === 'REFUNDED'" class="text-xs text-muted mt-1">By {{ row.refundedBy }}: {{ row.refundReason }}</p>
+          <p v-else-if="row.paidBy" class="text-xs text-muted mt-1">{{ row.paidBy === 'bakong' ? 'Confirmed by Bakong' : `By ${row.paidBy}` }}</p>
         </template>
         <template #createdAt-data="{ row }">
           <span :title="formatDateTime(row.createdAt)">{{ formatRelativeTime(row.createdAt) }}</span>
@@ -40,6 +66,9 @@
           <div v-if="canWrite && (row.status === 'PENDING' || row.status === 'EXPIRED')" class="flex gap-1 justify-end">
             <UButton size="xs" color="success" variant="soft" icon="i-lucide-check" @click="confirm = { row, action: 'paid' }">Mark paid</UButton>
             <UButton v-if="canCancel" size="xs" color="neutral" variant="ghost" icon="i-lucide-x" @click="confirm = { row, action: 'cancel' }">Cancel</UButton>
+          </div>
+          <div v-else-if="canCancel && row.status === 'PAID' && row.viewerId" class="flex justify-end">
+            <UButton size="xs" color="error" variant="ghost" icon="i-lucide-undo-2" :to="`/ruengflix/viewers/${row.viewerId}`">Refund…</UButton>
           </div>
         </template>
         <template #empty-state>
@@ -90,12 +119,26 @@ const loading = ref(false)
 const busy = ref(false)
 const error = ref('')
 const confirm = ref<{ row: StreamingOrder; action: 'paid' | 'cancel' } | null>(null)
+const copiedId = ref<number | null>(null)
+const lastLoaded = ref('')
+
+// Bill numbers are matched against the bank app by hand, so one click copies it
+async function copyBill(row: StreamingOrder) {
+  try {
+    await navigator.clipboard.writeText(row.billNumber)
+    copiedId.value = row.id
+    setTimeout(() => copiedId.value === row.id && (copiedId.value = null), 1500)
+  } catch {
+    toast.add({ title: 'Could not copy', description: 'Select the bill number and copy it instead.', color: 'warning' })
+  }
+}
 
 const statusItems = [
   { label: 'Waiting', value: 'PENDING' },
   { label: 'Paid', value: 'PAID' },
   { label: 'Expired', value: 'EXPIRED' },
   { label: 'Cancelled', value: 'CANCELLED' },
+  { label: 'Refunded', value: 'REFUNDED' },
   { label: 'All', value: 'all' }
 ]
 
@@ -115,19 +158,29 @@ const confirmText = computed(() => {
     : `Cancel ${c.row.billNumber}? Do this when the viewer didn't pay. Nothing is delivered.`
 })
 
-async function load() {
-  loading.value = true
+async function load(quiet = false) {
+  if (!quiet) loading.value = true
   error.value = ''
   try {
     const res = await streaming.orders({ status: status.value, q: q.value.trim() || undefined, page: page.value, size: pageSize.value })
     rows.value = res.items
     total.value = res.total
+    lastLoaded.value = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
   } catch (err) {
     error.value = apiErrorMessage(err)
   } finally {
     loading.value = false
   }
 }
+
+// The Waiting tab refreshes itself while it's on screen (not behind a confirm, not in a hidden tab)
+let timer: ReturnType<typeof setInterval> | undefined
+onMounted(() => {
+  timer = setInterval(() => {
+    if (status.value === 'PENDING' && !confirm.value && !busy.value && document.visibilityState === 'visible') load(true)
+  }, 30_000)
+})
+onBeforeUnmount(() => clearInterval(timer))
 
 async function act(row: StreamingOrder, action: 'paid' | 'cancel') {
   busy.value = true
@@ -156,6 +209,6 @@ watch(status, () => {
   page.value = 1
   load()
 })
-watch([page, pageSize], load)
-onMounted(load)
+watch([page, pageSize], () => load())
+onMounted(() => load())
 </script>

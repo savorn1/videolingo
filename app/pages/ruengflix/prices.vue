@@ -49,7 +49,7 @@
         <UFormField v-for="f in COIN_FIELDS" :key="f.key" :label="f.label" :hint="f.hint">
           <UInputNumber
             v-model="coinForm[f.key]"
-            :min="1"
+            :min="f.min"
             :max="f.max"
             :step="1"
             :format-options="{ useGrouping: false }"
@@ -123,7 +123,10 @@ const coinForm = reactive<Record<CoinPackKey | CoinKey, number | undefined>>({
   coinPack300: undefined,
   coinPack1000: undefined,
   episodeUnlockCoins: undefined,
-  dailyCheckInCoins: undefined
+  dailyCheckInCoins: undefined,
+  firstTopUpBonusPercent: undefined,
+  previewSeconds: undefined,
+  adUnlocksPerDay: undefined
 })
 const COIN_KEYS = [...COIN_PACK_FIELDS, ...COIN_FIELDS].map((f) => f.key)
 const stored = (v: unknown) => (v == null ? undefined : Number(v))

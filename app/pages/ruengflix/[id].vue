@@ -89,6 +89,7 @@
             <div class="flex gap-1 mt-0.5">
               <UBadge v-if="row.locked" size="sm" color="warning" variant="subtle" icon="i-lucide-lock">VIP</UBadge>
               <UBadge v-if="!row.subtitled" size="sm" color="neutral" variant="subtle" icon="i-lucide-captions-off">No subtitles</UBadge>
+              <UBadge v-if="row.dubbed" size="sm" color="info" variant="subtle" icon="i-lucide-mic">Khmer voice</UBadge>
             </div>
           </template>
           <template #finish-data="{ row }">{{ row.finish == null ? '—' : `${row.finish}%` }}</template>
@@ -101,6 +102,14 @@
           </template>
           <template #actions-data="{ row }">
             <div class="flex justify-end gap-1">
+              <UploadButton
+                v-if="canWrite"
+                :label="row.dubbed ? 'Replace voice' : 'Khmer voice'"
+                accept="audio/mpeg,audio/mp4,audio/x-m4a,audio/aac,audio/wav,audio/x-wav,audio/ogg"
+                variant="ghost"
+                :progress="dubUploading === row.videoId ? 0.5 : null"
+                @pick="(f: File) => uploadDub(row.videoId, f)"
+              />
               <UButton
                 v-if="ruengflixUrl(detail.siteUrl, id, row.number)"
                 :to="ruengflixUrl(detail.siteUrl, id, row.number)!"
@@ -126,6 +135,45 @@
           </template>
           <template #empty-state>
             <EmptyState icon="i-lucide-film" title="No released episodes" description="Enable a Public video in this collection to release it." />
+          </template>
+        </DataTable>
+      </UCard>
+
+      <!-- Paywall funnel -->
+      <UCard v-if="funnel && funnel.vip" class="mb-4">
+        <template #header>
+          <h2 class="font-semibold text-highlighted">Paywall</h2>
+          <p class="text-sm text-muted">
+            How viewers meet the paywall after the {{ funnel.freeEpisodes }} free episode(s): unlock-screen views (once per device) and how many unlocked each
+            episode with coins or an ad.
+          </p>
+        </template>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+          <div v-for="t in paywallTiles" :key="t.label" class="rounded-lg border border-default p-3">
+            <p class="text-xs text-muted">{{ t.label }}</p>
+            <p class="text-lg font-semibold text-highlighted tabular-nums">{{ t.value }}</p>
+          </div>
+        </div>
+        <p v-if="paywall.firstWall" class="text-sm mb-3">
+          At episode {{ paywall.firstWall.episode }}, {{ paywall.firstWall.wallViews }} saw the unlock screen and
+          <strong>{{ paywall.firstConversion }}%</strong> unlocked it ({{ paywall.firstWall.coinUnlocks }} with coins, {{ paywall.firstWall.adUnlocks }} with an
+          ad).
+          <template v-if="paywall.firstConversion < 5"> Few pay here: try one more free episode, or a shorter preview.</template>
+          <template v-else-if="paywall.firstConversion > 25"> Many pay here: the paywall could start an episode earlier.</template>
+        </p>
+        <DataTable :rows="funnelRows" :columns="funnelColumns" :columns-toggleable="false" row-key="episode">
+          <template #episode-data="{ row }">
+            <span class="tabular-nums">{{ row.episode }}</span>
+            <UBadge v-if="row.premium" size="sm" color="warning" variant="subtle" class="ml-1">VIP</UBadge>
+          </template>
+          <template #conversion-data="{ row }">
+            <div v-if="row.conversion != null" class="flex items-center gap-2">
+              <span class="h-1.5 w-16 rounded bg-elevated overflow-hidden"
+                ><span class="block h-full bg-primary" :style="{ width: `${Math.min(100, row.conversion)}%` }"
+              /></span>
+              <span class="tabular-nums">{{ row.conversion }}%</span>
+            </div>
+            <span v-else class="text-muted">—</span>
           </template>
         </DataTable>
       </UCard>
@@ -241,7 +289,7 @@
 
 <script setup lang="ts">
 import type { ColumnDef } from '#shared/types'
-import type { AlertLogEntry, SeriesFollower, StreamingEpisode, StreamingSeriesDetail } from '~/composables/useStreaming'
+import type { AlertLogEntry, FunnelEpisode, SeriesFollower, SeriesFunnel, StreamingEpisode, StreamingSeriesDetail } from '~/composables/useStreaming'
 import { SERIES_STATE_META, biggestDropOff, continuePercents, finishPercent, likePercent, ruengflixUrl } from '#shared/utils/ruengflix'
 
 definePageMeta({ middleware: 'admin' })
@@ -279,6 +327,71 @@ const episodeRows = computed<EpisodeRow[]>(() => {
 })
 const dropOff = computed(() => biggestDropOff(detail.value?.episodes ?? []))
 
+// ---------- Paywall funnel ----------
+const funnel = ref<SeriesFunnel | null>(null)
+type FunnelRow = FunnelEpisode & { conversion: number | null; finish: number | null }
+const funnelRows = computed<FunnelRow[]>(() =>
+  (funnel.value?.episodes ?? []).map((e) => ({
+    ...e,
+    finish: finishPercent(e.starts, e.completes),
+    conversion: e.wallViews ? Math.round(((e.coinUnlocks + e.adUnlocks) / e.wallViews) * 100) : null
+  }))
+)
+const funnelColumns: ColumnDef<FunnelRow>[] = [
+  { key: 'episode', label: 'Ep.' },
+  { key: 'starts', label: 'Plays' },
+  { key: 'finish', label: 'Finish', value: (r) => (r.finish == null ? '—' : `${r.finish}%`) },
+  { key: 'wallViews', label: 'Unlock screens' },
+  { key: 'coinUnlocks', label: 'Coins' },
+  { key: 'adUnlocks', label: 'Ads' },
+  { key: 'conversion', label: 'Unlocked', value: (r) => (r.conversion == null ? '—' : `${r.conversion}%`) }
+]
+const paywall = computed(() => {
+  const rows = funnel.value?.episodes ?? []
+  const firstWall = rows.find((e) => e.premium && e.wallViews > 0) ?? null
+  return {
+    wall: rows.reduce((n, e) => n + e.wallViews, 0),
+    coins: rows.reduce((n, e) => n + e.coinUnlocks, 0),
+    ads: rows.reduce((n, e) => n + e.adUnlocks, 0),
+    firstWall,
+    firstConversion: firstWall ? Math.round(((firstWall.coinUnlocks + firstWall.adUnlocks) / firstWall.wallViews) * 100) : 0
+  }
+})
+const paywallTiles = computed(() => [
+  { label: 'Unlock screens shown', value: paywall.value.wall },
+  { label: 'Unlocked with coins', value: paywall.value.coins },
+  { label: 'Unlocked with an ad', value: paywall.value.ads },
+  { label: 'Whole series sold', value: `${funnel.value?.seriesPurchases ?? 0} · $${Number(funnel.value?.seriesRevenueUsd ?? 0).toFixed(2)}` }
+])
+
+// ---------- Khmer voice tracks ----------
+const api = useApi()
+const dubUploading = ref<number | null>(null)
+async function uploadDub(videoId: number, file: File) {
+  if (!file.type.startsWith('audio/')) {
+    toast.add({ title: 'Choose an audio file (MP3, M4A, WAV…)', color: 'warning' })
+    return
+  }
+  dubUploading.value = videoId
+  try {
+    const body = new FormData()
+    body.append('file', file)
+    body.append('language', 'km')
+    const r = await api<{ message?: string }>(`/api/admin/videos/${videoId}/dubs/upload`, { method: 'POST', body })
+    const warn = !!r.message?.includes('drift')
+    toast.add({
+      title: warn ? 'Saved, but check the length' : 'Khmer voice saved',
+      description: warn ? r.message : 'RuengFlix offers it as "Khmer voice" within a minute.',
+      color: warn ? 'warning' : 'success'
+    })
+    await load()
+  } catch (err) {
+    toast.add({ title: 'Upload failed', description: apiErrorMessage(err), color: 'error' })
+  } finally {
+    dubUploading.value = null
+  }
+}
+
 const episodeColumns: ColumnDef<EpisodeRow>[] = [
   { key: 'number', label: 'Ep.' },
   { key: 'title' },
@@ -311,8 +424,14 @@ async function load() {
   loading.value = true
   error.value = ''
   try {
-    const [d, a, f] = await Promise.all([streaming.detail(id.value), streaming.alerts(id.value), streaming.followers(id.value)])
+    const [d, a, f, fun] = await Promise.all([
+      streaming.detail(id.value),
+      streaming.alerts(id.value),
+      streaming.followers(id.value),
+      streaming.funnel(id.value).catch(() => null)
+    ])
     detail.value = d
+    funnel.value = fun
     alertRows.value = a
     followerRows.value = f
     alertEpisode.value = d.series.episodes || undefined
