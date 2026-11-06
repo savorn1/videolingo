@@ -41,6 +41,12 @@
             >
               <UIcon :name="child.icon" class="w-4 h-4 shrink-0" :class="isActive(child.to) ? accent(item.color).activeIcon : 'text-gray-500'" />
               <span>{{ child.label }}</span>
+              <span
+                v-if="child.count"
+                class="ml-auto min-w-5 h-5 px-1.5 rounded-full bg-red-500 text-white text-[11px] font-semibold leading-5 text-center tabular-nums"
+                :aria-label="child.countLabel ?? `${child.count} waiting`"
+                >{{ child.count > 99 ? '99+' : child.count }}</span
+              >
             </NuxtLink>
           </div>
         </template>
@@ -57,6 +63,7 @@
         >
           <UIcon :name="link.icon" class="w-5 h-5 shrink-0" />
           <span v-if="isActive(link.to)" class="absolute -bottom-0.5 w-1 h-1 rounded-full bg-primary-400" />
+          <span v-if="link.count" class="absolute top-1 right-1 w-2 h-2 rounded-full bg-red-500" :aria-label="link.countLabel ?? `${link.count} waiting`" />
         </NuxtLink>
       </UTooltip>
     </template>
@@ -68,6 +75,10 @@ export interface SidebarLink {
   label: string
   to: string
   icon: string
+  /** Things waiting there (a red badge); hidden when 0 or absent */
+  count?: number
+  /** What the count means, for screen readers ("3 orders waiting") */
+  countLabel?: string
 }
 
 export interface SidebarGroup {

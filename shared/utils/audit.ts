@@ -17,7 +17,8 @@ const NOUNS: Record<string, string> = {
   'processing-jobs': 'processing job',
   ai: 'AI',
   'api-keys': 'API key',
-  webhooks: 'webhook'
+  webhooks: 'webhook',
+  streaming: 'RuengFlix'
 }
 
 const AUTH: Record<string, string> = {
